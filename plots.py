@@ -1,7 +1,4 @@
-
-# coding: utf-8
-
-# In[1]:
+#!/usr/bin/env python3.4
 
 from ROOT import TChain, TH1F, TH2F, gStyle, TCanvas, THStack, TLegend, gPad, TEfficiency, TCut
 from ROOT import TLine, TVector3, TPaveText, TTree, TFile
@@ -16,11 +13,9 @@ nue_cosmic = glob("nue_files/*/*.root")
 chain = TChain("robertoana/pandoratree")
 chain_pot = TChain("robertoana/pot")
 chain_numu = TChain("UBXSec/tree")
-chain_numu_proton = TChain("decisiontreeidana/tree")
 
 chain_nue = TChain("robertoana/pandoratree")
 chain_nue_pot = TChain("robertoana/pot")
-chain_nue_proton = TChain("decisiontreeidana/tree")
 
 gStyle.SetOptStat(0)
 gStyle.SetPalette(87)

@@ -1,16 +1,10 @@
+#!/usr/bin/env python3.4
+
 import ROOT
 from glob import glob
 
 bnb_cosmic = glob("nu_files/*/*.root")
 nue_cosmic = glob("nue_files/*/*.root")
-chain_numu_proton = ROOT.TChain("decisiontreeidana/tree")
-chain_nue_proton = ROOT.TChain("decisiontreeidana/tree")
-
-for f in bnb_cosmic:
-    chain_numu_proton.Add(f)
-
-for f in nue_cosmic:
-    chain_nue_proton.Add(f)
 
 f = ROOT.TFile("kin_file.root")
 t = ROOT.TTree()
