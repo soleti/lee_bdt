@@ -29,12 +29,10 @@ for f in bnb_cosmic:
     chain.Add(f)
     chain_pot.Add(f)
     chain_numu.Add(f)
-    chain_numu_proton.Add(f)
 
 for f in nue_cosmic:
     chain_nue.Add(f)
     chain_nue_pot.Add(f)
-    chain_nue_proton.Add(f)
 
 total_bnb_pot = 0
 for i in range(chain_pot.GetEntries()):
