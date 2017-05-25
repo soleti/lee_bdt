@@ -1,3 +1,6 @@
 *.root
 *.log
 *.vdp
+*.txt
+*.pdf
+*.png
