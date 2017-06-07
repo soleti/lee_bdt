@@ -7,6 +7,8 @@ from array import array
 from glob import glob
 import math
 
+
+
 bnb_cosmic = glob("nu_files/*/*.root")
 nue_cosmic = glob("nue_files/*/*.root")
 
@@ -47,7 +49,7 @@ for i in range(chain_nue_pot.GetEntries()):
 print("Total POT v_e", total_nue_pot)
 
 total_pot = 6.6e20
-
+print(total_nue_pot,total_bnb_pot)
 
 # In[3]:
 
@@ -269,8 +271,11 @@ def fill_kin_branches(root_chain, weight, variables):
     signal = 0
     if root_chain.category == 2: signal = 1
 
+    track_vertex = [root_chain.track_start_x[longest_track_id],root_chain.track_start_y[longest_track_id],root_chain.track_start_z[longest_track_id]]
     shower_vertex = [root_chain.shower_start_x[most_energetic_shower_id],root_chain.shower_start_y[most_energetic_shower_id],root_chain.shower_start_z[most_energetic_shower_id]]
     neutrino_vertex = [root_chain.vx,root_chain.vy,root_chain.vz]
+    true_neutrino_vertex = [root_chain.true_vx_sce,root_chain.true_vy_sce,root_chain.true_vz_sce]
+
     shower_vertex_d = math.sqrt(sum([(s-n)**2 for s,n in zip(shower_vertex,neutrino_vertex)]))
 
     variables["is_signal"][0] = signal
@@ -287,6 +292,8 @@ def fill_kin_branches(root_chain, weight, variables):
     variables["category"][0] = root_chain.category
     variables["event_weight"][0] = weight
     variables["pt"][0] = pt_plot(root_chain)
+    variables["shower_start_x"][0] = root_chain.shower_start_x[most_energetic_shower_id]
+    variables["track_start_x"][0] = root_chain.track_start_x[longest_track_id]
 
     variables["n_tracks"][0] = root_chain.n_tracks
     variables["n_showers"][0] = root_chain.n_showers
@@ -297,6 +304,8 @@ def fill_kin_branches(root_chain, weight, variables):
     variables["event"][0] = root_chain.event
     variables["run"][0] = root_chain.run
     variables["subrun"][0] = root_chain.subrun
+
+    variables["interaction_type"][0] = root_chain.interaction_type
 
 
 # In[6]:
@@ -422,14 +431,17 @@ track_id = array("f", [ 0 ] )
 event = array("f", [0])
 run = array("f", [0])
 subrun = array("f", [0])
-
+shower_start_x = array("f", [0])
+track_start_x = array("f", [0])
 shower_distance = array("f", [0])
+interaction_type = array("f", [0])
 
 variables = {"reco_energy":reco_energy, "track_length":track_length, "track_theta":track_theta, "track_phi":track_phi,
             "shower_theta":shower_theta,"shower_phi":shower_phi,"shower_energy":shower_energy,"shower_z":shower_z,
              "track_z":track_z,"event_weight":event_weight, "category":category,"is_signal":is_signal,"pt":pt,
              "n_tracks":n_tracks, "n_showers":n_showers, "track_shower_angle":track_shower_angle,"track_id":track_id,
-             "event":event,"shower_distance":shower_distance,"run":run,"subrun":subrun}
+             "event":event,"shower_distance":shower_distance,"run":run,"subrun":subrun,"track_start_x":track_start_x,
+             "shower_start_x":shower_start_x,"interaction_type":interaction_type}
 kin_tree = TTree("kin_tree","kin_tree")
 
 for n,b in variables.items():
@@ -447,6 +459,7 @@ for i in range(chain_nue.GetEntries()):
     electrons = sum(1 for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 11)
     photons = sum(1 for i in chain_nue.nu_daughters_pdg if i == 22)
     pions = sum(1 for i in chain_nue.nu_daughters_pdg if abs(i) == 211 or abs(i) == 111)
+
 
     # MEASURE EFFICIENCY
     if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
@@ -516,6 +529,7 @@ for i in range(chain_nue.GetEntries()):
 for i in range(chain.GetEntries()):
     chain.GetEntry(i)
     numu_passed = False
+
 
     if chain.event in numu_selected_events:
         numu_passed = numu_selected_events[chain.event]
