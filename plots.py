@@ -7,10 +7,69 @@ from array import array
 from glob import glob
 import math
 
+def find_interaction(dictionary,interaction):
+    for name,id_int in dictionary.items():
+        if id_int == interaction:
+            return name
+
+interactions = {
+    "kQE":0,
+    "kRes":1,
+    "kDIS":2,
+    "kCoh":3,
+    "kNuanceOffset":1000,
+    "k1eNp":1000+1,
+    "kNCQE":1000+2,
+    "kResCCNuProtonPiPlus":1000+3,
+    "kResCCNuNeutronPi0":1000+4,
+    "kResCCNuNeutronPiPlus":1000+5,
+    "kResNCNuProtonPi0":1000+6,
+    "kResNCNuProtonPiPlus":1000+7,
+    "kResNCNuNeutronPi0":1000+8,
+    "kResNCNuNeutronPiMinus":1000+9,
+    "kResCCNuBarNeutronPiMinus":1000+10,
+    "kResCCNuBarProtonPi0":1000+11,
+    "kResCCNuBarProtonPiMinus":1000+12,
+    "kResNCNuBarProtonPi0":1000+13,
+    "kResNCNuBarProtonPiPlus":1000+14,
+    "kResNCNuBarNeutronPi0":1000+15,
+    "kResNCNuBarNeutronPiMinus":1000+16,
+    "kResCCNuDeltaPlusPiPlus":1000+17,
+    "kResCCNuDelta2PlusPiMinus":1000+21,
+    "kResCCNuBarDelta0PiMinus":1000+28,
+    "kResCCNuBarDeltaMinusPiPlus":1000+32,
+    "kResCCNuProtonRhoPlus":1000+39,
+    "kResCCNuNeutronRhoPlus":1000+41,
+    "kResCCNuBarNeutronRhoMinus":1000+46,
+    "kResCCNuBarNeutronRho0":1000+48,
+    "kResCCNuSigmaPluskaonPlus":1000+53,
+    "kResCCNuSigmaPluskaon0":1000+55,
+    "kResCCNuBarSigmaMinuskaon0":1000+60,
+    "kResCCNuBarSigma0kaon0":1000+62,
+    "kResCCNuProtonEta":1000+67,
+    "kResCCNuBarNeutronEta":1000+70,
+    "kResCCNukaonPlusLambda0":1000+73,
+    "kResCCNuBarkaon0Lambda0":1000+76,
+    "kResCCNuProtonPiPlusPiMinus":1000+79,
+    "kResCCNuProtonPi0Pi0":1000+80,
+    "kResCCNuBarNeutronPiPlusPiMinus":1000+85,
+    "kResCCNuBarNeutronPi0Pi0":1000+86,
+    "kResCCNuBarProtonPi0Pi0":1000+90,
+    "kCCDIS":1000+91,
+    "kNCDIS":1000+92,
+    "kUnUsed1":1000+93,
+    "kUnUsed2":1000+94,
+    "k1eNpHyperon":1000+95,
+    "kNCCOH":1000+96,
+    "kCCCOH":1000+97,
+    "kNuElectronElastic":1000+98,
+    "kInverseMuDecay":1000+99
+}
 
 
-bnb_cosmic = glob("nu_files/*/*.root")
-nue_cosmic = glob("nue_files/*/*.root")
+bnb_cosmic = glob("nu_files_fidvol/*/*.root")
+nue_cosmic = glob("nue_files_fidvol/*/*.root")
+data_bnb = glob("data_files_bnb/*/*.root")
 
 chain = TChain("robertoana/pandoratree")
 chain_pot = TChain("robertoana/pot")
@@ -19,18 +78,23 @@ chain_numu = TChain("UBXSec/tree")
 chain_nue = TChain("robertoana/pandoratree")
 chain_nue_pot = TChain("robertoana/pot")
 
+chain_data_bnb = TChain("robertoana/pandoratree")
+chain_data_bnb_pot = TChain("robertoana/pot")
+chain_data_bnb_numu = TChain("UBXSec/tree")
+
 gStyle.SetOptStat(0)
 gStyle.SetPalette(87)
 gStyle.SetNumberContours(99)
-
-
-# In[2]:
-
 
 for f in bnb_cosmic:
     chain.Add(f)
     chain_pot.Add(f)
     chain_numu.Add(f)
+
+for f in data_bnb:
+    chain_data_bnb.Add(f)
+    chain_data_bnb_pot.Add(f)
+    chain_data_bnb_numu.Add(f)
 
 for f in nue_cosmic:
     chain_nue.Add(f)
@@ -48,21 +112,25 @@ for i in range(chain_nue_pot.GetEntries()):
     total_nue_pot += chain_nue_pot.pot
 print("Total POT v_e", total_nue_pot)
 
+total_data_bnb_pot = 0
+for i in range(chain_data_bnb_pot.GetEntries()):
+    chain_data_bnb_pot.GetEntry(i)
+    total_data_bnb_pot += chain_data_bnb_pot.pot
+print("Total data BNB POT", total_data_bnb_pot)
+
 total_pot = 6.6e20
-print(total_nue_pot,total_bnb_pot)
-
-# In[3]:
-
 
 numu_selected_events = {}
 for i in range(chain_numu.GetEntries()):
     chain_numu.GetEntry(i)
     numu_selected_events[chain_numu.event] = chain_numu.muon_is_reco
 
+numu_selected_events_data = {}
+for i in range(chain_data_bnb_numu.GetEntries()):
+    chain_data_bnb_numu.GetEntry(i)
+    numu_selected_events_data[chain_data_bnb_numu.event] = chain_data_bnb_numu.muon_is_reco
 
-# In[4]:
-
-
+h_n_candidates = TH1F("h_n_candidates",";# candidates;N. Entries / 1",5,0,5)
 h_true_reco_e = TH2F("h_true_reco_e",";True energy [GeV];Reco. energy [GeV]",18,0.2,2,18,0.2,2)
 h_diff = TH1F("h_diff",";(True energy - Reco. energy)/True energy;N.Entries / 0.1 GeV", 30,-1,2)
 
@@ -199,12 +267,12 @@ h_pt_dirt = TH1F("h_pt_dirt",";p_{t} [GeV/c^{2}];N. Entries / 0.1 GeV/c^{2}", 10
 
 h_pts = [h_pt_other,h_pt_cosmic,h_pt_nu_e,h_pt_nu_mu,h_pt_nc,h_pt_dirt]
 
-h_distance_other = TH1F("h_distance_other",";Distance [cm];N. Entries / 10 cm", 80,0,800)
-h_distance_cosmic = TH1F("h_distance_cosmic",";Distance [cm];N. Entries / 10 cm", 80,0,800)
-h_distance_nu_e = TH1F("h_distance_nu_e",";Distance [cm];N. Entries / 10 cm", 80,0,800)
-h_distance_nu_mu = TH1F("h_distance_nu_mu",";Distance [cm];N. Entries / 10 cm", 80,0,800)
-h_distance_nc = TH1F("h_distance_nc",";Distance [cm];N. Entries / 10 cm", 80,0,800)
-h_distance_dirt = TH1F("h_distance_dirt",";Distance [cm];N. Entries / 10 cm", 80,0,800)
+h_distance_other = TH1F("h_distance_other",";Distance [cm];N. Entries / 10 cm", 100,0,100)
+h_distance_cosmic = TH1F("h_distance_cosmic",";Distance [cm];N. Entries / 10 cm", 100,0,100)
+h_distance_nu_e = TH1F("h_distance_nu_e",";Distance [cm];N. Entries / 10 cm", 100,0,100)
+h_distance_nu_mu = TH1F("h_distance_nu_mu",";Distance [cm];N. Entries / 10 cm", 100,0,100)
+h_distance_nc = TH1F("h_distance_nc",";Distance [cm];N. Entries / 10 cm", 100,0,100)
+h_distance_dirt = TH1F("h_distance_dirt",";Distance [cm];N. Entries / 10 cm", 100,0,100)
 
 h_distances = [h_distance_other,h_distance_cosmic,h_distance_nu_e,h_distance_nu_mu,h_distance_nc,h_distance_dirt]
 
@@ -234,24 +302,18 @@ description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_
 l_energy = TLegend(0.48,0.55,0.84,0.84)
 l_plots = TLegend(0.48,0.55,0.84,0.84)
 
-passed = 0
-total = 0
-perfect = 0
-evt_shower = 0
-evt_track = 0
-perfect_tracks = 0
-perfect_showers = 0
-flash_passed = 0
-no_photons = 0
-
-
-# In[5]:
 
 def fill_kin_branches(root_chain, weight, variables):
     longest_track = 0
     longest_track_id = 0
-
+    most_proton_track_id = 0
+    most_proton_track = 0
+    most_proton_track_length = 0
     for itrk in range(root_chain.n_tracks):
+        if root_chain.predict_p[itrk] > most_proton_track:
+            most_proton_track = root_chain.predict_p[itrk]
+            most_proton_track_id = itrk
+            most_proton_track_length = root_chain.track_len[itrk]
         if root_chain.track_len[itrk] > longest_track:
             longest_track = root_chain.track_len[itrk]
             longest_track_id = itrk
@@ -259,9 +321,10 @@ def fill_kin_branches(root_chain, weight, variables):
     most_energetic_shower = 0
     most_energetic_shower_id = 0
     for ish in range(root_chain.n_showers):
-        if root_chain.shower_energy[ish] > most_energetic_shower:
-            most_energetic_shower = root_chain.shower_energy[ish]
-            most_energetic_shower_id = ish
+        if root_chain.shower_energy[ish] < 3:
+            if root_chain.shower_energy[ish] > most_energetic_shower:
+                most_energetic_shower = root_chain.shower_energy[ish]
+                most_energetic_shower_id = ish
 
 
     v_track = TVector3(root_chain.track_dir_x[longest_track_id],root_chain.track_dir_y[longest_track_id],root_chain.track_dir_z[longest_track_id])
@@ -277,38 +340,42 @@ def fill_kin_branches(root_chain, weight, variables):
     true_neutrino_vertex = [root_chain.true_vx_sce,root_chain.true_vy_sce,root_chain.true_vz_sce]
 
     shower_vertex_d = math.sqrt(sum([(s-n)**2 for s,n in zip(shower_vertex,neutrino_vertex)]))
+    track_vertex_d = math.sqrt(sum([(t-n)**2 for t,n in zip(track_vertex,neutrino_vertex)]))
 
     variables["is_signal"][0] = signal
-    variables["track_length"][0] = longest_track
-    variables["track_phi"][0] = root_chain.track_phi[longest_track_id]
-    variables["track_theta"][0] = root_chain.track_theta[longest_track_id]
-    variables["track_z"][0] = root_chain.track_dir_z[longest_track_id]
+    variables["track_length"][0] = most_proton_track_length
+    variables["track_phi"][0] = root_chain.track_phi[most_proton_track_id]
+    variables["track_theta"][0] = root_chain.track_theta[most_proton_track_id]
     variables["shower_energy"][0] = most_energetic_shower
     variables["shower_theta"][0] = root_chain.shower_theta[most_energetic_shower_id]
     variables["shower_phi"][0] = root_chain.shower_phi[most_energetic_shower_id]
-    variables["shower_z"][0] = root_chain.shower_dir_z[most_energetic_shower_id]
     variables["shower_distance"][0] = shower_vertex_d
+    variables["track_distance"][0] = track_vertex_d
+
+    variables["track_start_x"][0] = root_chain.track_start_x[most_proton_track_id]
+    variables["track_end_x"][0] = root_chain.track_end_x[most_proton_track_id]
+
+    variables["track_start_y"][0] = root_chain.track_start_y[most_proton_track_id]
+    variables["track_end_y"][0] = root_chain.track_end_y[most_proton_track_id]
+
+    variables["track_start_z"][0] = root_chain.track_start_z[most_proton_track_id]
+    variables["track_end_z"][0] = root_chain.track_end_z[most_proton_track_id]
+
     variables["reco_energy"][0] = root_chain.E
     variables["category"][0] = root_chain.category
     variables["event_weight"][0] = weight
     variables["pt"][0] = pt_plot(root_chain)
-    variables["shower_start_x"][0] = root_chain.shower_start_x[most_energetic_shower_id]
-    variables["track_start_x"][0] = root_chain.track_start_x[longest_track_id]
 
     variables["n_tracks"][0] = root_chain.n_tracks
     variables["n_showers"][0] = root_chain.n_showers
-    variables["track_id"][0] = root_chain.track_id[longest_track_id]
-
     variables["track_shower_angle"][0] = costheta_shower_track
 
     variables["event"][0] = root_chain.event
     variables["run"][0] = root_chain.run
     variables["subrun"][0] = root_chain.subrun
-
+    variables["proton_score"][0] = root_chain.predict_p[most_proton_track_id]
     variables["interaction_type"][0] = root_chain.interaction_type
 
-
-# In[6]:
 
 def kin_plot(root_chain, weight):
     h_n_trackss[root_chain.category].Fill(root_chain.n_tracks)
@@ -334,14 +401,16 @@ def kin_plot(root_chain, weight):
     h_pts[root_chain.category].Fill(pt_plot(root_chain), weight)
 
     costheta_plot(root_chain, weight)
+    neutrino_vertex = [root_chain.vx,root_chain.vy,root_chain.vz]
 
     for itrk in range(root_chain.n_tracks):
         h_track_thetas[root_chain.category].Fill(math.degrees(root_chain.track_theta[itrk]), weight)
         h_track_phis[root_chain.category].Fill(math.degrees(root_chain.track_phi[itrk]), weight)
         h_trklens[root_chain.category].Fill(root_chain.track_len[itrk], weight)
         h_trkzs[root_chain.category].Fill(root_chain.track_dir_z[itrk], weight)
-
-    neutrino_vertex = [root_chain.vx,root_chain.vy,root_chain.vz]
+        track_vertex = [root_chain.track_start_x[itrk],root_chain.track_start_y[itrk],root_chain.track_start_z[itrk]]
+        track_vertex_d = math.sqrt(sum([(s-n)**2 for s,n in zip(track_vertex,neutrino_vertex)]))
+        h_distances[root_chain.category].Fill(track_vertex_d)
 
     for ish in range(root_chain.n_showers):
         h_thetas[root_chain.category].Fill(math.degrees(root_chain.shower_theta[ish]), weight)
@@ -352,9 +421,6 @@ def kin_plot(root_chain, weight):
         h_distances[root_chain.category].Fill(shower_vertex_d)
 
     h_shower_es[root_chain.category].Fill(sum([root_chain.shower_energy[ish] for ish in range(root_chain.n_showers)]), weight)
-
-
-# In[7]:
 
 
 def costheta_plot(root_chain, weight=1):
@@ -375,15 +441,13 @@ def costheta_plot(root_chain, weight=1):
             h_costhetas[root_chain.category].Fill(costheta, weight)
 
 
-# In[8]:
-
-
 def pt_plot(root_chain):
     p_showers = []
     for ish in range(root_chain.n_showers):
         if root_chain.shower_energy[ish] > 0:
             p_vector = TVector3(root_chain.shower_dir_x[ish],root_chain.shower_dir_y[ish],root_chain.shower_dir_z[ish])
-            p_vector.SetMag(math.sqrt((root_chain.shower_energy[ish]+0.052)**2-0.052**2))
+            if (root_chain.shower_energy[ish] < 10):
+                p_vector.SetMag(math.sqrt((root_chain.shower_energy[ish]+0.052)**2-0.052**2))
             p_showers.append(p_vector)
 
     p_tracks = []
@@ -409,48 +473,87 @@ def pt_plot(root_chain):
     return pt
 
 
-# In[9]:
-
 is_signal = array("f", [ 0 ] )
 reco_energy = array("f", [ 0 ] )
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
 track_phi = array("f", [ 0 ] )
-track_z = array("f", [ 0 ] )
+
 shower_theta = array("f", [ 0 ] )
 shower_phi = array("f", [ 0 ] )
 shower_energy = array("f", [ 0 ] )
-shower_z = array("f", [ 0 ] )
+
 event_weight = array("f", [ 0 ] )
 category = array("f", [ 0 ] )
 pt = array("f", [ 0 ] )
 n_tracks = array("f", [ 0 ] )
 n_showers = array("f", [ 0 ] )
 track_shower_angle = array("f", [ 0 ] )
-track_id = array("f", [ 0 ] )
 event = array("f", [0])
 run = array("f", [0])
 subrun = array("f", [0])
-shower_start_x = array("f", [0])
-track_start_x = array("f", [0])
 shower_distance = array("f", [0])
 interaction_type = array("f", [0])
+proton_score = array("f", [0])
 
-variables = {"reco_energy":reco_energy, "track_length":track_length, "track_theta":track_theta, "track_phi":track_phi,
-            "shower_theta":shower_theta,"shower_phi":shower_phi,"shower_energy":shower_energy,"shower_z":shower_z,
-             "track_z":track_z,"event_weight":event_weight, "category":category,"is_signal":is_signal,"pt":pt,
-             "n_tracks":n_tracks, "n_showers":n_showers, "track_shower_angle":track_shower_angle,"track_id":track_id,
-             "event":event,"shower_distance":shower_distance,"run":run,"subrun":subrun,"track_start_x":track_start_x,
-             "shower_start_x":shower_start_x,"interaction_type":interaction_type}
+track_distance = array("f", [0])
+track_start_y = array("f", [0])
+track_end_y = array("f", [0])
+track_start_x = array("f", [0])
+track_end_x = array("f", [0])
+track_start_z = array("f", [0])
+track_end_z = array("f", [0])
+
+variables = {"reco_energy":reco_energy,
+    "track_length":track_length,
+    "track_theta":track_theta,
+    "track_phi":track_phi,
+    "shower_theta":shower_theta,
+    "shower_phi":shower_phi,
+    "shower_energy":shower_energy,
+    "event_weight":event_weight,
+    "category":category,
+    "is_signal":is_signal,
+    "pt":pt,
+    "n_tracks":n_tracks,
+    "n_showers":n_showers,
+    "track_shower_angle":track_shower_angle,
+    "event":event,
+    "shower_distance":shower_distance,
+    "run":run,
+    "subrun":subrun,
+    "interaction_type":interaction_type,
+    "proton_score":proton_score,
+    "track_distance":track_distance,
+    "track_start_y":track_start_y,
+    "track_end_y":track_end_y,
+    "track_start_x":track_start_x,
+    "track_end_x":track_end_x,
+    "track_start_z":track_start_z,
+    "track_end_z":track_end_z
+}
+
 kin_tree = TTree("kin_tree","kin_tree")
+
+data_tree = TTree("data_tree","data_tree")
 
 for n,b in variables.items():
     kin_tree.Branch(n,b,n+"/f")
+    data_tree.Branch(n,b,n+"/f")
 
-
-
-# In[ ]:
-
+passed = 0
+is_fiducial = 0
+perfect = 0
+evt_shower = 0
+evt_track = 0
+perfect_tracks = 0
+perfect_showers = 0
+flash_passed = 0
+eNp = 0
+not_passed = 0
+yesshower_notrack = 0
+noshower_yestrack = 0
+noshower_notrack = 0
 # NU_E INTRINSIC + COSMIC SAMPLE
 for i in range(chain_nue.GetEntries()):
     chain_nue.GetEntry(i)
@@ -462,37 +565,58 @@ for i in range(chain_nue.GetEntries()):
 
 
     # MEASURE EFFICIENCY
-    if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
-        no_photons+=1
-        p = False
-        p_track = False
-        p_shower = False
+    if chain_nue.true_nu_is_fiducial:
+        is_fiducial += 1
 
-        if protons == chain_nue.n_tracks and chain_nue.n_tracks == chain_nue.nu_matched_tracks: p_track = True
+        if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
+            eNp+=1
+            p = False
+            p_track = False
+            p_shower = False
 
-        if electrons == chain_nue.n_showers and chain_nue.n_showers == chain_nue.nu_matched_showers: p_shower = True
+            if protons == chain_nue.n_tracks and chain_nue.n_tracks == chain_nue.nu_matched_tracks: p_track = True
 
-        if p_track and p_shower:
-            p = True
+            if electrons == chain_nue.n_showers and chain_nue.n_showers == chain_nue.nu_matched_showers: p_shower = True
 
-        if chain_nue.true_nu_is_fiducial:
-            total += 1
+            if p_track and p_shower:
+                p = True
+
+
+            proton_energy = max([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if pdg == 2212])
+            electron_energy = max([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 11])
 
             if chain_nue.flash_passed:
                 flash_passed += 1
 
-            if chain_nue.shower_passed > 0:
-                evt_shower += 1
-                if chain_nue.track_passed > 0:
-                    evt_track += 1
+                if chain_nue.shower_passed > 0:
+                    evt_shower += 1
+
+                    if chain_nue.track_passed > 0:
+                        evt_track += 1
+                            # if not chain_nue.passed:
+                            #     print(chain_nue.n_tracks, chain_nue.n_showers)
+                            #     print("nu_e",chain_nue.run,chain_nue.subrun,chain_nue.event)
+
+            if chain_nue.passed:
+                passed+=1
+            else:
+                not_passed+=1
+                if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
+                    yesshower_notrack += 1
+                if chain_nue.track_passed > 0 and chain_nue.shower_passed <= 0:
+                    noshower_yestrack += 1
+                if chain_nue.flash_passed and chain_nue.track_passed <= 0 and chain_nue.shower_passed <= 0:
+                    noshower_notrack += 1
+
 
             if p_shower:
                 perfect_showers += 1
             if p_track:
                 perfect_tracks += 1
 
-            passed+=1
             if p: perfect += 1
+
+
 
             e_energy_track.Fill(chain_nue.passed and p_track, chain_nue.nu_E)
             e_energy_shower.Fill(chain_nue.passed and p_shower, chain_nue.nu_E)
@@ -506,6 +630,7 @@ for i in range(chain_nue.GetEntries()):
         h_vx_diff_cut.Fill(chain_nue.vx-chain_nue.true_vx_sce)
         h_vy_diff_cut.Fill(chain_nue.vy-chain_nue.true_vy_sce)
         h_vz_diff_cut.Fill(chain_nue.vz-chain_nue.true_vz_sce)
+        h_n_candidates.Fill(chain_nue.n_candidates)
 
         if chain_nue.category != 1:
             h_diff.Fill((chain_nue.nu_E-chain_nue.E)/chain_nue.nu_E)
@@ -513,7 +638,7 @@ for i in range(chain_nue.GetEntries()):
 
         proton = True
         for itrk in range(chain_nue.n_tracks):
-            if chain_nue.predict_p[itrk] < 0.5:
+            if chain_nue.predict_p[itrk] < -0.75:
                 proton = False
                 break
 
@@ -523,23 +648,18 @@ for i in range(chain_nue.GetEntries()):
             kin_tree.Fill()
 
 
-# In[ ]:
-
 # BNB + COSMIC SAMPLE
 for i in range(chain.GetEntries()):
     chain.GetEntry(i)
     numu_passed = False
 
-
     if chain.event in numu_selected_events:
         numu_passed = numu_selected_events[chain.event]
-
-
 
     if chain.passed and not numu_passed and abs(chain.nu_pdg) != 12:
         proton = True
         for itrk in range(chain.n_tracks):
-            if chain.predict_p[itrk] < 0.5:
+            if chain.predict_p[itrk] < -0.75:
                 proton = False
                 break
 
@@ -547,27 +667,37 @@ for i in range(chain.GetEntries()):
             kin_plot(chain, total_pot/total_bnb_pot)
             fill_kin_branches(chain, total_pot/total_bnb_pot, variables)
             kin_tree.Fill()
+            h_n_candidates.Fill(chain.n_candidates)
 
+for i in range(chain_data_bnb.GetEntries()):
+    chain_data_bnb.GetEntry(i)
+    numu_passed = False
 
-# In[ ]:
+    if chain_data_bnb.event in numu_selected_events_data:
+        numu_passed = numu_selected_events_data[chain_data_bnb.event]
+
+    if chain_data_bnb.passed and not numu_passed:
+        fill_kin_branches(chain_data_bnb,1,variables)
+        data_tree.Fill()
+
 
 kin_file = TFile("kin_file.root", "RECREATE")
 kin_tree.Write()
 kin_file.Close()
 
-print(no_photons)
+data_file = TFile("data_file.root", "RECREATE")
+data_tree.Write()
+data_file.Close()
+
 print("Entries", chain_nue.GetEntries())
-print("Is fiducial", total)
-print("Flash passed", total)
-print("At least 1 shower", evt_shower)
-print("At least 1 track", evt_track)
-print("Perfect showers", perfect_showers)
-print("Perfect tracks", perfect_tracks)
-
-print (passed, perfect, total)
-
-
-# In[ ]:
+print("Is fiducial", is_fiducial)
+print("1eNp + Is fiducial",eNp)
+print("1eNp + Is fiducial + Flash passed", flash_passed)
+print("1eNp + Is fiducial + Flash passed + At least 1 shower", evt_shower)
+print("1eNp + Is fiducial + Flash passed + At least 1 shower + At least 1 track", evt_track)
+print("Passed", passed*total_pot/total_nue_pot)
+print("Perfect showers", perfect_showers*total_pot/total_nue_pot)
+print("Perfect tracks", perfect_tracks*total_pot/total_nue_pot)
 
 
 for i,histo in enumerate(h_energies):
@@ -576,17 +706,6 @@ for i,histo in enumerate(h_energies):
     histo.SetFillColor(colors[i])
     h_energy.Add(histo)
     l_energy.AddEntry(histo, "%s: %.0f events" % (description[i], histo.Integral(3,20)), "f")
-
-
-
-# In[ ]:
-
-bkg = sum([h.Integral() for h in h_energies if h != h_nu_e])
-print("Signal/background",h_nu_e.Integral()/bkg)
-
-
-# In[ ]:
-
 
 for i,kind in enumerate(kinematic_plots):
     for j,histo in enumerate(kind):
@@ -601,11 +720,6 @@ for i,kind in enumerate(kinematic_plots):
         elif i == 0 and j != 5:
             l_plots.AddEntry(histo, "%s" % description[j], "l")
 
-
-
-# In[ ]:
-
-
 pt = TPaveText(0.1,0.91,0.60,0.97, "ndc")
 pt.AddText("MicroBooNE Preliminary 6.6e20 POT")
 pt.SetFillColor(0)
@@ -618,22 +732,17 @@ pt2.SetFillColor(0)
 pt2.SetBorderSize(0)
 pt2.SetShadowColor(0)
 
-
-# In[ ]:
-
-
 c_energy = TCanvas("c_energy")
-h_energy.Draw("hist")
-h_energy.GetXaxis().SetRangeUser(0.2,2)
-l_energy.Draw()
+e_energy.Draw("apl")
+e_energy.SetMarkerStyle(20)
+e_energy.SetLineColor(kRed+1)
+#e_energy.GetXaxis().SetRangeUser(0.2,2)
+#l_energy.Draw()
+e_energy.SaveAs("eff_new.root")
 c_energy.Update()
 pt.Draw()
 c_energy.SaveAs("plots/energy.pdf")
 c_energy.Draw()
-
-
-# In[ ]:
-
 
 c_reco_true = TCanvas("c_reco_true")
 h_true_reco_e.Draw("colz")
@@ -647,16 +756,9 @@ pt2.Draw()
 c_reco_true.SaveAs("plots/reco_true.pdf")
 c_reco_true.Draw()
 
-
-# In[ ]:
-
-
 c_plots=[]
 for i,kind in enumerate(kinematic_plots):
     c_plots.append(TCanvas("c_plot"+str(i)))
-
-
-# In[ ]:
 
 for i,kind in enumerate(kinematic_plots):
     c_plots[i].cd()
@@ -671,11 +773,8 @@ for i,kind in enumerate(kinematic_plots):
     c_plots[i].SaveAs("plots/c%i.pdf"%i)
     c_plots[i].Draw()
 
+c_candidates = TCanvas("c_candidates")
+h_n_candidates.Draw()
+c_candidates.Update()
+
 input()
-
-# In[ ]:
-
-
-
-
-# In[ ]:
