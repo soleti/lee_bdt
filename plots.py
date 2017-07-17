@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.4
 
-from ROOT import TChain, TH1F, TH2F, gStyle, TCanvas, THStack, TLegend, gPad, TEfficiency, TCut
+from ROOT import TChain, TH1F, TH2F, gStyle, TCanvas, THStack, TLegend, gPad, TCut
 from ROOT import TLine, TVector3, TPaveText, TTree, TFile
 from ROOT import kRed, kGreen, kBlue, kOrange, kGray
 from array import array
@@ -133,11 +133,6 @@ for i in range(chain_data_bnb_numu.GetEntries()):
 h_n_candidates = TH1F("h_n_candidates",";# candidates;N. Entries / 1",5,0,5)
 h_true_reco_e = TH2F("h_true_reco_e",";True energy [GeV];Reco. energy [GeV]",18,0.2,2,18,0.2,2)
 h_diff = TH1F("h_diff",";(True energy - Reco. energy)/True energy;N.Entries / 0.1 GeV", 30,-1,2)
-
-e_energy = TEfficiency("e_energy",";#nu_{e} energy [GeV];Efficiency",20,0,2)
-e_energy_perfect = TEfficiency("e_energy_perfect",";#nu_{e} energy [GeV];Efficiency",20,0,2)
-e_energy_track = TEfficiency("e_energy_track",";#nu_{e} energy [GeV];Efficiency",20,0,2)
-e_energy_shower = TEfficiency("e_energy_shower",";#nu_{e} energy [GeV];Efficiency",20,0,2)
 
 h_vx_diff = TH1F("h_vx_diff",";#Deltax [cm];N.Entries / 0.5 cm",80,-20,20)
 h_vy_diff = TH1F("h_vy_diff",";#Deltay [cm];N.Entries / 0.5 cm",80,-20,20)
@@ -541,87 +536,9 @@ for n,b in variables.items():
     kin_tree.Branch(n,b,n+"/f")
     data_tree.Branch(n,b,n+"/f")
 
-passed = 0
-is_fiducial = 0
-perfect = 0
-evt_shower = 0
-evt_track = 0
-perfect_tracks = 0
-perfect_showers = 0
-flash_passed = 0
-eNp = 0
-not_passed = 0
-yesshower_notrack = 0
-noshower_yestrack = 0
-noshower_notrack = 0
 # NU_E INTRINSIC + COSMIC SAMPLE
 for i in range(chain_nue.GetEntries()):
     chain_nue.GetEntry(i)
-
-    protons = sum(1 for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 2212)
-    electrons = sum(1 for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 11)
-    photons = sum(1 for i in chain_nue.nu_daughters_pdg if i == 22)
-    pions = sum(1 for i in chain_nue.nu_daughters_pdg if abs(i) == 211 or abs(i) == 111)
-
-
-    # MEASURE EFFICIENCY
-    if chain_nue.true_nu_is_fiducial:
-        is_fiducial += 1
-
-        if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
-            eNp+=1
-            p = False
-            p_track = False
-            p_shower = False
-
-            if protons == chain_nue.n_tracks and chain_nue.n_tracks == chain_nue.nu_matched_tracks: p_track = True
-
-            if electrons == chain_nue.n_showers and chain_nue.n_showers == chain_nue.nu_matched_showers: p_shower = True
-
-            if p_track and p_shower:
-                p = True
-
-
-            proton_energy = max([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if pdg == 2212])
-            electron_energy = max([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 11])
-
-            if chain_nue.flash_passed:
-                flash_passed += 1
-
-                if chain_nue.shower_passed > 0:
-                    evt_shower += 1
-
-                    if chain_nue.track_passed > 0:
-                        evt_track += 1
-                            # if not chain_nue.passed:
-                            #     print(chain_nue.n_tracks, chain_nue.n_showers)
-                            #     print("nu_e",chain_nue.run,chain_nue.subrun,chain_nue.event)
-
-            if chain_nue.passed:
-                passed+=1
-            else:
-                not_passed+=1
-                if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
-                    yesshower_notrack += 1
-                if chain_nue.track_passed > 0 and chain_nue.shower_passed <= 0:
-                    noshower_yestrack += 1
-                if chain_nue.flash_passed and chain_nue.track_passed <= 0 and chain_nue.shower_passed <= 0:
-                    noshower_notrack += 1
-
-
-            if p_shower:
-                perfect_showers += 1
-            if p_track:
-                perfect_tracks += 1
-
-            if p: perfect += 1
-
-
-
-            e_energy_track.Fill(chain_nue.passed and p_track, chain_nue.nu_E)
-            e_energy_shower.Fill(chain_nue.passed and p_shower, chain_nue.nu_E)
-            e_energy.Fill(chain_nue.passed, chain_nue.nu_E)
-            e_energy_perfect.Fill(chain_nue.passed and p, chain_nue.nu_E)
 
     if chain_nue.passed:
         h_vx_diff.Fill(chain_nue.vx-chain_nue.true_vx)
@@ -669,6 +586,7 @@ for i in range(chain.GetEntries()):
             kin_tree.Fill()
             h_n_candidates.Fill(chain.n_candidates)
 
+print("Data entries", chain_data_bnb.GetEntries())
 for i in range(chain_data_bnb.GetEntries()):
     chain_data_bnb.GetEntry(i)
     numu_passed = False
@@ -688,17 +606,6 @@ kin_file.Close()
 data_file = TFile("data_file.root", "RECREATE")
 data_tree.Write()
 data_file.Close()
-
-print("Entries", chain_nue.GetEntries())
-print("Is fiducial", is_fiducial)
-print("1eNp + Is fiducial",eNp)
-print("1eNp + Is fiducial + Flash passed", flash_passed)
-print("1eNp + Is fiducial + Flash passed + At least 1 shower", evt_shower)
-print("1eNp + Is fiducial + Flash passed + At least 1 shower + At least 1 track", evt_track)
-print("Passed", passed*total_pot/total_nue_pot)
-print("Perfect showers", perfect_showers*total_pot/total_nue_pot)
-print("Perfect tracks", perfect_tracks*total_pot/total_nue_pot)
-
 
 for i,histo in enumerate(h_energies):
     histo.SetLineColor(1)
@@ -732,17 +639,6 @@ pt2.SetFillColor(0)
 pt2.SetBorderSize(0)
 pt2.SetShadowColor(0)
 
-c_energy = TCanvas("c_energy")
-e_energy.Draw("apl")
-e_energy.SetMarkerStyle(20)
-e_energy.SetLineColor(kRed+1)
-#e_energy.GetXaxis().SetRangeUser(0.2,2)
-#l_energy.Draw()
-e_energy.SaveAs("eff_new.root")
-c_energy.Update()
-pt.Draw()
-c_energy.SaveAs("plots/energy.pdf")
-c_energy.Draw()
 
 c_reco_true = TCanvas("c_reco_true")
 h_true_reco_e.Draw("colz")
