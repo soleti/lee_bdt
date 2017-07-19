@@ -1,9 +1,11 @@
 #!/usr/bin/env python3.4
 
 import ROOT
-from array import array
-f_data = ROOT.TFile("data_file.root")
-t_data = f_data.Get("data_tree")
+import math
+from bdt_common import binning, labels, variables, spectators, bdt_cut
+
+f_data = ROOT.TFile("bnb_file.root")
+t_data = f_data.Get("bnb_tree")
 
 ROOT.TMVA.Tools.Instance()
 reader = ROOT.TMVA.Reader(":".join([
@@ -11,100 +13,78 @@ reader = ROOT.TMVA.Reader(":".join([
     "!Silent",
     "Color",]))
 
-track_length = array("f", [ 0 ] )
-track_theta = array("f", [ 0 ] )
-track_phi = array("f", [ 0 ] )
-track_z = array("f", [ 0 ] )
-shower_theta = array("f", [ 0 ] )
-shower_phi = array("f", [ 0 ] )
-shower_energy = array("f", [ 0 ] )
-shower_z = array("f", [ 0 ] )
-pt = array("f", [ 0 ] )
-n_tracks = array("f", [ 0 ] )
-n_showers = array("f", [ 0 ] )
-track_shower_angle = array("f", [ 0 ] )
-track_id = array("f", [ 0 ] )
-shower_start_x = array("f", [0])
-track_start_x = array("f", [0])
-shower_distance = array("f", [0])
-proton_score = array("f", [0])
-track_distance = array("f", [0])
-track_start_y = array("f", [0])
-track_end_y = array("f", [0])
-track_start_x = array("f", [0])
-track_end_x = array("f", [0])
-track_start_z = array("f", [0])
-track_end_z = array("f", [0])
 
-reco_energy = array("f", [ 0 ] )
-event_weight = array("f", [ 0 ] )
-category = array("f", [ 0 ] )
-event = array("f", [0])
-run = array("f", [0])
-subrun = array("f", [0])
-interaction_type = array("f", [0])
-
-t_data.SetBranchAddress("track_length", track_length)
-t_data.SetBranchAddress("track_theta",track_theta)
-t_data.SetBranchAddress("track_phi",track_phi)
-t_data.SetBranchAddress("shower_energy",shower_energy)
-t_data.SetBranchAddress("shower_theta",shower_theta)
-t_data.SetBranchAddress("shower_phi",shower_phi)
-t_data.SetBranchAddress("pt",pt)
-t_data.SetBranchAddress("n_tracks",n_tracks)
-t_data.SetBranchAddress("n_showers",n_showers)
-t_data.SetBranchAddress("track_shower_angle",track_shower_angle)
-t_data.SetBranchAddress("proton_score",proton_score)
-t_data.SetBranchAddress("shower_distance",shower_distance)
-t_data.SetBranchAddress("track_distance",track_distance)
-t_data.SetBranchAddress("track_start_y",track_start_y)
-t_data.SetBranchAddress("track_end_y",track_end_y)
-t_data.SetBranchAddress("track_start_x",track_start_x)
-t_data.SetBranchAddress("track_end_x",track_end_x)
-t_data.SetBranchAddress("track_start_z",track_start_z)
-t_data.SetBranchAddress("track_end_z",track_end_z)
-
-variables = [
-    ("track_length",track_length),
-    ("track_theta",track_theta),
-    ("track_phi",track_phi),
-    ("shower_energy",shower_energy),
-    ("shower_theta",shower_theta),
-    ("shower_phi",shower_phi),
-    ("pt",pt),
-    ("n_tracks",n_tracks),
-    ("n_showers",n_showers),
-    ("track_shower_angle",track_shower_angle),
-    ("proton_score",proton_score),
-    ("shower_distance",shower_distance),
-    ("track_distance",track_distance),
-    ("track_start_y",track_start_y),
-    ("track_end_y",track_end_y),
-    ("track_start_x",track_start_x),
-    ("track_end_x",track_end_x),
-    ("track_start_z",track_start_z),
-    ("track_end_z",track_end_z)
-]
+for name, var in variables:
+    t_data.SetBranchAddress(name, var)
 
 for name, var in variables:
     reader.AddVariable(name, var)
-
-spectators = [
-    ("reco_energy", reco_energy),
-    ("category", category),
-    ("event_weight", event_weight),
-    ("event", event),
-    ("run", run),
-    ("subrun", subrun),
-    ("interaction_type", interaction_type)
-]
 
 for name, var in spectators:
     reader.AddSpectator(name, var)
 
 reader.BookMVA("BDT method","dataset/weights/TMVAClassification_BDT.weights.xml")
+description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
+
+variables_dict = dict(variables)
+
+histograms = []
+
+for i,n in enumerate(variables_dict.keys()):
+    #h = ROOT.TH1F(n,labels[i],binning[i][0],binning[i][1],binning[i][2])
+    h = ROOT.TH1F("h_"+n,labels[n],binning[n][0],binning[n][1],binning[n][2])
+    histograms.append(h)
+
+histo_dict = dict(zip(variables_dict.keys(),histograms))
+
 
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
-    print(BDT_response)
+
+    if BDT_response > bdt_cut:
+
+        for name, var in variables:
+            histo_dict[name].Fill(var[0], t_data.event_weight)
+
+
+histograms_mc = []
+for h in histograms:
+    mc_file = ROOT.TFile("%s.root" % h.GetName())
+    histograms_mc.append(ROOT.gDirectory.Get(h.GetName()))
+    mc_file.Close()
+
+legend = ROOT.TLegend(0.455,0.53,0.70,0.85)
+legend.SetTextSize(16)
+
+for j in range(histograms_mc[0].GetNhists()):
+    legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
+
+legend.AddEntry(histograms[0], "Data BNB - BNB EXT shape normalized", "lep")
+
+pt = ROOT.TPaveText(0.09,0.91,0.60,0.97, "ndc")
+pt.AddText("MicroBooNE Preliminary 6.6e20 POT")
+pt.SetFillColor(0)
+pt.SetBorderSize(0)
+pt.SetShadowColor(0)
+
+canvases = []*len(histograms)
+
+for i in range(len(histograms)):
+    c = ROOT.TCanvas("c%i" % i)
+    histograms_mc[i].Draw("hist")
+    histograms_mc[i].GetYaxis().SetRangeUser(0,histograms[i].GetMaximum()*1.4)
+
+    integral = sum([histograms_mc[i].GetHists()[j].Integral() for j in range(histograms_mc[i].GetNhists())])
+    histograms[i].Scale(integral/histograms[i].Integral())
+    histograms[i].SetLineColor(1)
+    histograms[i].SetMarkerStyle(20)
+    histograms[i].Draw("ep same")
+    legend.Draw("same")
+
+    pt.Draw()
+    c.Update()
+    c.SaveAs("%s.pdf" % histograms[i].GetName())
+    canvases.append(c)
+
+input()

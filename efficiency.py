@@ -8,7 +8,7 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("nue_files_fidvol/*/*.root")
+nue_cosmic = glob("nue_files_42/*/*.root")
 
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 chain_nue_pot = ROOT.TChain("robertoana/pot")
