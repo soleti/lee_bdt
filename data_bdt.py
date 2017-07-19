@@ -73,13 +73,22 @@ canvases = []*len(histograms)
 for i in range(len(histograms)):
     c = ROOT.TCanvas("c%i" % i)
     histograms_mc[i].Draw("hist")
-    histograms_mc[i].GetYaxis().SetRangeUser(0,histograms[i].GetMaximum()*1.4)
+
+    h_mc_err = histograms_mc[i].GetHists()[0].Clone()
+    h_mc_err.SetName("h_mc_err%i" % i)
+    for j in range(1,histograms_mc[i].GetNhists()):
+        h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
     integral = sum([histograms_mc[i].GetHists()[j].Integral() for j in range(histograms_mc[i].GetNhists())])
     histograms[i].Scale(integral/histograms[i].Integral())
     histograms[i].SetLineColor(1)
     histograms[i].SetMarkerStyle(20)
+
+    h_mc_err.SetFillStyle(3002)
+    h_mc_err.SetFillColor(1)
+    h_mc_err.Draw("e same")
     histograms[i].Draw("ep same")
+
     legend.Draw("same")
 
     pt.Draw()

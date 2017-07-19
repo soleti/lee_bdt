@@ -91,7 +91,12 @@ track_start_x = array("f", [0])
 track_end_x = array("f", [0])
 track_start_z = array("f", [0])
 track_end_z = array("f", [0])
-
+shower_start_y = array("f", [0])
+shower_end_y = array("f", [0])
+shower_start_x = array("f", [0])
+shower_end_x = array("f", [0])
+shower_start_z = array("f", [0])
+shower_end_z = array("f", [0])
 reco_energy = array("f", [ 0 ] )
 event_weight = array("f", [ 0 ] )
 category = array("f", [ 0 ] )
@@ -128,7 +133,10 @@ variables = [
     ("track_start_x",track_start_x),
     ("track_end_x",track_end_x),
     ("track_start_z",track_start_z),
-    ("track_end_z",track_end_z)
+    ("track_end_z",track_end_z),
+    ("shower_start_y",shower_start_y),
+    ("shower_start_x",shower_start_x),
+    ("shower_start_z",shower_start_z),
 ]
 labels = {
     "n_tracks":";# tracks;N.Entries / 1",
