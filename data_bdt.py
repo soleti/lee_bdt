@@ -68,8 +68,8 @@ pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
 
-canvases = []*len(histograms)
-
+canvases = []
+h_errs = []
 for i in range(len(histograms)):
     c = ROOT.TCanvas("c%i" % i)
     histograms_mc[i].Draw("hist")
@@ -86,9 +86,9 @@ for i in range(len(histograms)):
 
     h_mc_err.SetFillStyle(3002)
     h_mc_err.SetFillColor(1)
-    h_mc_err.Draw("e same")
+    h_mc_err.Draw("e2 same")
     histograms[i].Draw("ep same")
-
+    h_errs.append(h_mc_err)
     legend.Draw("same")
 
     pt.Draw()
