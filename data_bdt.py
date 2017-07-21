@@ -47,53 +47,7 @@ for i in range(t_data.GetEntries()):
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
-
-histograms_mc = []
 for h in histograms:
-    mc_file = ROOT.TFile("%s.root" % h.GetName())
-    histograms_mc.append(ROOT.gDirectory.Get(h.GetName()))
-    mc_file.Close()
-
-legend = ROOT.TLegend(0.455,0.53,0.70,0.85)
-legend.SetTextSize(16)
-
-for j in range(histograms_mc[0].GetNhists()):
-    legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
-
-legend.AddEntry(histograms[0], "Data BNB - BNB EXT shape normalized", "lep")
-
-pt = ROOT.TPaveText(0.09,0.91,0.60,0.97, "ndc")
-pt.AddText("MicroBooNE Preliminary 6.6e20 POT")
-pt.SetFillColor(0)
-pt.SetBorderSize(0)
-pt.SetShadowColor(0)
-
-canvases = []
-h_errs = []
-for i in range(len(histograms)):
-    c = ROOT.TCanvas("c%i" % i)
-    histograms_mc[i].Draw("hist")
-
-    h_mc_err = histograms_mc[i].GetHists()[0].Clone()
-    h_mc_err.SetName("h_mc_err%i" % i)
-    for j in range(1,histograms_mc[i].GetNhists()):
-        h_mc_err.Add(histograms_mc[i].GetHists()[j])
-
-    integral = sum([histograms_mc[i].GetHists()[j].Integral() for j in range(histograms_mc[i].GetNhists())])
-    histograms[i].Scale(integral/histograms[i].Integral())
-    histograms[i].SetLineColor(1)
-    histograms[i].SetMarkerStyle(20)
-
-    h_mc_err.SetFillStyle(3002)
-    h_mc_err.SetFillColor(1)
-    h_mc_err.Draw("e2 same")
-    histograms[i].Draw("ep same")
-    h_errs.append(h_mc_err)
-    legend.Draw("same")
-
-    pt.Draw()
-    c.Update()
-    c.SaveAs("%s.pdf" % histograms[i].GetName())
-    canvases.append(c)
-
-input()
+    f = ROOT.TFile("%s_data.root" % h.GetName(),"RECREATE")
+    h.Write()
+    f.Close()
