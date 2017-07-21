@@ -119,6 +119,9 @@ l_plots = TLegend(0.48,0.55,0.84,0.84)
 
 
 def fill_kin_branches(root_chain, weight, variables):
+
+    if root_chain.category > 6: print(root_chain.event)
+
     longest_track = 0
     longest_track_id = 0
     most_proton_track_id = 0
