@@ -16,10 +16,14 @@ Then, we run the BDT training
 
 ```python bdt.py```
 
-We apply the BDT to the Monte Carlo
+We apply the BDT to the Monte Carlo...
 
 ```python mc_bdt.py```
 
-and to the data. This last module produces all the plots.
+...to the BNB data... 
 
 ```python data_bdt.py```
+
+...and finally to the EXT BNB data. This module also generates all the plots.
+
+```pythond dataext_bdt.py```
