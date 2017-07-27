@@ -6,12 +6,12 @@ from ROOT import kRed, kGreen, kBlue, kOrange, kGray, kWhite
 from array import array
 from glob import glob
 import math
+from bdt_common import total_pot
 
-
-bnb_cosmic = glob("nu_files_fidvol/*/*.root")
-nue_cosmic = glob("nue_files_fidvol/*/*.root")
-data_bnb = glob("data_files_bnb_mcc81/*/*.root")
-data_bnbext = glob("data_files_bnbext_mcc81/*/*.root")
+bnb_cosmic = glob("nu_files_6_42/*/*.root")
+nue_cosmic = glob("nue_files_42/*/*.root")
+data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
+data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
 
 chain = TChain("robertoana/pandoratree")
 chain_pot = TChain("robertoana/pot")
@@ -52,8 +52,6 @@ for f in nue_cosmic:
     chain_nue.Add(f)
     chain_nue_pot.Add(f)
 
-print(chain_data_bnb.GetEntries(),chain_data_bnbext.GetEntries())
-
 
 total_bnb_pot = 0
 for i in range(chain_pot.GetEntries()):
@@ -69,6 +67,7 @@ for i in range(chain_nue_pot.GetEntries()):
 print("Total POT v_e", total_nue_pot)
 
 total_data_bnb_pot = 0
+print(chain_data_bnb_pot.GetEntries())
 for i in range(chain_data_bnb_pot.GetEntries()):
     chain_data_bnb_pot.GetEntry(i)
     total_data_bnb_pot += chain_data_bnb_pot.pot
@@ -81,8 +80,6 @@ for i in range(chain_data_bnbext_pot.GetEntries()):
     total_data_bnbext_pot += chain_data_bnbext_pot.pot
 total_data_bnbext_pot *= 1e12
 print("Total data BNB EXT POT", total_data_bnbext_pot)
-
-total_pot = 6.6e20
 
 numu_selected_events = {}
 for i in range(chain_numu.GetEntries()):
@@ -111,17 +108,14 @@ h_vx_diff_cut = TH1F("h_vx_diff_cut",";#Deltax [cm];N.Entries / 0.5 cm",80,-20,2
 h_vy_diff_cut = TH1F("h_vy_diff_cut",";#Deltay [cm];N.Entries / 0.5 cm",80,-20,20)
 h_vz_diff_cut = TH1F("h_vz_diff_cut",";#Deltaz [cm];N.Entries / 0.5 cm",80,-20,20)
 
-colors = [kGray+2, kRed - 3, kGreen - 2, kBlue - 5, kBlue - 9, kOrange+3, kWhite, kWhite]
-description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data BNB - BNB EXT"]
+colors = [kGray+2, kRed - 3, kGreen - 2, kBlue - 5, kBlue - 9, kOrange+3, kWhite, kWhite, kRed-3]
+description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data BNB - BNB EXT", "Cosmic-contaminated"]
 
 l_energy = TLegend(0.455,0.53,0.705,0.85)
 l_plots = TLegend(0.48,0.55,0.84,0.84)
 
 
 def fill_kin_branches(root_chain, weight, variables):
-
-    if root_chain.category > 6: print(root_chain.event)
-
     longest_track = 0
     longest_track_id = 0
     most_proton_track_id = 0
@@ -344,6 +338,7 @@ for i in range(chain_nue.GetEntries()):
         h_vy_diff_cut.Fill(chain_nue.vy-chain_nue.true_vy_sce)
         h_vz_diff_cut.Fill(chain_nue.vz-chain_nue.true_vz_sce)
         h_n_candidates.Fill(chain_nue.n_candidates)
+
 
         if chain_nue.category != 1:
             h_diff.Fill((chain_nue.nu_E-chain_nue.E)/chain_nue.nu_E)

@@ -9,10 +9,10 @@ fout = ROOT.TFile("test.root")
 
 tout = ROOT.TChain("dataset/TestTree")
 tout.Add("test.root")
-colors = [ROOT.kGray+2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5, ROOT.kBlue - 9, ROOT.kOrange+3, ROOT.kRed - 3 ]
+colors = [ROOT.kGray+2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5, ROOT.kBlue - 9, ROOT.kOrange+3, ROOT.kWhite, ROOT.kRed - 3 ]
 
 kinds = []
-categories = ["other", "cosmic", "nu_e", "nu_mu", "nc", "dirt"]
+categories = ["other", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data", "mixed"]
 stacked_histos = []
 
 for name, var in variables:
@@ -29,7 +29,15 @@ for i,n in enumerate(variables_dict.keys()):
     for c in categories:
         h = ROOT.TH1F("h_%s_%s" % (n, c), labels[n],binning[n][0],binning[n][1],binning[n][2])
         histos.append(h)
-        h_stack.Add(h)
+
+    h_stack.Add(histos[0])
+    h_stack.Add(histos[1])
+    h_stack.Add(histos[7])
+    h_stack.Add(histos[2])
+    h_stack.Add(histos[3])
+    h_stack.Add(histos[4])
+    h_stack.Add(histos[5])
+    h_stack.Add(histos[6])
 
     stacked_histos.append(h_stack)
     kinds.append(histos)
@@ -37,22 +45,26 @@ for i,n in enumerate(variables_dict.keys()):
 histo_dict = dict(zip(variables_dict.keys(), kinds))
 bkg_types = [0]*2000
 
+h_bdt = ROOT.TH1F("h_bdt_mc",";BDT response; N. Entries / 0.05", 40,-1,1)
+
 for i in range(tout.GetEntries()):
     tout.GetEntry(i)
+    h_bdt.Fill(tout.BDT, tout.event_weight*2)
+
     if tout.BDT > bdt_cut:
 
         category = int(tout.category)
-        if int(tout.category) == 7: category = 1
 
         # Store interaction types of background events
-        # if tout.reco_energy > 0.1 and tout.category != 1 and tout.category != 2:
-        #     bkg_types[int(tout.interaction_type)] += tout.event_weight*2
-        #h_energies[int(tout.category)].Fill(tout.reco_energy, tout.event_weight*2)
+        if tout.reco_energy > 0.1 and tout.category != 1 and tout.category != 2:
+            bkg_types[int(tout.interaction_type)] += tout.event_weight*2
 
         for name, var in variables:
             histo_dict[name][category].Fill(var[0],tout.event_weight*2)
 
-
+f_bdt = ROOT.TFile("bdt_mc.root", "RECREATE")
+h_bdt.Write()
+f_bdt.Close()
 
 for i,histos in enumerate(kinds):
     for j,h in enumerate(histos):
@@ -61,7 +73,7 @@ for i,histos in enumerate(kinds):
         h.SetFillColor(colors[j])
 
 for h in stacked_histos:
-    f = ROOT.TFile("%s.root" % h.GetName(),"RECREATE")
+    f = ROOT.TFile("plots/%s.root" % h.GetName(),"RECREATE")
     h.Write()
     f.Close()
 

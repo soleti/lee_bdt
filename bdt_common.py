@@ -5,6 +5,8 @@ def find_interaction(dictionary,interaction):
         if id_int == interaction:
             return name
 
+total_pot = 5e19
+
 interactions = {
     "kQE":0,
     "kRes":1,
@@ -67,7 +69,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = -0.038
+bdt_cut = 0.05
 
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
@@ -105,7 +107,6 @@ run = array("f", [0])
 subrun = array("f", [0])
 interaction_type = array("f", [0])
 spectators = [
-    #("reco_energy", reco_energy),
     ("category", category),
     ("event_weight", event_weight),
     ("event", event),
@@ -118,10 +119,10 @@ variables = [
     ("track_length",track_length),
     ("track_theta",track_theta),
     ("track_phi",track_phi),
-    #("shower_energy",shower_energy),
+    ("shower_energy",shower_energy),
     ("shower_theta",shower_theta),
     ("shower_phi",shower_phi),
-    #("pt",pt),
+    ("pt",pt),
     ("n_tracks",n_tracks),
     ("n_showers",n_showers),
     ("track_shower_angle",track_shower_angle),
@@ -137,14 +138,16 @@ variables = [
     ("shower_start_y",shower_start_y),
     ("shower_start_x",shower_start_x),
     ("shower_start_z",shower_start_z),
+    ("reco_energy", reco_energy)
+
 ]
 labels = {
     "n_tracks":";# tracks;N.Entries / 1",
     "n_showers":";# showers;N.Entries / 1",
-    "track_theta":";Track #theta [#circ];N. Entries / 5#circ",
-    "track_phi":";Track #phi [#circ];N. Entries / 10#circ",
-    "shower_theta":";Shower #theta [#circ];N. Entries / 5#circ",
-    "shower_phi":";Shower #phi [#circ];N. Entries / 10#circ",
+    "track_theta":";Track #theta [#circ];N. Entries / 20#circ",
+    "track_phi":";Track #phi [#circ];N. Entries / 40#circ",
+    "shower_theta":";Shower #theta [#circ];N. Entries / 20#circ",
+    "shower_phi":";Shower #phi [#circ];N. Entries / 40#circ",
     "shower_distance":";Shower distance [cm];N. Entries / 1 cm",
     "track_distance":";Track distance [cm];N. Entries / 1 cm",
     "track_shower_angle":";cos#theta [#circ];N. Entries / 0.2",
@@ -161,32 +164,39 @@ labels = {
     "shower_end_z":";Shower end z [cm]",
     "shower_end_x":";Shower end x [cm]",
     "track_length":";Track length [cm];N. Entries / 2 cm",
-    "proton_score":";Proton score; N. Entries / 0.1"
+    "proton_score":";Proton score; N. Entries / 0.1",
+    "shower_energy":";Shower energy [GeV]; N. Entries / 0.1 GeV",
+    "pt":";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
+    "reco_energy":";Reco. energy [GeV]; N. Entries / 0.1 GeV",
 
 }
 
 binning = {
     "n_tracks":[5,1,6],
     "n_showers":[5,1,6],
-    "track_theta":[18,0,180],
-    "track_phi":[18,-180,180],
-    "shower_theta":[18,0,180],
-    "shower_phi":[18,-180,180],
-    "shower_distance":[20,0,20],
-    "track_distance":[20,0,20],
+    "track_theta":[9,0,180],
+    "track_phi":[9,-180,180],
+    "shower_theta":[9,0,180],
+    "shower_phi":[9,-180,180],
+    "shower_distance":[10,0,10],
+    "track_distance":[10,0,10],
     "track_shower_angle":[10,-1,1],
-    "track_start_y":[20,y_start,y_end],
-    "track_start_z":[20,z_start,z_end],
-    "track_start_x":[20,x_start,x_end],
-    "track_end_y":[20,y_start,y_end],
-    "track_end_z":[20,z_start,z_end],
-    "track_end_x":[20,x_start,x_end],
-    "shower_start_y":[20,y_start,y_end],
-    "shower_start_z":[20,z_start,z_end],
-    "shower_start_x":[20,x_start,x_end],
-    "shower_end_y":[20,y_start,y_end],
-    "shower_end_z":[20,z_start,z_end],
-    "shower_end_x":[20,x_start,x_end],
-    "track_length":[20,0,100],
-    "proton_score":[10,0,1]
+    "track_start_y":[10,y_start,y_end],
+    "track_start_z":[10,z_start,z_end],
+    "track_start_x":[10,x_start,x_end],
+    "track_end_y":[10,y_start,y_end],
+    "track_end_z":[10,z_start,z_end],
+    "track_end_x":[10,x_start,x_end],
+    "shower_start_y":[10,y_start,y_end],
+    "shower_start_z":[10,z_start,z_end],
+    "shower_start_x":[10,x_start,x_end],
+    "shower_end_y":[10,y_start,y_end],
+    "shower_end_z":[10,z_start,z_end],
+    "shower_end_x":[10,x_start,x_end],
+    "track_length":[10,0,100],
+    "proton_score":[10,0,1],
+    "shower_energy":[20,0,2],
+    "pt":[20,0,2],
+    "reco_energy":[19,0.1,2]
+
 }

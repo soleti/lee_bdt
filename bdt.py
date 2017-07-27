@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.4
 
 import ROOT
+from bdt_common import binning, labels, variables, spectators, bdt_cut
 
 
 f_input = ROOT.TFile("kin_file.root")
@@ -19,15 +20,14 @@ factory = ROOT.TMVA.Factory("TMVAClassification", fout,
                                 "AnalysisType=Classification"]))
 dataloader = ROOT.TMVA.DataLoader("dataset");
 
-#dataloader.AddSpectator("reco_energy","F")
 
 dataloader.AddVariable("track_length","F")
 dataloader.AddVariable("track_theta","F")
 dataloader.AddVariable("track_phi","F")
-#dataloader.AddVariable("shower_energy","F")
+dataloader.AddVariable("shower_energy","F")
 dataloader.AddVariable("shower_theta","F")
 dataloader.AddVariable("shower_phi","F")
-#dataloader.AddVariable("pt","F")
+dataloader.AddVariable("pt","F")
 dataloader.AddVariable("n_tracks","F")
 dataloader.AddVariable("n_showers","F")
 dataloader.AddVariable("track_shower_angle","F")
@@ -43,6 +43,8 @@ dataloader.AddVariable("track_end_z","F")
 dataloader.AddVariable("shower_start_y","F")
 dataloader.AddVariable("shower_start_x","F")
 dataloader.AddVariable("shower_start_z","F")
+dataloader.AddVariable("reco_energy","F")
+
 dataloader.AddSpectator("category","F")
 dataloader.AddSpectator("event_weight","F")
 dataloader.AddSpectator("event","F")

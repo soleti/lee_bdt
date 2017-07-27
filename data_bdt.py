@@ -37,17 +37,24 @@ for i,n in enumerate(variables_dict.keys()):
 
 histo_dict = dict(zip(variables_dict.keys(),histograms))
 
+h_bdt = ROOT.TH1F("h_bdt_data",";BDT response; N. Entries / 0.05", 40,-1,1)
+
 
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
+    h_bdt.Fill(BDT_response, t_data.event_weight)
 
     if BDT_response > bdt_cut:
 
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
+f_bdt = ROOT.TFile("bdt_data.root", "RECREATE")
+h_bdt.Write()
+f_bdt.Close()
+
 for h in histograms:
-    f = ROOT.TFile("%s_data.root" % h.GetName(),"RECREATE")
+    f = ROOT.TFile("plots/%s_data.root" % h.GetName(),"RECREATE")
     h.Write()
     f.Close()

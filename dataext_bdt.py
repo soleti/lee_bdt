@@ -3,9 +3,21 @@
 import ROOT
 import math
 from bdt_common import binning, labels, variables, spectators, bdt_cut
+from glob import glob
 ROOT.gStyle.SetOptStat(0)
 f_data = ROOT.TFile("bnbext_file.root")
 t_data = f_data.Get("bnbext_tree")
+data_bnb = glob("data_files_bnb_6_42/*/*.root")
+
+chain_data_bnb_pot = ROOT.TChain("robertoana/pot")
+for f in data_bnb:
+    chain_data_bnb_pot.Add(f)
+total_data_bnb_pot = 0
+
+for i in range(chain_data_bnb_pot.GetEntries()):
+    chain_data_bnb_pot.GetEntry(i)
+    total_data_bnb_pot += chain_data_bnb_pot.pot
+total_data_bnb_pot *= 1e12
 
 ROOT.TMVA.Tools.Instance()
 reader = ROOT.TMVA.Reader(":".join([
@@ -23,8 +35,9 @@ for name, var in variables:
 for name, var in spectators:
     reader.AddSpectator(name, var)
 
+
 reader.BookMVA("BDT method","dataset/weights/TMVAClassification_BDT.weights.xml")
-description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
+description = ["Other", "Cosmic", "Cosmic contaminated", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data"]
 
 variables_dict = dict(variables)
 
@@ -37,21 +50,26 @@ for i,n in enumerate(variables_dict.keys()):
 
 histo_dict = dict(zip(variables_dict.keys(),histograms))
 
+h_bdt = ROOT.TH1F("h_bdt_dataext",";BDT response; N. Entries / 0.05", 40,-1,1)
 
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
+    h_bdt.Fill(BDT_response, t_data.event_weight)
 
     if BDT_response > bdt_cut:
 
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
+f_bdt = ROOT.TFile("bdt_dataext.root", "RECREATE")
+h_bdt.Write()
+f_bdt.Close()
 
 histograms_data = []
 data_files = []
 for h in histograms:
-    data_files.append(ROOT.TFile("%s_data.root" % h.GetName()))
+    data_files.append(ROOT.TFile("plots/%s_data.root" % h.GetName()))
 
 for i,h in enumerate(histograms):
     h_data = data_files[i].Get(h.GetName())
@@ -60,23 +78,31 @@ for i,h in enumerate(histograms):
 
 histograms_mc = []
 for h in histograms:
-    mc_file = ROOT.TFile("%s.root" % h.GetName())
+    mc_file = ROOT.TFile("plots/%s.root" % h.GetName())
     histograms_mc.append(ROOT.gDirectory.Get(h.GetName()))
     mc_file.Close()
 
-legend = ROOT.TLegend(0.09455587,0.7850208,0.8223496,0.9791956,"","brNDC")
+legend = ROOT.TLegend(0.09455587,0.7850208,0.8923496,0.9791956,"","brNDC")
 legend.SetTextSize(16)
+legend.SetTextFont(63)
+legend.SetHeader("MicroBooNE Preliminary 5e19 POT");
+legend.SetTextFont(43)
 
 for j in range(histograms_mc[0].GetNhists()):
-    legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
+    if histograms_mc[0].GetHists()[j].Integral():
+        legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
 
-legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT shape normalized", "lep")
+
+
+for i in range(len(histograms)):
+    for j in range(histograms_data[i].GetNbinsX()):
+        histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
+        if histograms_data[i].GetBinContent(j) > 0:
+            histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
+    histograms_data[i].Scale(total_data_bnb_pot/5e19)
+
+legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
 legend.SetNColumns(2)
-pt = ROOT.TPaveText(0.09,0.91,0.60,0.97)
-pt.AddText("MicroBooNE Preliminary 6.6e20 POT")
-pt.SetFillColor(0)
-pt.SetBorderSize(0)
-pt.SetShadowColor(0)
 
 canvases = []
 h_errs = []
@@ -84,6 +110,8 @@ h_ratios = []
 pads = []
 lines = []
 for i in range(len(histograms)):
+    histograms_mc[i].GetHists()[2].SetFillStyle(3001)
+
     c = ROOT.TCanvas("c%i" % i,"",900,44,700,645)
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
@@ -98,7 +126,6 @@ for i in range(len(histograms)):
     pad_top.Draw()
     pad_top.cd()
     pads.append(pad_top)
-    pt.Draw()
 
     histograms_mc[i].Draw("hist")
     histograms_mc[i].GetYaxis().SetTitleSize(0.06)
@@ -106,15 +133,6 @@ for i in range(len(histograms)):
     histograms_mc[i].SetMinimum(0.1)
     histograms_mc[i].SetMaximum(h_mc_err.GetMaximum()*1.3)
 
-    integral = sum([histograms_mc[i].GetHists()[j].Integral() for j in range(histograms_mc[i].GetNhists())])
-
-    for j in range(histograms_data[i].GetNbinsX()):
-        histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
-        if histograms_data[i].GetBinContent(j) > 0:
-            histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
-
-
-    histograms_data[i].Scale(integral/histograms_data[i].Integral())
     histograms_data[i].SetLineColor(1)
     histograms_data[i].SetMarkerStyle(20)
 
@@ -163,7 +181,9 @@ for i in range(len(histograms)):
     lines.append(line)
     c.cd()
     c.Update()
-    c.SaveAs("%s.pdf" % histograms[i].GetName())
+    c.SaveAs("plots/%s.pdf" % histograms[i].GetName())
     canvases.append(c)
+
+
 
 input()
