@@ -2,7 +2,7 @@
 
 import ROOT
 import math
-from bdt_common import binning, labels, variables, spectators, bdt_cut
+from bdt_common import binning, labels, variables, spectators, bdt_cut, description
 
 f_data = ROOT.TFile("bnb_file.root")
 t_data = f_data.Get("bnb_tree")
@@ -12,7 +12,6 @@ reader = ROOT.TMVA.Reader(":".join([
     "!V",
     "!Silent",
     "Color",]))
-
 
 for name, var in variables:
     t_data.SetBranchAddress(name, var)
@@ -24,14 +23,13 @@ for name, var in spectators:
     reader.AddSpectator(name, var)
 
 reader.BookMVA("BDT method","dataset/weights/TMVAClassification_BDT.weights.xml")
-description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
+
 
 variables_dict = dict(variables)
 
 histograms = []
 
 for i,n in enumerate(variables_dict.keys()):
-    #h = ROOT.TH1F(n,labels[i],binning[i][0],binning[i][1],binning[i][2])
     h = ROOT.TH1F("h_"+n,labels[n],binning[n][0],binning[n][1],binning[n][2])
     histograms.append(h)
 

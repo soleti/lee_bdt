@@ -6,10 +6,15 @@ from ROOT import kRed, kGreen, kBlue, kOrange, kGray, kWhite
 from array import array
 from glob import glob
 import math
-from bdt_common import total_pot
+from bdt_common import total_pot, variables, spectators
+import random
 
-bnb_cosmic = glob("nu_files_6_42/*/*.root")
-nue_cosmic = glob("nue_files_42/*/*.root")
+gStyle.SetOptStat(0)
+gStyle.SetPalette(87)
+gStyle.SetNumberContours(99)
+
+bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
+nue_cosmic = glob("nue_files_6_42_energy/*/*.root")
 data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
 data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
 
@@ -29,9 +34,6 @@ chain_data_bnbext_pot = TChain("robertoana/pot")
 chain_data_bnbext_numu = TChain("UBXSec/tree")
 
 
-gStyle.SetOptStat(0)
-gStyle.SetPalette(87)
-gStyle.SetNumberContours(99)
 
 for f in bnb_cosmic:
     chain.Add(f)
@@ -67,7 +69,6 @@ for i in range(chain_nue_pot.GetEntries()):
 print("Total POT v_e", total_nue_pot)
 
 total_data_bnb_pot = 0
-print(chain_data_bnb_pot.GetEntries())
 for i in range(chain_data_bnb_pot.GetEntries()):
     chain_data_bnb_pot.GetEntry(i)
     total_data_bnb_pot += chain_data_bnb_pot.pot
@@ -100,29 +101,16 @@ h_n_candidates = TH1F("h_n_candidates",";# candidates;N. Entries / 1",5,0,5)
 h_true_reco_e = TH2F("h_true_reco_e",";True energy [GeV];Reco. energy [GeV]",18,0.2,2,18,0.2,2)
 h_diff = TH1F("h_diff",";(True energy - Reco. energy)/True energy;N.Entries / 0.1 GeV", 30,-1,2)
 
-h_vx_diff = TH1F("h_vx_diff",";#Deltax [cm];N.Entries / 0.5 cm",80,-20,20)
-h_vy_diff = TH1F("h_vy_diff",";#Deltay [cm];N.Entries / 0.5 cm",80,-20,20)
-h_vz_diff = TH1F("h_vz_diff",";#Deltaz [cm];N.Entries / 0.5 cm",80,-20,20)
-
-h_vx_diff_cut = TH1F("h_vx_diff_cut",";#Deltax [cm];N.Entries / 0.5 cm",80,-20,20)
-h_vy_diff_cut = TH1F("h_vy_diff_cut",";#Deltay [cm];N.Entries / 0.5 cm",80,-20,20)
-h_vz_diff_cut = TH1F("h_vz_diff_cut",";#Deltaz [cm];N.Entries / 0.5 cm",80,-20,20)
-
 colors = [kGray+2, kRed - 3, kGreen - 2, kBlue - 5, kBlue - 9, kOrange+3, kWhite, kWhite, kRed-3]
-description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data BNB - BNB EXT", "Cosmic-contaminated"]
-
-l_energy = TLegend(0.455,0.53,0.705,0.85)
-l_plots = TLegend(0.48,0.55,0.84,0.84)
-
 
 def fill_kin_branches(root_chain, weight, variables):
     longest_track = 0
     longest_track_id = 0
     most_proton_track_id = 0
-    most_proton_track = 0
+    most_proton_track = 1
     most_proton_track_length = 0
     for itrk in range(root_chain.n_tracks):
-        if root_chain.predict_p[itrk] > most_proton_track:
+        if root_chain.predict_p[itrk] < most_proton_track:
             most_proton_track = root_chain.predict_p[itrk]
             most_proton_track_id = itrk
             most_proton_track_length = root_chain.track_len[itrk]
@@ -146,18 +134,27 @@ def fill_kin_branches(root_chain, weight, variables):
     signal = 0
     if root_chain.category == 2: signal = 1
 
-    track_vertex = [root_chain.track_start_x[longest_track_id],root_chain.track_start_y[longest_track_id],root_chain.track_start_z[longest_track_id]]
+    track_vertex = [root_chain.track_start_x[most_proton_track_id],root_chain.track_start_y[most_proton_track_id],root_chain.track_start_z[most_proton_track_id]]
+    track_end = [root_chain.track_end_x[most_proton_track_id],root_chain.track_end_y[most_proton_track_id],root_chain.track_end_z[most_proton_track_id]]
     shower_vertex = [root_chain.shower_start_x[most_energetic_shower_id],root_chain.shower_start_y[most_energetic_shower_id],root_chain.shower_start_z[most_energetic_shower_id]]
     neutrino_vertex = [root_chain.vx,root_chain.vy,root_chain.vz]
     true_neutrino_vertex = [root_chain.true_vx_sce,root_chain.true_vy_sce,root_chain.true_vz_sce]
 
     shower_vertex_d = math.sqrt(sum([(s-n)**2 for s,n in zip(shower_vertex,neutrino_vertex)]))
     track_vertex_d = math.sqrt(sum([(t-n)**2 for t,n in zip(track_vertex,neutrino_vertex)]))
+    track_end_d = math.sqrt(sum([(t-n)**2 for t,n in zip(track_end,neutrino_vertex)]))
+
+    track_shower_d = math.sqrt(sum([(s-t)**2 for s,t in zip(shower_vertex,track_vertex)]))
+    trackend_shower_d = math.sqrt(sum([(s-t)**2 for s,t in zip(shower_vertex,track_end)]))
+
+    direction = 1
+    if trackend_shower_d < track_shower_d: direction = -1
+    theta = math.acos(direction*root_chain.track_dir_z[most_proton_track_id])
 
     variables["is_signal"][0] = signal
-    variables["track_length"][0] = most_proton_track_length
+    variables["track_length"][0] = root_chain.track_energy[most_proton_track_id]
     variables["track_phi"][0] = math.degrees(root_chain.track_phi[most_proton_track_id])
-    variables["track_theta"][0] = math.degrees(root_chain.track_theta[most_proton_track_id])
+    variables["track_theta"][0] = math.degrees(theta)
     variables["shower_energy"][0] = most_energetic_shower
     variables["shower_theta"][0] = math.degrees(root_chain.shower_theta[most_energetic_shower_id])
     variables["shower_phi"][0] = math.degrees(root_chain.shower_phi[most_energetic_shower_id])
@@ -247,74 +244,7 @@ def pt_plot(root_chain):
     pt = (p_track_sum+p_shower_sum).Perp()
     return pt
 
-
-is_signal = array("f", [ 0 ] )
-reco_energy = array("f", [ 0 ] )
-track_length = array("f", [ 0 ] )
-track_theta = array("f", [ 0 ] )
-track_phi = array("f", [ 0 ] )
-
-shower_theta = array("f", [ 0 ] )
-shower_phi = array("f", [ 0 ] )
-shower_energy = array("f", [ 0 ] )
-
-event_weight = array("f", [ 0 ] )
-category = array("f", [ 0 ] )
-pt = array("f", [ 0 ] )
-n_tracks = array("f", [ 0 ] )
-n_showers = array("f", [ 0 ] )
-track_shower_angle = array("f", [ 0 ] )
-event = array("f", [0])
-run = array("f", [0])
-subrun = array("f", [0])
-shower_distance = array("f", [0])
-interaction_type = array("f", [0])
-proton_score = array("f", [0])
-
-track_distance = array("f", [0])
-track_start_y = array("f", [0])
-track_end_y = array("f", [0])
-track_start_x = array("f", [0])
-track_end_x = array("f", [0])
-track_start_z = array("f", [0])
-track_end_z = array("f", [0])
-shower_start_y = array("f", [0])
-shower_end_y = array("f", [0])
-shower_start_x = array("f", [0])
-shower_end_x = array("f", [0])
-shower_start_z = array("f", [0])
-shower_end_z = array("f", [0])
-variables = {"reco_energy":reco_energy,
-    "track_length":track_length,
-    "track_theta":track_theta,
-    "track_phi":track_phi,
-    "shower_theta":shower_theta,
-    "shower_phi":shower_phi,
-    "shower_energy":shower_energy,
-    "event_weight":event_weight,
-    "category":category,
-    "is_signal":is_signal,
-    "pt":pt,
-    "n_tracks":n_tracks,
-    "n_showers":n_showers,
-    "track_shower_angle":track_shower_angle,
-    "event":event,
-    "shower_distance":shower_distance,
-    "run":run,
-    "subrun":subrun,
-    "interaction_type":interaction_type,
-    "proton_score":proton_score,
-    "track_distance":track_distance,
-    "track_start_y":track_start_y,
-    "track_end_y":track_end_y,
-    "track_start_x":track_start_x,
-    "track_end_x":track_end_x,
-    "track_start_z":track_start_z,
-    "track_end_z":track_end_z,
-    "shower_start_y":shower_start_y,
-    "shower_start_x":shower_start_x,
-    "shower_start_z":shower_start_z,
-}
+variables = dict(variables+spectators)
 
 kin_tree = TTree("kin_tree","kin_tree")
 
@@ -331,12 +261,6 @@ for i in range(chain_nue.GetEntries()):
     chain_nue.GetEntry(i)
 
     if chain_nue.passed:
-        h_vx_diff.Fill(chain_nue.vx-chain_nue.true_vx)
-        h_vy_diff.Fill(chain_nue.vy-chain_nue.true_vy)
-        h_vz_diff.Fill(chain_nue.vz-chain_nue.true_vz)
-        h_vx_diff_cut.Fill(chain_nue.vx-chain_nue.true_vx_sce)
-        h_vy_diff_cut.Fill(chain_nue.vy-chain_nue.true_vy_sce)
-        h_vz_diff_cut.Fill(chain_nue.vz-chain_nue.true_vz_sce)
         h_n_candidates.Fill(chain_nue.n_candidates)
 
 
@@ -352,8 +276,9 @@ for i in range(chain_nue.GetEntries()):
 
         tracks_contained = min([chain_nue.track_is_fiducial[i] for i in range(chain_nue.n_tracks)])
         showers_contained = min([chain_nue.shower_is_fiducial[i] for i in range(chain_nue.n_showers)])
+
         if proton:
-            fill_kin_branches(chain_nue, total_pot/total_nue_pot, variables)
+            fill_kin_branches(chain_nue, total_pot/total_nue_pot*chain_nue.bnbweight, variables)
             kin_tree.Fill()
 
 
@@ -411,7 +336,7 @@ for i in range(chain_data_bnbext.GetEntries()):
         showers_contained = min([chain_data_bnbext.shower_is_fiducial[i] for i in range(chain_data_bnbext.n_showers)])
 
     if chain_data_bnbext.passed and not numu_passed:
-        fill_kin_branches(chain_data_bnbext,1.2300 * (382718/chain_data_bnbext.GetEntries()) * (chain_data_bnb.GetEntries()/547616)*total_pot/5e19,variables)
+        fill_kin_branches(chain_data_bnbext,1.2300 * (382718/chain_data_bnbext.GetEntries()) * (chain_data_bnb.GetEntries()/547616),variables)
         bnbext_tree.Fill()
 
 

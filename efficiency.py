@@ -8,7 +8,7 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("nue_files_42/*/*.root")
+nue_cosmic = glob("nue_files_dedx/*/Pandora*.root")
 
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 chain_nue_pot = ROOT.TChain("robertoana/pot")
@@ -28,6 +28,9 @@ e_energy = ROOT.TEfficiency("e_energy",";#nu_{e} energy [GeV];Fraction",20,0,2)
 ep_energy = ROOT.TEfficiency("e_energy",";#nu_{e} energy [GeV];Efficiency #times Purity",20,0,2)
 
 e_proton = ROOT.TEfficiency("e_proton",";p kinetic energy [GeV];#epsilon #times P_{reco}",20,0,0.5)
+
+h_dedx_electron = ROOT.TH1F("h_dedx_electron",";dE/dx [MeV/cm];Area normalized", 50,0,5)
+h_dedx_photon = ROOT.TH1F("h_dedx_photon",";dE/dx [MeV/cm];Area normalized", 50,0,5)
 
 
 p_energy = ROOT.TEfficiency("p_energy",";#nu_{e} energy [GeV];Purity",20,0,2)
@@ -79,6 +82,12 @@ for i in range(entries):
             #if energy > 0.06:
             pions += 1
 
+    if chain_nue.passed and electrons == 0:
+        for pdg,dedx in zip(chain_nue.matched_showers,chain_nue.shower_dEdx):
+            if pdg == 22:
+                h_dedx_photon.Fill(dEdx[2])
+            if abs(pdg) == 11:
+                h_dedx.Fill(chain_nue.dEdx[2])
 
     if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
         eNp+=1
@@ -110,16 +119,20 @@ for i in range(entries):
             true_neutrino_vertex_nosce = [chain_nue.true_vx,chain_nue.true_vy,chain_nue.true_vz]
 
             dist = 0
+
             if chain_nue.passed:
                 dist = math.sqrt(sum([(t-r)**2 for t,r in zip(neutrino_vertex,true_neutrino_vertex)]))
 
-            if chain_nue.passed:
                 passed+=1
                 if p:
                     reco_ok += 1
                 if chain_nue.distance < 5:
                     vertex_ok += 1
 
+                if p_shower:
+                    for i in range(chain_nue.n_showers):
+                        if chain_nue.dEdx[i][2] > 0:
+                            h_dedx.Fill(chain_nue.dEdx[i][2])
 
                 h_dist.Fill(dist)
                 h_dist_nosce.Fill(math.sqrt(sum([(t-r)**2 for t,r in zip(neutrino_vertex,true_neutrino_vertex_nosce)])))
@@ -266,4 +279,12 @@ c_z = ROOT.TCanvas("c_z", "", 500, 500)
 h_z_diff.Draw()
 c_z.Update()
 
+
+c_dedx = ROOT.TCanvas("c_dedx")
+h_dedx.Draw()
+h_dedx_photon.SetLineColor(ROOT.kRed+1)
+h_dedx_photon.Scale(h_dedx.Integral()/h_dedx_photon.Integral())
+h_dedx_photon.Draw("hist same")
+
+c_dedx.Update()
 input()

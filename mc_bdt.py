@@ -56,7 +56,7 @@ for i in range(tout.GetEntries()):
         category = int(tout.category)
 
         # Store interaction types of background events
-        if tout.reco_energy > 0.1 and tout.category != 1 and tout.category != 2:
+        if tout.reco_energy > 0.1 and tout.category == 4 and tout.category != 1 and tout.category != 2:
             bkg_types[int(tout.interaction_type)] += tout.event_weight*2
 
         for name, var in variables:

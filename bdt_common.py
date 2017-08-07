@@ -5,7 +5,9 @@ def find_interaction(dictionary,interaction):
         if id_int == interaction:
             return name
 
-total_pot = 5e19
+total_pot = 2.879e19
+
+description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
 
 interactions = {
     "kQE":0,
@@ -106,13 +108,17 @@ event = array("f", [0])
 run = array("f", [0])
 subrun = array("f", [0])
 interaction_type = array("f", [0])
+is_signal = array("f", [ 0 ] )
+
 spectators = [
     ("category", category),
     ("event_weight", event_weight),
     ("event", event),
     ("run", run),
     ("subrun", subrun),
-    ("interaction_type", interaction_type)
+    ("interaction_type", interaction_type),
+    ("is_signal", is_signal)
+
 ]
 
 variables = [
