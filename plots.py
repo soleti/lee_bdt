@@ -6,7 +6,7 @@ from ROOT import kRed, kGreen, kBlue, kOrange, kGray, kWhite
 from array import array
 from glob import glob
 import math
-from bdt_common import total_pot, variables, spectators
+from bdt_common import total_pot, variables, spectators, x_start, x_end, y_start, y_end, z_start, z_end
 import random
 
 gStyle.SetOptStat(0)
@@ -24,78 +24,48 @@ chain_numu = TChain("UBXSec/tree")
 
 chain_nue = TChain("robertoana/pandoratree")
 chain_nue_pot = TChain("robertoana/pot")
+chain_nue_numu = TChain("UBXSec/tree")
 
 chain_data_bnb = TChain("robertoana/pandoratree")
-chain_data_bnb_pot = TChain("robertoana/pot")
 chain_data_bnb_numu = TChain("UBXSec/tree")
 
 chain_data_bnbext = TChain("robertoana/pandoratree")
-chain_data_bnbext_pot = TChain("robertoana/pot")
 chain_data_bnbext_numu = TChain("UBXSec/tree")
 
-
+def is_fiducial(point):
+    fidvol_cut = 50
+    ok_y = point[1] > y_start+fidvol_cut and point[1] < y_end-fidvol_cut
+    ok_x = point[0] > x_start+fidvol_cut and point[0] < x_end-fidvol_cut
+    ok_z = point[2] > z_start+fidvol_cut and point[2] < z_end-fidvol_cut
+    return ok_y and ok_x and ok_z
 
 for f in bnb_cosmic:
     chain.Add(f)
     chain_pot.Add(f)
     chain_numu.Add(f)
 
-for f in data_bnb:
-    chain_data_bnb.Add(f)
-    chain_data_bnb_pot.Add(f)
-    chain_data_bnb_numu.Add(f)
-
-for f in data_bnbext:
-    chain_data_bnbext.Add(f)
-    chain_data_bnbext_pot.Add(f)
-    chain_data_bnbext_numu.Add(f)
-
 for f in nue_cosmic:
     chain_nue.Add(f)
+    chain_nue_numu.Add(f)
     chain_nue_pot.Add(f)
-
 
 total_bnb_pot = 0
 for i in range(chain_pot.GetEntries()):
     chain_pot.GetEntry(i)
     total_bnb_pot += chain_pot.pot
-
-print("Total POT BNB", total_bnb_pot)
+print("Total POT BNB {0:.2e}".format(total_bnb_pot))
 
 total_nue_pot = 0
 for i in range(chain_nue_pot.GetEntries()):
     chain_nue_pot.GetEntry(i)
     total_nue_pot += chain_nue_pot.pot
-print("Total POT v_e", total_nue_pot)
+print("Total POT v_e {0:.2e}".format(total_nue_pot))
 
-total_data_bnb_pot = 0
-for i in range(chain_data_bnb_pot.GetEntries()):
-    chain_data_bnb_pot.GetEntry(i)
-    total_data_bnb_pot += chain_data_bnb_pot.pot
-total_data_bnb_pot *= 1e12
-print("Total data BNB POT", total_data_bnb_pot)
+total_data_bnb_pot = 3.54e19
+print("Total data POT BNB {0:.2e}".format(total_data_bnb_pot))
 
-total_data_bnbext_pot = 0
-for i in range(chain_data_bnbext_pot.GetEntries()):
-    chain_data_bnbext_pot.GetEntry(i)
-    total_data_bnbext_pot += chain_data_bnbext_pot.pot
-total_data_bnbext_pot *= 1e12
-print("Total data BNB EXT POT", total_data_bnbext_pot)
-
-numu_selected_events = {}
-for i in range(chain_numu.GetEntries()):
-    chain_numu.GetEntry(i)
-    numu_selected_events[chain_numu.event] = chain_numu.muon_is_reco
-
-numu_selected_events_data = {}
-for i in range(chain_data_bnb_numu.GetEntries()):
-    chain_data_bnb_numu.GetEntry(i)
-    numu_selected_events_data[chain_data_bnb_numu.event] = chain_data_bnb_numu.muon_is_reco
-
-numu_selected_events_data_ext = {}
-for i in range(chain_data_bnbext_numu.GetEntries()):
-    chain_data_bnbext_numu.GetEntry(i)
-    numu_selected_events_data_ext[chain_data_bnbext_numu.event] = chain_data_bnbext_numu.muon_is_reco
+data_ext_scaling_factor = 1.279
+print("Data EXT scaling factor {0:.2f}".format(data_ext_scaling_factor))
 
 h_n_candidates = TH1F("h_n_candidates",";# candidates;N. Entries / 1",5,0,5)
 h_true_reco_e = TH2F("h_true_reco_e",";True energy [GeV];Reco. energy [GeV]",18,0.2,2,18,0.2,2)
@@ -194,6 +164,12 @@ def fill_kin_branches(root_chain, weight, variables):
     variables["proton_score"][0] = root_chain.predict_p[most_proton_track_id]
     variables["interaction_type"][0] = root_chain.interaction_type
 
+    variables["shower_open_angle"][0] = math.degrees(root_chain.shower_open_angle[most_energetic_shower_id])
+
+    dedx = root_chain.shower_dEdx[most_energetic_shower_id][2]
+
+    variables["dedx"][0] = dedx
+
 
 def costheta_plot(root_chain, weight=1):
     electrons = sum(1 for i,pdg in enumerate(root_chain.nu_daughters_pdg) if abs(pdg) == 11)
@@ -260,84 +236,106 @@ for n,b in variables.items():
 for i in range(chain_nue.GetEntries()):
     chain_nue.GetEntry(i)
 
-    if chain_nue.passed:
-        h_n_candidates.Fill(chain_nue.n_candidates)
-
+    if chain_nue.passed and chain_numu.muon_is_reco != 1:
 
         if chain_nue.category != 1:
             h_diff.Fill((chain_nue.nu_E-chain_nue.E)/chain_nue.nu_E)
             h_true_reco_e.Fill(chain_nue.nu_E,chain_nue.E)
 
-        proton = True
-        for itrk in range(chain_nue.n_tracks):
-            if chain_nue.predict_p[itrk] < -0.75:
-                proton = False
-                break
-
         tracks_contained = min([chain_nue.track_is_fiducial[i] for i in range(chain_nue.n_tracks)])
         showers_contained = min([chain_nue.shower_is_fiducial[i] for i in range(chain_nue.n_showers)])
 
-        if proton:
+        track_fidvol = True
+        for i in range(chain_nue.n_tracks):
+            track_start = [chain_nue.track_start_x[i], chain_nue.track_start_y[i], chain_nue.track_start_z[i]]
+            track_end = [chain_nue.track_end_x[i], chain_nue.track_end_y[i], chain_nue.track_end_z[i]]
+            track_fidvol = track_fidvol and is_fiducial(track_start) and is_fiducial(track_end)
+
+        shower_fidvol = True
+        for i in range(chain_nue.n_showers):
+            shower_start = [chain_nue.shower_start_x[i], chain_nue.shower_start_y[i], chain_nue.shower_start_z[i]]
+            shower_fidvol = shower_fidvol and is_fiducial(shower_start)
+
+        if track_fidvol and shower_fidvol:
             fill_kin_branches(chain_nue, total_pot/total_nue_pot*chain_nue.bnbweight, variables)
             kin_tree.Fill()
+            h_n_candidates.Fill(chain_nue.n_candidates)
+
 
 
 # BNB + COSMIC SAMPLE
 for i in range(chain.GetEntries()):
     chain.GetEntry(i)
-    numu_passed = False
+    chain_numu.GetEntry(i)
 
-    if chain.event in numu_selected_events:
-        numu_passed = numu_selected_events[chain.event]
+    if chain.passed and abs(chain.nu_pdg) != 12 and chain_numu.muon_is_reco != 1:
+        track_fidvol = True
+        for i in range(chain.n_tracks):
+            track_start = [chain.track_start_x[i], chain.track_start_y[i], chain.track_start_z[i]]
+            track_end = [chain.track_end_x[i], chain.track_end_y[i], chain.track_end_z[i]]
+            track_fidvol = track_fidvol and is_fiducial(track_start) and is_fiducial(track_end)
 
-    if chain.passed and not numu_passed and abs(chain.nu_pdg) != 12:
-        proton = True
-        for itrk in range(chain.n_tracks):
-            if chain.predict_p[itrk] < -0.75:
-                proton = False
-                break
+        shower_fidvol = True
+        for i in range(chain.n_showers):
+            shower_start = [chain.shower_start_x[i], chain.shower_start_y[i], chain.shower_start_z[i]]
+            shower_fidvol = shower_fidvol and is_fiducial(shower_start)
 
-        tracks_contained = min([chain.track_is_fiducial[i] for i in range(chain.n_tracks)])
-        showers_contained = min([chain.shower_is_fiducial[i] for i in range(chain.n_showers)])
-
-        if proton:
+        if track_fidvol and shower_fidvol:
             fill_kin_branches(chain, total_pot/total_bnb_pot, variables)
             kin_tree.Fill()
             h_n_candidates.Fill(chain.n_candidates)
 
+run_subrun_list = []
+run_subrun_file = open("run_subrun_bnb.txt","w")
 for i in range(chain_data_bnb.GetEntries()):
     chain_data_bnb.GetEntry(i)
-    numu_passed = False
 
-    if chain_data_bnb.event in numu_selected_events_data:
-        numu_passed = numu_selected_events_data[chain_data_bnb.event]
+    run_subrun = "%i %i" % (chain_data_bnb.run, chain_data_bnb.subrun)
+    if run_subrun not in run_subrun_list:
+        run_subrun_list.append(run_subrun)
+        print(run_subrun, file=run_subrun_file)
 
-    tracks_contained = 0
-    showers_contained = 0
-    if chain_data_bnb.n_tracks > 0:
-        tracks_contained = min([chain_data_bnb.track_is_fiducial[i] for i in range(chain_data_bnb.n_tracks)])
-        showers_contained = min([chain_data_bnb.shower_is_fiducial[i] for i in range(chain_data_bnb.n_showers)])
+    if chain_data_bnb.passed and chain_data_bnb_numu.muon_is_reco != 1:
+        track_fidvol = True
+        for i in range(chain_data_bnb.n_tracks):
+            track_start = [chain_data_bnb.track_start_x[i], chain_data_bnb.track_start_y[i], chain_data_bnb.track_start_z[i]]
+            track_end = [chain_data_bnb.track_end_x[i], chain_data_bnb.track_end_y[i], chain_data_bnb.track_end_z[i]]
+            track_fidvol = track_fidvol and is_fiducial(track_start) and is_fiducial(track_end)
 
-    if chain_data_bnb.passed and not numu_passed:
-        fill_kin_branches(chain_data_bnb,total_pot/total_data_bnb_pot,variables)
-        bnb_tree.Fill()
+        shower_fidvol = True
+        for i in range(chain_data_bnb.n_showers):
+            shower_start = [chain_data_bnb.shower_start_x[i], chain_data_bnb.shower_start_y[i], chain_data_bnb.shower_start_z[i]]
+            shower_fidvol = shower_fidvol and is_fiducial(shower_start)
 
+        if track_fidvol and shower_fidvol:
+            fill_kin_branches(chain_data_bnb,total_pot/total_data_bnb_pot,variables)
+            bnb_tree.Fill()
+
+run_subrun_list_ext = []
+run_subrun_file_ext = open("run_subrun_ext.txt","w")
 for i in range(chain_data_bnbext.GetEntries()):
     chain_data_bnbext.GetEntry(i)
-    numu_passed = False
 
-    if chain_data_bnbext.event in numu_selected_events_data_ext:
-        numu_passed = numu_selected_events_data_ext[chain_data_bnbext.event]
+    run_subrun = "%i %i" % (chain_data_bnbext.run, chain_data_bnbext.subrun)
+    if run_subrun not in run_subrun_list_ext:
+        run_subrun_list_ext.append(run_subrun)
+        print(run_subrun, file=run_subrun_file_ext)
 
-    tracks_contained = 0
-    showers_contained = 0
-    if chain_data_bnbext.n_tracks > 0:
-        tracks_contained = min([chain_data_bnbext.track_is_fiducial[i] for i in range(chain_data_bnbext.n_tracks)])
-        showers_contained = min([chain_data_bnbext.shower_is_fiducial[i] for i in range(chain_data_bnbext.n_showers)])
+    if chain_data_bnbext.passed and chain_data_bnbext_numu.muon_is_reco != 1:
+        track_fidvol = True
+        for i in range(chain_data_bnbext.n_tracks):
+            track_start = [chain_data_bnbext.track_start_x[i], chain_data_bnbext.track_start_y[i], chain_data_bnbext.track_start_z[i]]
+            track_end = [chain_data_bnbext.track_end_x[i], chain_data_bnbext.track_end_y[i], chain_data_bnbext.track_end_z[i]]
+            track_fidvol = track_fidvol and is_fiducial(track_start) and is_fiducial(track_end)
 
-    if chain_data_bnbext.passed and not numu_passed:
-        fill_kin_branches(chain_data_bnbext,1.2300 * (382718/chain_data_bnbext.GetEntries()) * (chain_data_bnb.GetEntries()/547616),variables)
-        bnbext_tree.Fill()
+        shower_fidvol = True
+        for i in range(chain_data_bnbext.n_showers):
+            shower_start = [chain_data_bnbext.shower_start_x[i], chain_data_bnbext.shower_start_y[i], chain_data_bnbext.shower_start_z[i]]
+            shower_fidvol = shower_fidvol and is_fiducial(shower_start)
+
+        if track_fidvol and shower_fidvol:
+            fill_kin_branches(chain_data_bnbext,data_ext_scaling_factor*total_pot/total_data_bnb_pot,variables)
+            bnbext_tree.Fill()
 
 
 kin_file = TFile("kin_file.root", "RECREATE")

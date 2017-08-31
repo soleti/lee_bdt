@@ -5,7 +5,7 @@ def find_interaction(dictionary,interaction):
         if id_int == interaction:
             return name
 
-total_pot = 2.879e19
+total_pot = 5e19
 
 description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
 
@@ -71,7 +71,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.05
+bdt_cut = -10.05
 
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
@@ -109,6 +109,8 @@ run = array("f", [0])
 subrun = array("f", [0])
 interaction_type = array("f", [0])
 is_signal = array("f", [ 0 ] )
+shower_open_angle = array("f", [0])
+dedx = array("f", [0])
 
 spectators = [
     ("category", category),
@@ -144,8 +146,9 @@ variables = [
     ("shower_start_y",shower_start_y),
     ("shower_start_x",shower_start_x),
     ("shower_start_z",shower_start_z),
-    ("reco_energy", reco_energy)
-
+    ("reco_energy", reco_energy),
+    ("shower_open_angle", shower_open_angle),
+    ("dedx",dedx)
 ]
 labels = {
     "n_tracks":";# tracks;N.Entries / 1",
@@ -174,7 +177,8 @@ labels = {
     "shower_energy":";Shower energy [GeV]; N. Entries / 0.1 GeV",
     "pt":";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
     "reco_energy":";Reco. energy [GeV]; N. Entries / 0.1 GeV",
-
+    "shower_open_angle":";Shower open angle [#circ]; N. Entries / 2#circ",
+    "dedx":";dE/dx [MeV/cm]; N. Entries / 0.2 MeV/cm"
 }
 
 binning = {
@@ -203,6 +207,7 @@ binning = {
     "proton_score":[10,0,1],
     "shower_energy":[20,0,2],
     "pt":[20,0,2],
-    "reco_energy":[19,0.1,2]
-
+    "reco_energy":[19,0.1,2],
+    "shower_open_angle":[45,0,90],
+    "dedx":[40,0,8]
 }
