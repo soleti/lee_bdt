@@ -7,7 +7,7 @@ def find_interaction(dictionary,interaction):
 
 total_pot = 5e19
 
-description = ["Other", "Cosmic", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Cosmic contaminated"]
+description = ["Other", "Cosmic", "Cosmic contaminated", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data"]
 
 interactions = {
     "kQE":0,
@@ -71,8 +71,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.11
-
+bdt_cut = 0.43
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
 track_phi = array("f", [ 0 ] )

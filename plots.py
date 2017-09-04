@@ -190,10 +190,12 @@ def fill_tree(chain, chain_numu, weight, tree):
     return total_events
 
 cosmic_mc = glob("cosmic_only/*/*.root")
-bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
-data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
-data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
-
+# bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
+# data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
+# data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
+bnb_cosmic = glob("mc_bnb_nofidvol/*/*.root")
+data_bnb = glob("data_bnb_nofidvol/*/*.root")
+data_bnbext = glob("data_ext_nofidvol/*/*.root")
 chain_cosmic_mc = TChain("robertoana/pandoratree")
 chain_cosmic_mc_numu = TChain("UBXSec/tree")
 

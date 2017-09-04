@@ -37,7 +37,7 @@ for name, var in spectators:
 
 
 reader.BookMVA("BDT method","dataset/weights/TMVAClassification_BDT.weights.xml")
-description = ["Other", "Cosmic", "Cosmic contaminated", "Beam Intrinsic #nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC", "Dirt", "Data"]
+
 
 variables_dict = dict(variables)
 
@@ -115,6 +115,10 @@ legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0
 legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
 legend.SetNColumns(2)
 
+legend_cosmic = ROOT.TLegend(0.099,0.909,0.900,0.987,"","brNDC")
+legend_cosmic.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "lep")
+legend_cosmic.AddEntry(histograms_cosmic[0], "CORSIKA Monte Carlo: shape normalized", "f")
+legend_cosmic.SetNColumns(2)
 canvases = []
 h_errs = []
 h_ratios = []
@@ -125,13 +129,18 @@ for i in range(len(histograms)):
 
     histograms[i].SetLineColor(ROOT.kBlack)
 
-    c_cosmic = ROOT.TCanvas("c%i_canvas" % i)
-    # histograms_cosmic[i].Scale(histograms[i].Integral()/histograms_cosmic[i].Integral())
+    c_cosmic = ROOT.TCanvas("c%i_canvas" % i,"",900,44,700,645)
+    if histograms_cosmic[i].Integral() > 0:
+        histograms_cosmic[i].Scale(histograms[i].Integral()/histograms_cosmic[i].Integral())
     histograms_cosmic[i].SetLineColor(ROOT.kBlack)
-    histograms_cosmic[i].SetMarkerStyle(20)
-    histograms_cosmic[i].Draw("ep")
-    histograms[i].Draw("hist same")
+    histograms_cosmic[i].SetFillColor(ROOT.kRed-3)
+    histograms_cosmic[i].Draw("hist")
+    histograms[i].SetMarkerStyle(20)
+    histograms[i].Draw("ep same")
+    legend_cosmic.Draw()
+    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01,histograms_cosmic[i].GetMaximum()*1.3)
     c_cosmic.Update()
+    c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
     canvases_cosmic.append(c_cosmic)
 
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
