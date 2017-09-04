@@ -4,9 +4,9 @@ import ROOT
 from bdt_common import binning, labels, variables, spectators, bdt_cut
 
 
-f_input = ROOT.TFile("kin_file.root")
+f_input = ROOT.TFile("mc_file.root")
 t = ROOT.TTree()
-t = f_input.Get("kin_tree")
+t = f_input.Get("mc_tree")
 
 ROOT.TMVA.Tools.Instance()
 fout = ROOT.TFile("test.root","RECREATE")

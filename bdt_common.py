@@ -71,7 +71,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = -10.05
+bdt_cut = 0.11
 
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
@@ -178,7 +178,7 @@ labels = {
     "pt":";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
     "reco_energy":";Reco. energy [GeV]; N. Entries / 0.1 GeV",
     "shower_open_angle":";Shower open angle [#circ]; N. Entries / 2#circ",
-    "dedx":";dE/dx [MeV/cm]; N. Entries / 0.2 MeV/cm"
+    "dedx":";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm"
 }
 
 binning = {
@@ -208,6 +208,6 @@ binning = {
     "shower_energy":[20,0,2],
     "pt":[20,0,2],
     "reco_energy":[19,0.1,2],
-    "shower_open_angle":[45,0,90],
-    "dedx":[40,0,8]
+    "shower_open_angle":[23,0,46],
+    "dedx":[19,0.3,6]
 }

@@ -45,15 +45,32 @@ for i,n in enumerate(variables_dict.keys()):
 histo_dict = dict(zip(variables_dict.keys(), kinds))
 bkg_types = [0]*2000
 
-h_bdt = ROOT.TH1F("h_bdt_mc",";BDT response; N. Entries / 0.05", 40,-1,1)
+h_bdt_stack = ROOT.THStack("h_bdt",";BDT response; N. Entries / 0.05")
+h_bdts = []
+for i,c in enumerate(categories):
+    h = ROOT.TH1F("h_bdt_%s" % c, "BDT response; N. Entries / 0.05", 40, -1, 1)
+    h.SetLineColor(1)
+    h.SetFillColor(colors[i])
+    h.SetLineWidth(2)
+    h_bdts.append(h)
+
+h_bdt_stack.Add(h_bdts[0])
+h_bdt_stack.Add(h_bdts[1])
+h_bdt_stack.Add(h_bdts[7])
+h_bdt_stack.Add(h_bdts[2])
+h_bdt_stack.Add(h_bdts[3])
+h_bdt_stack.Add(h_bdts[4])
+h_bdt_stack.Add(h_bdts[5])
+h_bdt_stack.Add(h_bdts[6])
 
 for i in range(tout.GetEntries()):
     tout.GetEntry(i)
-    h_bdt.Fill(tout.BDT, tout.event_weight*2)
+    category = int(tout.category)
+
+    h_bdts[category].Fill(tout.BDT, tout.event_weight*2)
 
     if tout.BDT > bdt_cut:
 
-        category = int(tout.category)
 
         # Store interaction types of background events
         if tout.reco_energy > 0.1 and tout.category == 4 and tout.category != 1 and tout.category != 2:
@@ -62,8 +79,8 @@ for i in range(tout.GetEntries()):
         for name, var in variables:
             histo_dict[name][category].Fill(var[0],tout.event_weight*2)
 
-f_bdt = ROOT.TFile("bdt_mc.root", "RECREATE")
-h_bdt.Write()
+f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
+h_bdt_stack.Write()
 f_bdt.Close()
 
 for i,histos in enumerate(kinds):

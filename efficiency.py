@@ -8,7 +8,7 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("nue_files_dedx/*/Pandora*.root")
+nue_cosmic = glob("nue_files_6_42_energy/*/Pandora*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 chain_nue_pot = ROOT.TChain("robertoana/pot")
 
@@ -144,7 +144,7 @@ for i in range(entries):
 
 
             if protons == 1:
-                e_proton.Fill(chain_nue.passed and p_track and p_shower and proton_energy-0.938>0.04, proton_energy-0.938)
+                e_proton.Fill(chain_nue.passed and p_track and p_shower, proton_energy-0.938)
 
             if chain_nue.passed and protons == 1 and chain_nue.nu_matched_tracks == 1 and dist < 2:
                 l_e_proton.Fill(chain_nue.track_len[0], proton_energy-0.938)

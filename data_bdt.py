@@ -35,7 +35,7 @@ for i,n in enumerate(variables_dict.keys()):
 
 histo_dict = dict(zip(variables_dict.keys(),histograms))
 
-h_bdt = ROOT.TH1F("h_bdt_data",";BDT response; N. Entries / 0.05", 40,-1,1)
+h_bdt = ROOT.TH1F("h_bdt",";BDT response; N. Entries / 0.05", 40,-1,1)
 
 
 for i in range(t_data.GetEntries()):
@@ -48,7 +48,7 @@ for i in range(t_data.GetEntries()):
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
-f_bdt = ROOT.TFile("bdt_data.root", "RECREATE")
+f_bdt = ROOT.TFile("plots/h_bdt_data.root", "RECREATE")
 h_bdt.Write()
 f_bdt.Close()
 

@@ -50,7 +50,7 @@ for i,n in enumerate(variables_dict.keys()):
 
 histo_dict = dict(zip(variables_dict.keys(),histograms))
 
-h_bdt = ROOT.TH1F("h_bdt_dataext",";BDT response; N. Entries / 0.05", 40,-1,1)
+h_bdt = ROOT.TH1F("h_bdt",";BDT response; N. Entries / 0.05", 40,-1,1)
 
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
@@ -62,7 +62,7 @@ for i in range(t_data.GetEntries()):
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
-f_bdt = ROOT.TFile("bdt_dataext.root", "RECREATE")
+f_bdt = ROOT.TFile("plots/h_bdt_dataext.root", "RECREATE")
 h_bdt.Write()
 f_bdt.Close()
 
@@ -71,9 +71,16 @@ data_files = []
 for h in histograms:
     data_files.append(ROOT.TFile("plots/%s_data.root" % h.GetName()))
 
+histograms_cosmic = []
+cosmic_files = []
+for h in histograms:
+    cosmic_files.append(ROOT.TFile("plots/%s_cosmic.root" % h.GetName()))
+
 for i,h in enumerate(histograms):
     h_data = data_files[i].Get(h.GetName())
+    h_cosmic = cosmic_files[i].Get(h.GetName())
     histograms_data.append(h_data)
+    histograms_cosmic.append(h_cosmic)
 
 
 histograms_mc = []
@@ -93,7 +100,7 @@ for j in range(histograms_mc[0].GetNhists()):
         legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
 
 
-
+#
 # for i in range(len(histograms)):
 #     for j in range(histograms_data[i].GetNbinsX()):
 #         histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
@@ -105,7 +112,7 @@ for j in range(histograms_mc[0].GetNhists()):
 
 legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0].Integral()), "lep")
 
-legend.AddEntry(histograms[0], "Data BNB EXT: %.0f events" % (histograms[0].Integral()), "f")
+legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
 legend.SetNColumns(2)
 
 canvases = []
@@ -113,11 +120,23 @@ h_errs = []
 h_ratios = []
 pads = []
 lines = []
+canvases_cosmic = []
 for i in range(len(histograms)):
+
+    histograms[i].SetLineColor(ROOT.kBlack)
+
+    c_cosmic = ROOT.TCanvas("c%i_canvas" % i)
+    # histograms_cosmic[i].Scale(histograms[i].Integral()/histograms_cosmic[i].Integral())
+    histograms_cosmic[i].SetLineColor(ROOT.kBlack)
+    histograms_cosmic[i].SetMarkerStyle(20)
+    histograms_cosmic[i].Draw("ep")
+    histograms[i].Draw("hist same")
+    c_cosmic.Update()
+    canvases_cosmic.append(c_cosmic)
+
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
     c = ROOT.TCanvas("c%i" % i,"",900,44,700,645)
-    histograms[i].SetLineColor(ROOT.kBlack)
     histograms_mc[i].Add(histograms[i])
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
@@ -172,12 +191,12 @@ for i in range(len(histograms)):
     h_ratio.GetXaxis().SetLabelSize(0.13);
     h_ratio.GetXaxis().SetTitleSize(0.13);
     h_ratio.GetXaxis().SetTitleOffset(0.91);
-    h_ratio.GetYaxis().SetTitle("Data/MC");
+    h_ratio.GetYaxis().SetTitle("BNB/(MC+EXT)");
     h_ratio.GetYaxis().SetNdivisions(509);
     h_ratio.GetYaxis().SetLabelFont(42);
     h_ratio.GetYaxis().SetLabelSize(0.13);
     h_ratio.GetYaxis().SetTitleSize(0.13);
-    h_ratio.GetYaxis().SetTitleOffset(0.4);
+    h_ratio.GetYaxis().SetTitleOffset(0.36);
     h_ratio.Draw("ep")
     line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1, h_ratio.GetXaxis().GetXmax(), 1)
     line.SetLineWidth(2)
@@ -188,7 +207,6 @@ for i in range(len(histograms)):
     c.Update()
     c.SaveAs("plots/%s.pdf" % histograms[i].GetName())
     canvases.append(c)
-
 
 
 input()
