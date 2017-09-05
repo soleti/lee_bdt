@@ -2,7 +2,7 @@
 
 import ROOT
 import math
-from bdt_common import binning, labels, variables, spectators, bdt_cut, description
+from bdt_common import binning, labels, variables, spectators, bdt_cut, description, total_pot
 from glob import glob
 ROOT.gStyle.SetOptStat(0)
 f_data = ROOT.TFile("bnbext_file.root")
@@ -92,27 +92,25 @@ for h in histograms:
 legend = ROOT.TLegend(0.09455587,0.7850208,0.8923496,0.9791956,"","brNDC")
 legend.SetTextSize(16)
 legend.SetTextFont(63)
-legend.SetHeader("MicroBooNE Preliminary 5e19 POT");
+legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot);
 legend.SetTextFont(43)
 
 for j in range(histograms_mc[0].GetNhists()):
     if histograms_mc[0].GetHists()[j].Integral():
         legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
 
+# legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0].Integral()), "lep")
+# legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
 
-#
-# for i in range(len(histograms)):
-#     for j in range(histograms_data[i].GetNbinsX()):
-#         histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
-#         if histograms_data[i].GetBinContent(j) > 0:
-#            histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
-#     histograms_data[i].Scale(total_data_bnb_pot/5e19)
+for i in range(len(histograms)):
+    for j in range(histograms_data[i].GetNbinsX()):
+        histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
+        if histograms_data[i].GetBinContent(j) > 0:
+           histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
 
-#legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
+legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
 
-legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0].Integral()), "lep")
 
-legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
 legend.SetNColumns(2)
 
 legend_cosmic = ROOT.TLegend(0.099,0.909,0.900,0.987,"","brNDC")
@@ -129,24 +127,24 @@ for i in range(len(histograms)):
 
     histograms[i].SetLineColor(ROOT.kBlack)
 
-    c_cosmic = ROOT.TCanvas("c%i_canvas" % i,"",900,44,700,645)
-    if histograms_cosmic[i].Integral() > 0:
-        histograms_cosmic[i].Scale(histograms[i].Integral()/histograms_cosmic[i].Integral())
-    histograms_cosmic[i].SetLineColor(ROOT.kBlack)
-    histograms_cosmic[i].SetFillColor(ROOT.kRed-3)
-    histograms_cosmic[i].Draw("hist")
-    histograms[i].SetMarkerStyle(20)
-    histograms[i].Draw("ep same")
-    legend_cosmic.Draw()
-    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01,histograms_cosmic[i].GetMaximum()*1.3)
-    c_cosmic.Update()
-    c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
-    canvases_cosmic.append(c_cosmic)
+    # c_cosmic = ROOT.TCanvas("c%i_canvas" % i,"",900,44,700,645)
+    # if histograms_cosmic[i].Integral() > 0:
+    #     histograms_cosmic[i].Scale(histograms[i].Integral()/histograms_cosmic[i].Integral())
+    # histograms_cosmic[i].SetLineColor(ROOT.kBlack)
+    # histograms_cosmic[i].SetFillColor(ROOT.kRed-3)
+    # histograms_cosmic[i].Draw("hist")
+    # histograms[i].SetMarkerStyle(20)
+    # histograms[i].Draw("ep same")
+    # legend_cosmic.Draw()
+    # histograms_cosmic[i].GetYaxis().SetRangeUser(0.01,histograms_cosmic[i].GetMaximum()*1.3)
+    # c_cosmic.Update()
+    # c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
+    # canvases_cosmic.append(c_cosmic)
 
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
     c = ROOT.TCanvas("c%i" % i,"",900,44,700,645)
-    histograms_mc[i].Add(histograms[i])
+    # histograms_mc[i].Add(histograms[i])
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)

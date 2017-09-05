@@ -71,7 +71,8 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.43
+bdt_cut = 0.05
+
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
 track_phi = array("f", [ 0 ] )
@@ -110,6 +111,7 @@ interaction_type = array("f", [0])
 is_signal = array("f", [ 0 ] )
 shower_open_angle = array("f", [0])
 dedx = array("f", [0])
+numu_score = array("f", [0])
 
 spectators = [
     ("category", category),
@@ -147,7 +149,8 @@ variables = [
     ("shower_start_z",shower_start_z),
     ("reco_energy", reco_energy),
     ("shower_open_angle", shower_open_angle),
-    ("dedx",dedx)
+    ("dedx",dedx),
+    ("numu_score",numu_score)
 ]
 labels = {
     "n_tracks":";# tracks;N.Entries / 1",
@@ -177,7 +180,8 @@ labels = {
     "pt":";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
     "reco_energy":";Reco. energy [GeV]; N. Entries / 0.1 GeV",
     "shower_open_angle":";Shower open angle [#circ]; N. Entries / 2#circ",
-    "dedx":";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm"
+    "dedx":";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm",
+    "numu_score":";#nu_{#mu} selection score; N. Entries / 0.01"
 }
 
 binning = {
@@ -208,5 +212,6 @@ binning = {
     "pt":[20,0,2],
     "reco_energy":[19,0.1,2],
     "shower_open_angle":[23,0,46],
-    "dedx":[19,0.3,6]
+    "dedx":[19,0.3,6],
+    "numu_score":[20,0,1]
 }
