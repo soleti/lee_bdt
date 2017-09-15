@@ -8,21 +8,11 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("mc_nue_nofidvol/*/Pandora*.root")[:1]
-print(nue_cosmic)
+nue_cosmic = glob("nue_efficiency/*/Pandora*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
-chain_nue_pot = ROOT.TChain("robertoana/pot")
 
 for f in nue_cosmic:
     chain_nue.Add(f)
-    chain_nue_pot.Add(f)
-
-# total_pot = 6.6e20
-# total_nue_pot = 0
-# for i in range(chain_nue_pot.GetEntries()):
-#     chain_nue_pot.GetEntry(i)
-#     total_nue_pot += chain_nue_pot.pot
-# print("Total POT v_e", total_nue_pot)
 
 e_energy = ROOT.TEfficiency("e_energy",
                             ";#nu_{e} energy [GeV];Fraction", 20, 0, 2)
@@ -70,9 +60,7 @@ h_z_diff = ROOT.TH1F("h_z_diff",
 
 is_fiducial = 0
 eNp = 0
-yesshower_notrack = 0
-noshower_yestrack = 0
-noshower_notrack = 0
+
 passed = 0
 not_passed = 0
 flash_passed = 0
@@ -165,8 +153,6 @@ for i in range(entries):
                 h_y_diff.Fill(neutrino_vertex[1] - true_neutrino_vertex[1])
                 h_z_diff.Fill(neutrino_vertex[2] - true_neutrino_vertex[2])
 
-                # print("proton", protons, chain_nue.nu_matched_tracks)
-                # print("electrons", electrons, chain_nue.nu_matched_showers)
                 p_energy.Fill(p_track and p_shower, chain_nue.nu_E)
                 p_dist_energy.Fill(chain_nue.distance < 5, chain_nue.nu_E)
 
@@ -195,16 +181,6 @@ print("1eNp + Is fiducial", is_fiducial)
 
 print("Passed", passed)
 print("Not passed", not_passed)
-
-print("No flash {:.1f} %".format(
-    noflash / not_passed * 100))
-print("Yes shower no track {:.1f} %".format(
-    yesshower_notrack / not_passed * 100))
-print("No shower yes track {:.1f} %".format(
-    noshower_yestrack / not_passed * 100))
-print("No shower no track {:.1f} %".format(
-    noshower_notrack / not_passed * 100))
-
 
 eff = passed / is_fiducial
 eff_err = math.sqrt((eff * (1 - eff)) / eNp)
@@ -240,12 +216,12 @@ pt.SetShadowColor(0)
 
 legend = ROOT.TLegend(0.13, 0.68, 0.84, 0.86)
 legend.SetTextSize(16)
-legend.AddEntry(e_energy, "#epsilon ({0:.1f} \
-                #pm {1:.1f}) %".format(eff * 100, eff_err * 100),
+legend.AddEntry(e_energy, "#epsilon ({0:.1f} #pm {1:.1f}) %"
+                .format(eff * 100, eff_err * 100),
                 "lep")
 
 legend.AddEntry(e_energy, "", "")
-legend.AddEntry(p_energy, "P_{{reco}} \({0:.1f} #pm {1:.1f}) %"
+legend.AddEntry(p_energy, "P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
                 .format(p_reco * 100, p_reco_err * 100),
                 "lep")
 
@@ -253,9 +229,9 @@ legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
                 .format(p_vertex * 100, p_vertex_err * 100), "lep")
 legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
                 .format(ep_reco * 100, ep_reco_err * 100), "lep")
-legend.AddEntry(ep_dist_energy, "#epsilon #times P_{{vertex}} \
-                ({0:.1f} #pm {1:.1f}) %"
-                .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
+legend.AddEntry(
+    ep_dist_energy, "#epsilon #times P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
+    .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
 
 legend.SetNColumns(2)
 
