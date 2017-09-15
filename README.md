@@ -12,18 +12,6 @@ First, we fill the tree that will be used by the BDT:
 
 ```python plots.py```
 
-Then, we run the BDT training
+Then, to run the BDT and plot the results:
 
-```python bdt.py```
-
-We apply the BDT to the Monte Carlo...
-
-```python mc_bdt.py```
-
-...to the BNB data... 
-
-```python data_bdt.py```
-
-...and finally to the EXT BNB data. This module also generates all the plots.
-
-```pythond dataext_bdt.py```
+```source run_bdt.sh```
