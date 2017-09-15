@@ -8,7 +8,8 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("nue_files_6_42_energy/*/Pandora*.root")
+nue_cosmic = glob("mc_nue_nofidvol/*/Pandora*.root")[:1]
+print(nue_cosmic)
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 chain_nue_pot = ROOT.TChain("robertoana/pot")
 
@@ -87,9 +88,6 @@ for i in range(entries):
         if chain_nue.true_nu_is_fiducial:
             is_fiducial += 1
 
-            if chain_nue.flash_passed:
-                flash_passed += 1
-
 
             p = False
             p_track = False
@@ -135,12 +133,16 @@ for i in range(entries):
 
             else:
                 not_passed+=1
-                if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
-                    yesshower_notrack += 1
-                if chain_nue.track_passed > 0 and chain_nue.shower_passed <= 0:
-                    noshower_yestrack += 1
-                if chain_nue.track_passed <= 0 and chain_nue.shower_passed <= 0:
-                    noshower_notrack += 1
+                if chain_nue.flash_passed > 0:
+                    if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
+                        yesshower_notrack += 1
+                    if chain_nue.track_passed > 0 and chain_nue.shower_passed <= 0:
+                        noshower_yestrack += 1
+                    if chain_nue.track_passed <= 0 and chain_nue.shower_passed <= 0:
+                        noshower_notrack += 1
+                if chain_nue.flash_passed == 1 and chain_nue.track_passed == 1 and chain_nue.shower_passed == 1: print(chain_nue.run, chain_nue.subrun, chain_nue.event)
+                else:
+                    noflash += 1
 
 
             if protons == 1:
@@ -157,15 +159,14 @@ for i in range(entries):
 print("Entries", entries)
 print("1eNp", eNp)
 print("1eNp + Is fiducial", is_fiducial)
-print("1eNp + Is fiducial + Flash passed", flash_passed)
+
 print("Passed", passed)
-
 print("Not passed", not_passed)
-print("Not flash", noflash)
 
-print("Yes shower no track", yesshower_notrack/not_passed)
-print("No shower yes track", noshower_yestrack/not_passed)
-print("No shower no track", noshower_notrack/not_passed)
+print("No flash {:.1f} %".format(noflash/not_passed*100))
+print("Yes shower no track {:.1f} %".format(yesshower_notrack/not_passed*100))
+print("No shower yes track {:.1f} %".format(noshower_yestrack/not_passed*100))
+print("No shower no track {:.1f} %".format(noshower_notrack/not_passed*100))
 
 
 eff = passed/is_fiducial
