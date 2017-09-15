@@ -7,3 +7,5 @@
 dataset
 *.ipynb*
 __pycache__
+dedx.py
+eff_comparison.py
