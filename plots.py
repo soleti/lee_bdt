@@ -186,7 +186,7 @@ def numu_selection(mychain):
     return -99999
 
 
-def fill_tree(chain, chain_numu, weight, tree):
+def fill_tree(chain, chain_numu, weight, tree, option=""):
     total_events = 0
 
     for i in range(chain.GetEntries()):
@@ -208,26 +208,49 @@ def fill_tree(chain, chain_numu, weight, tree):
 
             dedx = chain.shower_dEdx[choose_shower(chain)][2]
 
-            if is_fiducial(neutrino_vertex) and track_fidvol and shower_fidvol:
-                total_events += weight
-                fill_kin_branches(chain,chain_numu,weight,variables)
+            option_check = True
+            event_weight = weight
+            if option == "bnb":
+                option_check = abs(chain.nu_pdg) != 12
+            if option == "nue":
+                event_weight = weight*chain.bnbweight
+                option_check = abs(chain.nu_pdg) == 12
+
+            most_energetic_shower_id = choose_shower(chain)
+            dedx = chain.shower_dEdx[most_energetic_shower_id][2]
+
+            if is_active(neutrino_vertex) and track_fidvol and shower_fidvol and option_check:
+                total_events += event_weight
+                fill_kin_branches(chain,chain_numu,event_weight,variables)
                 tree.Fill()
+
 
     return total_events
 
 cosmic_mc = glob("cosmic_only/*/*.root")
-bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
-data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
-data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
-# bnb_cosmic = glob("mc_bnb_nofidvol/*/*.root")
-# data_bnb = glob("data_bnb_nofidvol/*/*.root")
-# data_bnbext = glob("data_ext_nofidvol/*/*.root")
+
+# nue_cosmic = glob("nue_files_6_42_energy/*/*.root")
+# bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
+# data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
+# data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
+# data_ext_scaling_factor = 1.2640
+
+data_ext_scaling_factor = 1.2693
+nue_cosmic = glob("mc_nue_nofidvol/*/*.root")
+bnb_cosmic = glob("mc_bnb_nofidvol/*/*.root")
+data_bnb = glob("data_bnb_nofidvol/*/*.root")
+data_bnbext = glob("data_ext_nofidvol/*/*.root")
+
 chain_cosmic_mc = TChain("robertoana/pandoratree")
 chain_cosmic_mc_numu = TChain("UBXSec/tree")
 
 chain = TChain("robertoana/pandoratree")
 chain_pot = TChain("robertoana/pot")
 chain_numu = TChain("UBXSec/tree")
+
+chain_nue = TChain("robertoana/pandoratree")
+chain_nue_pot = TChain("robertoana/pot")
+chain_nue_numu = TChain("UBXSec/tree")
 
 chain_data_bnb = TChain("robertoana/pandoratree")
 chain_data_bnb_pot = TChain("robertoana/pot")
@@ -240,6 +263,11 @@ chain_data_bnbext_numu = TChain("UBXSec/tree")
 for f in cosmic_mc:
     chain_cosmic_mc.Add(f)
     chain_cosmic_mc_numu.Add(f)
+
+for f in nue_cosmic:
+    chain_nue.Add(f)
+    chain_nue_pot.Add(f)
+    chain_nue_numu.Add(f)
 
 for f in bnb_cosmic:
     chain.Add(f)
@@ -257,6 +285,11 @@ for f in data_bnbext:
     chain_data_bnbext_numu.Add(f)
 
 run_subrun_list = []
+
+total_nue_pot = 0
+for i in range(chain_nue_pot.GetEntries()):
+    chain_nue_pot.GetEntry(i)
+    total_nue_pot += chain_nue_pot.pot
 
 total_bnb_pot = 0
 for i in range(chain_pot.GetEntries()):
@@ -284,7 +317,6 @@ for i in range(chain_data_bnbext_pot.GetEntries()):
     print(run_subrun, file=run_subrun_ext)
 run_subrun_ext.close()
 
-data_ext_scaling_factor = 1.264
 print("Data EXT scaling factor {0:.2f}".format(data_ext_scaling_factor))
 
 variables = dict(variables+spectators)
@@ -305,8 +337,12 @@ total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu, 1, cosmic_mc_
 print("MC cosmic {} events".format(total_cosmic_mc))
 
 print ("*** MC BNB + cosmic sample ***")
-total_mc = fill_tree(chain, chain_numu, total_pot/total_bnb_pot, mc_tree)
+total_mc = fill_tree(chain, chain_numu, total_pot/total_bnb_pot, mc_tree, "bnb")
 print("MC {0:.0f} events".format(total_mc))
+
+print ("*** MC nu_e + cosmic sample ***")
+total_nu_e = fill_tree(chain_nue, chain_nue_numu, total_pot/total_nue_pot, mc_tree, "nue")
+print("MC nu_e {0:.0f} events".format(total_nu_e))
 
 print ("*** Data BNB sample ***")
 total_data_bnb = fill_tree(chain_data_bnb, chain_data_bnb_numu, total_pot/total_data_bnb_pot, bnb_tree)
