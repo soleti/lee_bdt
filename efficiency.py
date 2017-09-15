@@ -24,27 +24,49 @@ for f in nue_cosmic:
 #     total_nue_pot += chain_nue_pot.pot
 # print("Total POT v_e", total_nue_pot)
 
-e_energy = ROOT.TEfficiency("e_energy",";#nu_{e} energy [GeV];Fraction",20,0,2)
-ep_energy = ROOT.TEfficiency("e_energy",";#nu_{e} energy [GeV];Efficiency #times Purity",20,0,2)
+e_energy = ROOT.TEfficiency("e_energy",
+                            ";#nu_{e} energy [GeV];Fraction", 20, 0, 2)
+ep_energy = ROOT.TEfficiency("e_energy",
+                             ";#nu_{e} energy [GeV];Efficiency #times Purity",
+                             20, 0, 2)
 
-e_proton = ROOT.TEfficiency("e_proton",";p kinetic energy [GeV];#epsilon #times P_{reco}",20,0,0.5)
+e_proton = ROOT.TEfficiency("e_proton",
+                            ";p kinetic energy [GeV];#epsilon #times P_{reco}",
+                            20, 0, 0.5)
 
-h_dedx_electron = ROOT.TH1F("h_dedx_electron","Electrons;dE/dx [MeV/cm];Area normalized", 50,0,5)
-h_dedx_photon = ROOT.TH1F("h_dedx_photon","Photons;dE/dx [MeV/cm];Area normalized", 50,0,5)
+h_dedx_electron = ROOT.TH1F("h_dedx_electron",
+                            "Electrons;dE/dx [MeV/cm];Area normalized",
+                            50, 0, 5)
+h_dedx_photon = ROOT.TH1F("h_dedx_photon",
+                          "Photons;dE/dx [MeV/cm];Area normalized",
+                          50, 0, 5)
 
+p_energy = ROOT.TEfficiency("p_energy",
+                            ";#nu_{e} energy [GeV];Purity",
+                            20, 0, 2)
+p_dist_energy = ROOT.TEfficiency("p_dist_energy",
+                                 ";#nu_{e} energy [GeV];Purity",
+                                 20, 0, 2)
+ep_dist_energy = ROOT.TEfficiency("p_dist_energy",
+                                  ";#nu_{e} energy [GeV];Efficiency #times \
+                                  Purity",
+                                  20, 0, 2)
 
-p_energy = ROOT.TEfficiency("p_energy",";#nu_{e} energy [GeV];Purity",20,0,2)
-p_dist_energy = ROOT.TEfficiency("p_dist_energy",";#nu_{e} energy [GeV];Purity",20,0,2)
-ep_dist_energy = ROOT.TEfficiency("p_dist_energy",";#nu_{e} energy [GeV];Efficiency #times Purity",20,0,2)
+l_e_proton = ROOT.TH2F("l_e_proton",
+                       ";Reco. track length [cm];True p kinetic energy [GeV]",
+                       100, 0, 50, 100, 0, 0.5)
 
-l_e_proton = ROOT.TH2F("l_e_proton",";Reco. track length [cm];True p kinetic energy [GeV]",100,0,50,100,0,0.5)
+h_dist = ROOT.TH1F("h_dist", ";Distance [cm];N. Entries / 0.2 cm", 50, 0, 10)
+h_dist_nosce = ROOT.TH1F("h_dist_nosce",
+                         ";Distance [cm];N. Entries / 0.2 cm",
+                         50, 0, 10)
 
-h_dist = ROOT.TH1F("h_dist",";Distance [cm];N. Entries / 0.2 cm",50,0,10)
-h_dist_nosce = ROOT.TH1F("h_dist_nosce",";Distance [cm];N. Entries / 0.2 cm",50,0,10)
-
-h_x_diff = ROOT.TH1F("h_x_diff",";#Delta x [cm]; N. Entries / 0.2 cm",50,-5,5)
-h_y_diff = ROOT.TH1F("h_y_diff",";#Delta y [cm]; N. Entries / 0.2 cm",50,-5,5)
-h_z_diff = ROOT.TH1F("h_z_diff",";#Delta z [cm]; N. Entries / 0.2 cm",50,-5,5)
+h_x_diff = ROOT.TH1F("h_x_diff",
+                     ";#Delta x [cm]; N. Entries / 0.2 cm", 50, -5, 5)
+h_y_diff = ROOT.TH1F("h_y_diff",
+                     ";#Delta y [cm]; N. Entries / 0.2 cm", 50, -5, 5)
+h_z_diff = ROOT.TH1F("h_z_diff",
+                     ";#Delta z [cm]; N. Entries / 0.2 cm", 50, -5, 5)
 
 is_fiducial = 0
 eNp = 0
@@ -83,19 +105,20 @@ for i in range(entries):
             pions += 1
 
     if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
-        eNp+=1
+        eNp += 1
 
         if chain_nue.true_nu_is_fiducial:
             is_fiducial += 1
-
 
             p = False
             p_track = False
             p_shower = False
 
-            if protons == chain_nue.nu_matched_tracks: p_track = True
+            if protons == chain_nue.nu_matched_tracks:
+                p_track = True
 
-            if electrons == chain_nue.nu_matched_showers: p_shower = True
+            if electrons == chain_nue.nu_matched_showers:
+                p_shower = True
 
             if p_track and p_shower:
                 p = True
@@ -111,16 +134,19 @@ for i in range(entries):
             dist = 0
 
             if chain_nue.passed:
-                dist = math.sqrt(sum([(t-r)**2 for t,r in zip(neutrino_vertex,true_neutrino_vertex)]))
+                dist = math.sqrt(sum([(t-r) ** 2 for t, r in zip(neutrino_vertex,true_neutrino_vertex)]))
 
-                passed+=1
+                passed += 1
                 if p:
                     reco_ok += 1
                 if chain_nue.distance < 5:
                     vertex_ok += 1
 
                 h_dist.Fill(dist)
-                h_dist_nosce.Fill(math.sqrt(sum([(t-r)**2 for t,r in zip(neutrino_vertex,true_neutrino_vertex_nosce)])))
+                h_dist_nosce.Fill(math.sqrt(
+                    sum([(t - r)**2 for t, r in zip(
+                        neutrino_vertex, true_neutrino_vertex_nosce)])
+                ))
 
                 h_x_diff.Fill(neutrino_vertex[0]-true_neutrino_vertex[0])
                 h_y_diff.Fill(neutrino_vertex[1]-true_neutrino_vertex[1])
@@ -132,7 +158,7 @@ for i in range(entries):
                 p_dist_energy.Fill(chain_nue.distance < 5, chain_nue.nu_E)
 
             else:
-                not_passed+=1
+                not_passed += 1
                 if chain_nue.flash_passed > 0:
                     if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
                         yesshower_notrack += 1
@@ -163,65 +189,83 @@ print("1eNp + Is fiducial", is_fiducial)
 print("Passed", passed)
 print("Not passed", not_passed)
 
-print("No flash {:.1f} %".format(noflash/not_passed*100))
-print("Yes shower no track {:.1f} %".format(yesshower_notrack/not_passed*100))
-print("No shower yes track {:.1f} %".format(noshower_yestrack/not_passed*100))
-print("No shower no track {:.1f} %".format(noshower_notrack/not_passed*100))
+print("No flash {:.1f} %".format(
+    noflash / not_passed * 100))
+print("Yes shower no track {:.1f} %".format(
+    yesshower_notrack / not_passed * 100))
+print("No shower yes track {:.1f} %".format(
+    noshower_yestrack / not_passed * 100))
+print("No shower no track {:.1f} %".format(
+    noshower_notrack / not_passed * 100))
 
 
-eff = passed/is_fiducial
-eff_err = math.sqrt((eff*(1-eff))/eNp)
+eff = passed / is_fiducial
+eff_err = math.sqrt((eff * (1 - eff)) / eNp)
 
-p_reco = reco_ok/passed
-p_reco_err = math.sqrt((p_reco*(1-p_reco))/passed)
-p_vertex = vertex_ok/passed
-p_vertex_err = math.sqrt((p_vertex*(1-p_vertex))/passed)
+p_reco = reco_ok / passed
+p_reco_err = math.sqrt((p_reco * (1 - p_reco)) / passed)
+p_vertex = vertex_ok / passed
+p_vertex_err = math.sqrt((p_vertex * (1 - p_vertex)) / passed)
 
-ep_reco = reco_ok/is_fiducial
-ep_reco_err = math.sqrt((ep_reco*(1-ep_reco))/is_fiducial)
-ep_vertex = vertex_ok/is_fiducial
-ep_vertex_err = math.sqrt((ep_vertex*(1-ep_vertex))/is_fiducial)
+ep_reco = reco_ok / is_fiducial
+ep_reco_err = math.sqrt((ep_reco * (1 - ep_reco)) / is_fiducial)
+ep_vertex = vertex_ok / is_fiducial
+ep_vertex_err = math.sqrt((ep_vertex * (1 - ep_vertex)) / is_fiducial)
 
-print("Efficiency: ({0:.1f} +- {1:.1f}) %".format(eff*100, eff_err*100))
-print("Reco. purity: ({0:.1f} +- {1:.1f}) %".format(p_reco*100, p_reco_err*100))
-print("Vertex purity: ({0:.1f} +- {1:.1f}) %".format(p_vertex*100, p_vertex_err*100))
-print("Reco. efficiency x purity: ({0:.1f} +- {1:.1f}) %".format(ep_reco*100, ep_reco_err*100))
-print("Vertex efficiency x purity: ({0:.1f} +- {1:.1f}) %".format(ep_vertex*100, ep_vertex_err*100))
-f_energy = ROOT.TFile("f_energy.root","RECREATE")
+print("Efficiency: ({0:.1f} +- {1:.1f}) %".format(eff * 100, eff_err * 100))
+print("Reco. purity: ({0:.1f} +- {1:.1f}) %"
+      .format(p_reco * 100, p_reco_err * 100))
+print("Vertex purity: ({0:.1f} +- {1:.1f}) %"
+      .format(p_vertex * 100, p_vertex_err * 100))
+print("Reco. efficiency x purity: ({0:.1f} +- {1:.1f}) %"
+      .format(ep_reco * 100, ep_reco_err * 100))
+print("Vertex efficiency x purity: ({0:.1f} +- {1:.1f}) %"
+      .format(ep_vertex * 100, ep_vertex_err * 100))
+f_energy = ROOT.TFile("f_energy.root", "RECREATE")
 e_energy.Write()
 f_energy.Close()
 
-pt = ROOT.TPaveText(0.1,0.91,0.45,0.97, "ndc")
+pt = ROOT.TPaveText(0.1, 0.91, 0.45, 0.97, "ndc")
 pt.AddText("MicroBooNE Preliminary")
 pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
 
-legend = ROOT.TLegend(0.13,0.68,0.84,0.86)
+legend = ROOT.TLegend(0.13, 0.68, 0.84, 0.86)
 legend.SetTextSize(16)
-legend.AddEntry(e_energy, "#epsilon ({0:.1f} #pm {1:.1f}) %".format(eff*100, eff_err*100), "lep")
+legend.AddEntry(e_energy, "#epsilon ({0:.1f} \
+                #pm {1:.1f}) %".format(eff * 100, eff_err * 100),
+                "lep")
+
 legend.AddEntry(e_energy, "", "")
-legend.AddEntry(p_energy, "P_{{reco}} ({0:.1f} #pm {1:.1f}) %".format(p_reco*100, p_reco_err*100), "lep")
-legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %".format(p_vertex*100, p_vertex_err*100), "lep")
-legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %".format(ep_reco*100, ep_reco_err*100), "lep")
-legend.AddEntry(ep_dist_energy, "#epsilon #times P_{{vertex}} ({0:.1f} #pm {1:.1f}) %".format(ep_vertex*100, ep_vertex_err*100), "lep")
+legend.AddEntry(p_energy, "P_{{reco}} \({0:.1f} #pm {1:.1f}) %"
+                .format(p_reco * 100, p_reco_err * 100),
+                "lep")
+
+legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
+                .format(p_vertex * 100, p_vertex_err * 100), "lep")
+legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
+                .format(ep_reco * 100, ep_reco_err * 100), "lep")
+legend.AddEntry(ep_dist_energy, "#epsilon #times P_{{vertex}} \
+                ({0:.1f} #pm {1:.1f}) %"
+                .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
 
 legend.SetNColumns(2)
 
 c_energy = ROOT.TCanvas("c_energy")
 e_energy.Draw("apl")
 p_energy.SetMarkerStyle(22)
-p_energy.SetLineColor(ROOT.kGreen+1)
+p_energy.SetLineColor(ROOT.kGreen + 1)
 p_energy.SetLineWidth(2)
 p_energy.Draw("pl same")
 
 p_dist_energy.SetMarkerStyle(22)
-p_dist_energy.SetLineColor(ROOT.kGreen+3)
+p_dist_energy.SetLineColor(ROOT.kGreen + 3)
 p_dist_energy.SetLineWidth(2)
 p_dist_energy.Draw("pl same")
 
 ep_energy.SetMarkerStyle(23)
-ep_energy.SetLineColor(ROOT.kBlue+1)
+ep_energy.SetLineColor(ROOT.kBlue + 1)
 ep_energy.SetLineWidth(2)
 ep_energy.Draw("pl same")
 
