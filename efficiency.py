@@ -170,15 +170,16 @@ for i in range(entries):
                 else:
                     noflash += 1
 
-
             if protons == 1:
                 e_proton.Fill(chain_nue.passed and p_track and p_shower, proton_energy-0.938)
 
             if chain_nue.passed and protons == 1 and chain_nue.nu_matched_tracks == 1 and dist < 2:
-                l_e_proton.Fill(chain_nue.track_len[0], proton_energy-0.938)
+                l_e_proton.Fill(chain_nue.track_len[0], proton_energy - 0.938)
 
-            ep_energy.Fill(chain_nue.passed and p_track and p_shower, chain_nue.nu_E)
-            ep_dist_energy.Fill(chain_nue.passed and chain_nue.distance < 5, chain_nue.nu_E)
+            ep_energy.Fill(chain_nue.passed and p_track and p_shower,
+                           chain_nue.nu_E)
+            ep_dist_energy.Fill(chain_nue.passed and chain_nue.distance < 5,
+                                chain_nue.nu_E)
             e_energy.Fill(chain_nue.passed, chain_nue.nu_E)
 
 
