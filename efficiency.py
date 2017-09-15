@@ -97,11 +97,11 @@ for i in range(entries):
                 electrons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 22:
-            #if energy > 0.035:
+            # if energy > 0.035:
             photons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 111:
-            #if energy > 0.06:
+            # if energy > 0.06:
             pions += 1
 
     if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
@@ -123,18 +123,31 @@ for i in range(entries):
             if p_track and p_shower:
                 p = True
 
-            proton_energy = sum([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if pdg == 2212])
-            electron_energy = max([chain_nue.nu_daughters_E[i] for i,pdg in enumerate(chain_nue.nu_daughters_pdg) if abs(pdg) == 11])
+            proton_energy = sum([chain_nue.nu_daughters_E[i]
+                                 for i, pdg in
+                                 enumerate(chain_nue.nu_daughters_pdg)
+                                 if pdg == 2212])
 
-            neutrino_vertex = [chain_nue.vx,chain_nue.vy,chain_nue.vz]
+            electron_energy = max([chain_nue.nu_daughters_E[i]
+                                   for i, pdg in
+                                   enumerate(chain_nue.nu_daughters_pdg)
+                                   if abs(pdg) == 11])
 
-            true_neutrino_vertex = [chain_nue.true_vx_sce,chain_nue.true_vy_sce,chain_nue.true_vz_sce]
-            true_neutrino_vertex_nosce = [chain_nue.true_vx,chain_nue.true_vy,chain_nue.true_vz]
+            neutrino_vertex = [chain_nue.vx, chain_nue.vy, chain_nue.vz]
+
+            true_neutrino_vertex = [chain_nue.true_vx_sce,
+                                    chain_nue.true_vy_sce,
+                                    chain_nue.true_vz_sce]
+            true_neutrino_vertex_nosce = [chain_nue.true_vx,
+                                          chain_nue.true_vy,
+                                          chain_nue.true_vz]
 
             dist = 0
 
             if chain_nue.passed:
-                dist = math.sqrt(sum([(t-r) ** 2 for t, r in zip(neutrino_vertex,true_neutrino_vertex)]))
+                dist = math.sqrt(sum([(t - r) ** 2
+                                      for t, r in zip(neutrino_vertex,
+                                                      true_neutrino_vertex)]))
 
                 passed += 1
                 if p:
@@ -148,9 +161,9 @@ for i in range(entries):
                         neutrino_vertex, true_neutrino_vertex_nosce)])
                 ))
 
-                h_x_diff.Fill(neutrino_vertex[0]-true_neutrino_vertex[0])
-                h_y_diff.Fill(neutrino_vertex[1]-true_neutrino_vertex[1])
-                h_z_diff.Fill(neutrino_vertex[2]-true_neutrino_vertex[2])
+                h_x_diff.Fill(neutrino_vertex[0] - true_neutrino_vertex[0])
+                h_y_diff.Fill(neutrino_vertex[1] - true_neutrino_vertex[1])
+                h_z_diff.Fill(neutrino_vertex[2] - true_neutrino_vertex[2])
 
                 # print("proton", protons, chain_nue.nu_matched_tracks)
                 # print("electrons", electrons, chain_nue.nu_matched_showers)
@@ -159,21 +172,14 @@ for i in range(entries):
 
             else:
                 not_passed += 1
-                if chain_nue.flash_passed > 0:
-                    if chain_nue.shower_passed > 0 and chain_nue.track_passed <= 0:
-                        yesshower_notrack += 1
-                    if chain_nue.track_passed > 0 and chain_nue.shower_passed <= 0:
-                        noshower_yestrack += 1
-                    if chain_nue.track_passed <= 0 and chain_nue.shower_passed <= 0:
-                        noshower_notrack += 1
-                if chain_nue.flash_passed == 1 and chain_nue.track_passed == 1 and chain_nue.shower_passed == 1: print(chain_nue.run, chain_nue.subrun, chain_nue.event)
-                else:
+                if chain_nue.flash_passed != 1:
                     noflash += 1
 
             if protons == 1:
-                e_proton.Fill(chain_nue.passed and p_track and p_shower, proton_energy-0.938)
+                e_proton.Fill(chain_nue.passed and p_track and p_shower,
+                              proton_energy - 0.938)
 
-            if chain_nue.passed and protons == 1 and chain_nue.nu_matched_tracks == 1 and dist < 2:
+            if chain_nue.passed and protons == 1 and dist < 2:
                 l_e_proton.Fill(chain_nue.track_len[0], proton_energy - 0.938)
 
             ep_energy.Fill(chain_nue.passed and p_track and p_shower,
@@ -271,16 +277,16 @@ ep_energy.SetLineWidth(2)
 ep_energy.Draw("pl same")
 
 ep_dist_energy.SetMarkerStyle(23)
-ep_dist_energy.SetLineColor(ROOT.kBlue+3)
+ep_dist_energy.SetLineColor(ROOT.kBlue + 3)
 ep_dist_energy.SetLineWidth(2)
 ep_dist_energy.Draw("pl same")
 
 e_energy.SetMarkerStyle(20)
-e_energy.SetLineColor(ROOT.kRed+1)
+e_energy.SetLineColor(ROOT.kRed + 1)
 e_energy.SetLineWidth(2)
 c_energy.Update()
-e_energy.GetPaintedGraph().GetXaxis().SetRangeUser(0.1,2)
-e_energy.GetPaintedGraph().GetYaxis().SetRangeUser(0,1.39)
+e_energy.GetPaintedGraph().GetXaxis().SetRangeUser(0.1, 2)
+e_energy.GetPaintedGraph().GetYaxis().SetRangeUser(0, 1.39)
 pt.Draw()
 legend.Draw()
 c_energy.SaveAs("plots/efficiency.pdf")
@@ -296,15 +302,15 @@ c_lproton.Update()
 
 c_dist = ROOT.TCanvas("c_dist")
 h_dist.Draw()
-h_dist_nosce.SetLineColor(ROOT.kRed+1)
+h_dist_nosce.SetLineColor(ROOT.kRed + 1)
 h_dist_nosce.Draw("same")
 c_dist.Update()
 
-c_x = ROOT.TCanvas("c_x","",500,500)
+c_x = ROOT.TCanvas("c_x", "", 500, 500)
 h_x_diff.Draw()
 c_x.Update()
 
-c_y = ROOT.TCanvas("c_y","",500,500)
+c_y = ROOT.TCanvas("c_y", "", 500, 500)
 h_y_diff.Draw()
 c_y.Update()
 
