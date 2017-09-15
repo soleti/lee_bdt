@@ -99,16 +99,16 @@ for j in range(histograms_mc[0].GetNhists()):
     if histograms_mc[0].GetHists()[j].Integral():
         legend.AddEntry(histograms_mc[0].GetHists()[j], "%s: %.0f events" % (description[j], histograms_mc[0].GetHists()[j].Integral()), "f")
 
-# legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0].Integral()), "lep")
-# legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
+legend.AddEntry(histograms_data[0], "Data BNB: %.0f events" % (histograms_data[0].Integral()), "lep")
+legend.AddEntry(histograms[0], "Data EXT: %.0f events" % (histograms[0].Integral()), "f")
 
-for i in range(len(histograms)):
-    for j in range(histograms_data[i].GetNbinsX()):
-        histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
-        if histograms_data[i].GetBinContent(j) > 0:
-           histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
-
-legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
+# for i in range(len(histograms)):
+#     for j in range(histograms_data[i].GetNbinsX()):
+#         histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
+#         if histograms_data[i].GetBinContent(j) > 0:
+#            histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
+#
+# legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
 
 
 legend.SetNColumns(2)
@@ -144,7 +144,7 @@ for i in range(len(histograms)):
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
     c = ROOT.TCanvas("c%i" % i,"",900,44,700,645)
-    # histograms_mc[i].Add(histograms[i])
+    histograms_mc[i].Add(histograms[i])
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)
