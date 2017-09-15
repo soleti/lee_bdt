@@ -4,3 +4,6 @@
 *.txt
 *.pdf
 *.png
+dataset
+*.ipynb*
+__pycache__
