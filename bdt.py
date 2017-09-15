@@ -34,7 +34,7 @@ dataloader.AddBackgroundTree(t)
 dataloader.PrepareTrainingAndTestTree(sigCut, bgCut, "SplitMode=Random:NormMode=NumEvents:!V")
 
 method = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
-                   "!H:!V:NTrees=20:MinNodeSize=2.5%:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:UseBaggedBoost:BaggedSampleFraction=0.5:SeparationType=GiniIndex:nCuts=20")
+                   "!H:!V:NTrees=50:MinNodeSize=2.5%:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:UseBaggedBoost:BaggedSampleFraction=0.5:SeparationType=GiniIndex:nCuts=20")
 
 factory.TrainAllMethods()
 factory.TestAllMethods()
