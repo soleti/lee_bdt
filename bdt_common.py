@@ -71,7 +71,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.05
+bdt_cut = -10
 
 track_length = array("f", [ 0 ] )
 track_theta = array("f", [ 0 ] )
@@ -194,19 +194,19 @@ binning = {
     "shower_distance":[10,0,10],
     "track_distance":[10,0,10],
     "track_shower_angle":[10,-1,1],
-    "track_start_y":[10,y_start,y_end],
-    "track_start_z":[10,z_start,z_end],
-    "track_start_x":[10,x_start,x_end],
-    "track_end_y":[10,y_start,y_end],
-    "track_end_z":[10,z_start,z_end],
-    "track_end_x":[10,x_start,x_end],
-    "shower_start_y":[10,y_start,y_end],
-    "shower_start_z":[10,z_start,z_end],
-    "shower_start_x":[10,x_start,x_end],
-    "shower_end_y":[10,y_start,y_end],
-    "shower_end_z":[10,z_start,z_end],
-    "shower_end_x":[10,x_start,x_end],
-    "track_length":[10,0,100],
+    "track_start_y":[20,y_start,y_end],
+    "track_start_z":[20,z_start,z_end],
+    "track_start_x":[20,x_start,x_end],
+    "track_end_y":[20,y_start,y_end],
+    "track_end_z":[20,z_start,z_end],
+    "track_end_x":[20,x_start,x_end],
+    "shower_start_y":[20,y_start,y_end],
+    "shower_start_z":[20,z_start,z_end],
+    "shower_start_x":[20,x_start,x_end],
+    "shower_end_y":[20,y_start,y_end],
+    "shower_end_z":[20,z_start,z_end],
+    "shower_end_x":[20,x_start,x_end],
+    "track_length":[10,0,20],
     "proton_score":[10,0,1],
     "shower_energy":[20,0,2],
     "pt":[20,0,2],
