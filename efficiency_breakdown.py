@@ -100,12 +100,14 @@ for evt in range(entries):
 
                     if not find_track and not find_shower:
                         track_no_shower_no += 1
+
                 else:
                     flash_not_passed += 1
 
 
 print("Passed event, perfect {:.1f} %".format(perfect_event / total * 100))
-print("Passed event, incomplete {:.1f} %".format(incomplete_event / total * 100))
+print("Passed event, incomplete {:.1f} %"
+      .format(incomplete_event / total * 100))
 print("Passed event, splitted {:.1f} %".format(splitted_event / total * 100))
 print("Passed event, wrong {:.1f} %".format(wrong_event / total * 100))
 print("Not passed event, flash not passed {:.1f}% "
