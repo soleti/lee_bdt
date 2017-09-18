@@ -59,7 +59,7 @@ h_z_diff = ROOT.TH1F("h_z_diff",
                      ";#Delta z [cm]; N. Entries / 0.2 cm", 50, -5, 5)
 
 is_fiducial = 0
-eNp = 0
+eNp_events = 0
 
 passed = 0
 not_passed = 0
@@ -77,7 +77,7 @@ for i in range(entries):
     pions = 0
     for i, energy in enumerate(chain_nue.nu_daughters_E):
         if chain_nue.nu_daughters_pdg[i] == 2212:
-            if energy - 0.938 > 0.0005:
+            if energy - 0.938 > 0.05:
                 protons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 11:
@@ -92,8 +92,10 @@ for i in range(entries):
             # if energy > 0.06:
             pions += 1
 
-    if electrons > 0 and photons == 0 and pions == 0 and protons > 0:
-        eNp += 1
+    eNp = electrons == 1 and photons == 0 and pions == 0 and protons > 0
+
+    if eNp and chain_nue.nu_E > 0.1:
+        eNp_events += 1
 
         if chain_nue.true_nu_is_fiducial:
             is_fiducial += 1
@@ -176,7 +178,7 @@ for i in range(entries):
 
 
 print("Entries", entries)
-print("1eNp", eNp)
+print("1eNp", eNp_events)
 print("1eNp + Is fiducial", is_fiducial)
 
 print("Passed", passed)
