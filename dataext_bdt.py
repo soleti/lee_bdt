@@ -1,4 +1,4 @@
-# !/usr/bin/env python3.4
+#!/usr/bin/env python3.4
 
 import ROOT
 import math
@@ -7,6 +7,8 @@ from bdt_common import binning, labels, variables, spectators, bdt_cut
 from bdt_common import description, total_pot
 
 from glob import glob
+
+draw_subtraction = False
 
 ROOT.gStyle.SetOptStat(0)
 
@@ -115,19 +117,21 @@ legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
 legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
                 .format(histograms[0].Integral()), "f")
 
-for i in range(len(histograms)):
-    for j in range(histograms_data[i].GetNbinsX()):
-        histograms_data[i].SetBinContent(j,
-                                         histograms_data[i].GetBinContent(j) -
-                                         histograms[i].GetBinContent(j))
-        if histograms_data[i].GetBinContent(j) > 0:
-            err1 = histograms_data[i].GetBinError(j)
-            err2 = histograms[i].GetBinError(j)
-            histograms_data[i].SetBinError(j, math.sqrt(err1**2 + err2**2))
+if draw_subtraction:
+    for i in range(len(histograms)):
+        for j in range(histograms_data[i].GetNbinsX()):
+            bnb = histograms_data[i].GetBinContent(j)
+            ext = histograms[i].GetBinContent(j)
 
-legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: {:.0f} events"
-                .format(histograms_data[0].Integral()), "lep")
+            histograms_data[i].SetBinContent(j, bnb - ext)
 
+            if bnb > 0:
+                err1 = histograms_data[i].GetBinError(j)
+                err2 = histograms[i].GetBinError(j)
+                histograms_data[i].SetBinError(j, math.sqrt(err1**2 + err2**2))
+
+    legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: {:.0f} events"
+                    .format(histograms_data[0].Integral()), "lep")
 
 legend.SetNColumns(2)
 
@@ -154,6 +158,7 @@ for i in range(len(histograms)):
     histograms_cosmic[i].SetLineColor(ROOT.kBlack)
     histograms_cosmic[i].SetFillColor(ROOT.kRed - 3)
     histograms_cosmic[i].Draw("hist")
+
     histograms[i].SetMarkerStyle(20)
     histograms[i].Draw("ep same")
     legend_cosmic.Draw()
@@ -168,7 +173,9 @@ for i in range(len(histograms)):
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
     c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
-    histograms_mc[i].Add(histograms[i])
+
+    if not draw_subtraction:
+        histograms_mc[i].Add(histograms[i])
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)
