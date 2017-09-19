@@ -1,6 +1,7 @@
-#!/usr/bin/env python3.4
+# !/usr/bin/env python3.4
 
 import ROOT
+import math
 
 from bdt_common import binning, labels, variables, spectators, bdt_cut
 from bdt_common import description, total_pot
@@ -104,7 +105,8 @@ for j in range(histograms_mc[0].GetNhists()):
         legend.AddEntry(
             histograms_mc[0].GetHists()[j],
             "{}: {:.0f} events".format(description[j],
-                histograms_mc[0].GetHists()[j].Integral()),
+                                       histograms_mc[0].GetHists()[j].
+                                       Integral()),
             "f")
 
 legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
@@ -113,13 +115,18 @@ legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
 legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
                 .format(histograms[0].Integral()), "f")
 
-# for i in range(len(histograms)):
-#     for j in range(histograms_data[i].GetNbinsX()):
-#         histograms_data[i].SetBinContent(j, histograms_data[i].GetBinContent(j)-histograms[i].GetBinContent(j))
-#         if histograms_data[i].GetBinContent(j) > 0:
-#            histograms_data[i].SetBinError(j, math.sqrt(histograms_data[i].GetBinError(j)**2+histograms[i].GetBinError(j)**2))
-#
-# legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: %.0f events" % (histograms_data[0].Integral()), "lep")
+for i in range(len(histograms)):
+    for j in range(histograms_data[i].GetNbinsX()):
+        histograms_data[i].SetBinContent(j,
+                                         histograms_data[i].GetBinContent(j) -
+                                         histograms[i].GetBinContent(j))
+        if histograms_data[i].GetBinContent(j) > 0:
+            err1 = histograms_data[i].GetBinError(j)
+            err2 = histograms[i].GetBinError(j)
+            histograms_data[i].SetBinError(j, math.sqrt(err1**2 + err2**2))
+
+legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: {:.0f} events"
+                .format(histograms_data[0].Integral()), "lep")
 
 
 legend.SetNColumns(2)
@@ -150,8 +157,10 @@ for i in range(len(histograms)):
     histograms[i].SetMarkerStyle(20)
     histograms[i].Draw("ep same")
     legend_cosmic.Draw()
-    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01,
-        histograms_cosmic[i].GetMaximum() * 1.3)
+
+    upper_limit = histograms_cosmic[i].GetMaximum() * 1.3
+    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01, upper_limit)
+
     c_cosmic.Update()
     c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
     canvases_cosmic.append(c_cosmic)
@@ -163,7 +172,7 @@ for i in range(len(histograms)):
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)
-    for j in range(1,histograms_mc[i].GetNhists()):
+    for j in range(1, histograms_mc[i].GetNhists()):
         h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
     pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
@@ -213,14 +222,15 @@ for i in range(len(histograms)):
     h_ratio.GetXaxis().SetLabelSize(0.13)
     h_ratio.GetXaxis().SetTitleSize(0.13)
     h_ratio.GetXaxis().SetTitleOffset(0.91)
-    h_ratio.GetYaxis().SetTitle("BNB/(MC+EXT)")
+    h_ratio.GetYaxis().SetTitle("BNB / (MC + EXT)")
     h_ratio.GetYaxis().SetNdivisions(509)
     h_ratio.GetYaxis().SetLabelFont(42)
     h_ratio.GetYaxis().SetLabelSize(0.13)
     h_ratio.GetYaxis().SetTitleSize(0.13)
     h_ratio.GetYaxis().SetTitleOffset(0.36)
     h_ratio.Draw("ep")
-    line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1, h_ratio.GetXaxis().GetXmax(), 1)
+    line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
+                      h_ratio.GetXaxis().GetXmax(), 1)
     line.SetLineWidth(2)
     line.SetLineStyle(2)
     line.Draw()
