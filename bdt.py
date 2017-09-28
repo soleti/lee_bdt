@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import ROOT
 from bdt_common import variables, spectators
@@ -20,10 +20,10 @@ factory = ROOT.TMVA.Factory("TMVAClassification", fout,
                                 "AnalysisType=Classification"]))
 dataloader = ROOT.TMVA.DataLoader("dataset")
 
-for name, var in variables:
+for name in variables.keys():
     dataloader.AddVariable(name, "F")
 
-for name, var in spectators:
+for name in spectators.keys():
     dataloader.AddSpectator(name, "F")
 
 sigCut = ROOT.TCut("is_signal > 0.5")

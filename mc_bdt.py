@@ -1,18 +1,21 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import ROOT
 from array import array
 import math
-from bdt_common import bdt_cut, binning, labels, find_interaction, variables, interactions
+from bdt_common import bdt_cut, binning, labels, find_interaction, variables
+from bdt_common import interactions
 
 fout = ROOT.TFile("test.root")
 
 tout = ROOT.TChain("dataset/TestTree")
 tout.Add("test.root")
-colors = [ROOT.kGray+2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5, ROOT.kBlue - 9, ROOT.kOrange+3, ROOT.kWhite, ROOT.kRed - 3 ]
+colors = [ROOT.kGray + 2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5,
+          ROOT.kBlue - 9, ROOT.kOrange + 3, ROOT.kWhite, ROOT.kRed - 3]
 
 kinds = []
-categories = ["other", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data", "mixed"]
+categories = ["other", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data",
+              "mixed"]
 stacked_histos = []
 
 for name, var in variables:
@@ -20,14 +23,15 @@ for name, var in variables:
 
 variables_dict = dict(variables)
 
-for i,n in enumerate(variables_dict.keys()):
-    #h = ROOT.TH1F(n,labels[i],binning[i][0],binning[i][1],binning[i][2])
+for i, n in enumerate(variables_dict.keys()):
+    # h = ROOT.TH1F(n,labels[i],binning[i][0],binning[i][1],binning[i][2])
     histos = []
 
-    h_stack = ROOT.THStack("h_"+n,labels[n])
+    h_stack = ROOT.THStack("h_" + n, labels[n])
 
     for c in categories:
-        h = ROOT.TH1F("h_%s_%s" % (n, c), labels[n],binning[n][0],binning[n][1],binning[n][2])
+        h = ROOT.TH1F("h_%s_%s" % (n, c), labels[n],
+                      binning[n][0], binning[n][1], binning[n][2])
         histos.append(h)
 
     h_stack.Add(histos[0])
@@ -43,11 +47,11 @@ for i,n in enumerate(variables_dict.keys()):
     kinds.append(histos)
 
 histo_dict = dict(zip(variables_dict.keys(), kinds))
-bkg_types = [0]*2000
+bkg_types = [0] * 2000
 
-h_bdt_stack = ROOT.THStack("h_bdt",";BDT response; N. Entries / 0.05")
+h_bdt_stack = ROOT.THStack("h_bdt", ";BDT response; N. Entries / 0.05")
 h_bdts = []
-for i,c in enumerate(categories):
+for i, c in enumerate(categories):
     h = ROOT.TH1F("h_bdt_%s" % c, "BDT response; N. Entries / 0.05", 40, -1, 1)
     h.SetLineColor(1)
     h.SetFillColor(colors[i])
@@ -63,40 +67,47 @@ h_bdt_stack.Add(h_bdts[4])
 h_bdt_stack.Add(h_bdts[5])
 h_bdt_stack.Add(h_bdts[6])
 
+passed_events = open("mc_passed.txt", "w")
+
 for i in range(tout.GetEntries()):
     tout.GetEntry(i)
     category = int(tout.category)
 
-    h_bdts[category].Fill(tout.BDT, tout.event_weight*2)
-
+    h_bdts[category].Fill(tout.BDT, tout.event_weight * 2)
     if tout.BDT > bdt_cut:
-
-
         # Store interaction types of background events
         if tout.reco_energy > 0.1 and tout.category == 4 and tout.category != 1 and tout.category != 2:
-            bkg_types[int(tout.interaction_type)] += tout.event_weight*2
+            bkg_types[int(tout.interaction_type)] += tout.event_weight * 2
+
+        print("{} {} {} {}".format(int(tout.run),
+                                   int(tout.subrun),
+                                   int(tout.event),
+                                   tout.event_weight * 2), file = passed_events)
 
         for name, var in variables:
-            histo_dict[name][category].Fill(var[0],tout.event_weight*2)
+            histo_dict[name][category].Fill(var[0], tout.event_weight * 2)
+
+passed_events.close()
 
 f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
 h_bdt_stack.Write()
 f_bdt.Close()
 
-for i,histos in enumerate(kinds):
-    for j,h in enumerate(histos):
+for i, histos in enumerate(kinds):
+    for j, h in enumerate(histos):
         h.SetLineColor(1)
         h.SetLineWidth(2)
         h.SetFillColor(colors[j])
 
 for h in stacked_histos:
-    f = ROOT.TFile("plots/%s.root" % h.GetName(),"RECREATE")
+    f = ROOT.TFile("plots/%s.root" % h.GetName(), "RECREATE")
     h.Write()
     f.Close()
 
 # Save interaction types of background events
-event_file = open("events.txt","w")
-for i,interaction in enumerate(bkg_types):
-    if int(interaction)>0:
-        print(find_interaction(interactions,i),int(interaction),file=event_file)
+event_file = open("events.txt", "w")
+for i, interaction in enumerate(bkg_types):
+    if int(interaction) > 0:
+        print(find_interaction(interactions, i), int(interaction),
+              file=event_file)
 event_file.close()

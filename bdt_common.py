@@ -9,8 +9,10 @@ def find_interaction(dictionary, interaction):
 
 total_pot = 5e19
 
-description = ["Other", "Cosmic", "Cosmic contaminated", "Beam Intrinsic",
-               "#nu_{e}", "Beam Intrinsic #nu_{#mu}", "Beam Intrinsic NC",
+description = ["Other", "Cosmic", "Cosmic contaminated",
+               "Beam Intrinsic #nu_{e}",
+               "Beam Intrinsic #nu_{#mu}",
+               "Beam Intrinsic NC",
                "Dirt", "Data"]
 
 interactions = {
@@ -75,7 +77,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = -10
+bdt_cut = -10.5
 
 track_length = array("f", [0])
 track_theta = array("f", [0])
@@ -116,6 +118,8 @@ is_signal = array("f", [0])
 shower_open_angle = array("f", [0])
 dedx = array("f", [0])
 numu_score = array("f", [0])
+dedx_hits = array("f", [0])
+
 
 spectators = [
     ("category", category),
@@ -124,8 +128,8 @@ spectators = [
     ("run", run),
     ("subrun", subrun),
     ("interaction_type", interaction_type),
-    ("is_signal", is_signal)
-
+    ("is_signal", is_signal),
+    ("dedx_hits", dedx_hits)
 ]
 
 variables = [

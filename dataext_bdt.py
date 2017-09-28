@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import ROOT
 import math
@@ -59,13 +59,18 @@ histo_dict = dict(zip(variables_dict.keys(), histograms))
 
 h_bdt = ROOT.TH1F("h_bdt", ";BDT response; N. Entries / 0.05", 40, -1, 1)
 
+passed_events = open("dataext_passed.txt", "w")
+
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
     h_bdt.Fill(BDT_response, t_data.event_weight)
 
     if BDT_response > bdt_cut:
-
+        print("{} {} {} {}".format(int(t_data.run),
+                                   int(t_data.subrun),
+                                   int(t_data.event),
+                                   t_data.event_weight * 2), file = passed_events)
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 

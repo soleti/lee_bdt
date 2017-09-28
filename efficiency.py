@@ -75,13 +75,17 @@ for i in range(entries):
     electrons = 0
     photons = 0
     pions = 0
+    electron_energy = 0
+    proton_energy = 0
     for i, energy in enumerate(chain_nue.nu_daughters_E):
         if chain_nue.nu_daughters_pdg[i] == 2212:
-            if energy - 0.938 > 0.05:
+            proton_energy += energy
+            if energy - 0.938 > 0.000005:
                 protons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 11:
-            if energy > 0.03:
+            electron_energy += energy
+            if energy > 0.000003:
                 electrons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 22:

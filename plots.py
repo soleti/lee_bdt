@@ -1,22 +1,26 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 from ROOT import TChain, TTree, TFile, TVector3
 from array import array
 from glob import glob
 import math
-from bdt_common import total_pot, variables, spectators, x_start, x_end, y_start, y_end, z_start, z_end
+from bdt_common import total_pot, variables, spectators
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
+
 
 def is_fiducial(point):
-    ok_y = point[1] > y_start+20 and point[1] < y_end-20
-    ok_x = point[0] > x_start+10 and point[0] < x_end-10
-    ok_z = point[2] > z_start+10 and point[2] < z_end-50
+    ok_y = point[1] > y_start + 20 and point[1] < y_end - 20
+    ok_x = point[0] > x_start + 10 and point[0] < x_end - 10
+    ok_z = point[2] > z_start + 10 and point[2] < z_end - 50
     return ok_y and ok_x and ok_z
+
 
 def is_active(point):
     ok_y = point[1] > y_start and point[1] < y_end
     ok_x = point[0] > x_start and point[0] < x_end
     ok_z = point[2] > z_start and point[2] < z_end
     return ok_y and ok_x and ok_z
+
 
 def choose_shower(root_chain):
     most_energetic_shower = 0
@@ -51,7 +55,8 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
     costheta_shower_track = v_track.Dot(v_shower)/(v_track.Mag()*v_shower.Mag())
 
     signal = 0
-    if root_chain.category == 2: signal = 1
+    if root_chain.category == 2:
+        signal = 1
 
     track_vertex = [root_chain.track_start_x[most_proton_track_id],root_chain.track_start_y[most_proton_track_id],root_chain.track_start_z[most_proton_track_id]]
     track_end = [root_chain.track_end_x[most_proton_track_id],root_chain.track_end_y[most_proton_track_id],root_chain.track_end_z[most_proton_track_id]]
@@ -70,6 +75,7 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
     if trackend_shower_d < track_shower_d: direction = -1
     theta = math.acos(direction*root_chain.track_dir_z[most_proton_track_id])
 
+    variables["dedx_hits"] = array("f", [1,2,3])
     variables["is_signal"][0] = signal
     variables["track_length"][0] = root_chain.track_energy[most_proton_track_id]
     variables["track_phi"][0] = math.degrees(root_chain.track_phi[most_proton_track_id])
@@ -124,7 +130,8 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
 
 
 def costheta_plot(root_chain, weight=1):
-    electrons = sum(1 for i,pdg in enumerate(root_chain.nu_daughters_pdg) if abs(pdg) == 11)
+    electrons = sum(1 for i, pdg in
+                    enumerate(root_chain.nu_daughters_pdg) if abs(pdg) == 11)
 
     if electrons == 1:
         e_dir = []
@@ -137,7 +144,7 @@ def costheta_plot(root_chain, weight=1):
         for ish in range(root_chain.n_showers):
             v_reco = TVector3(root_chain.shower_dir_x[ish], root_chain.shower_dir_y[ish], root_chain.shower_dir_z[ish])
             v_true = TVector3(e_dir[0][0], e_dir[0][1], e_dir[0][2])
-            costheta = v_reco.Dot(v_true)/(v_reco.Mag()*v_true.Mag())
+            costheta = v_reco.Dot(v_true) / (v_reco.Mag() * v_true.Mag())
             h_costhetas[root_chain.category].Fill(costheta, weight)
 
 
@@ -172,13 +179,14 @@ def pt_plot(root_chain):
     pt = (p_track_sum+p_shower_sum).Perp()
     return pt
 
+
 def numu_selection(mychain):
     for i in range(mychain.nslices):
         flashmatch_cut = not (mychain.slc_flsmatch_qllx[i] - mychain.slc_flsmatch_tpcx[i] > 20)
         dist_cut = False
         if len(mychain.beamfls_z) > 0: dist_cut = mychain.slc_flsmatch_hypoz[i] - mychain.beamfls_z[0] < 100
 
-        broken_tracks_cut = not (mychain.slc_vtxcheck_angle[i] > 2.9) and not (mychain.slc_vtxcheck_angle[i] < 0.05 and mychain.slc_vtxcheck_angle[i] !=-9999 )
+        broken_tracks_cut = not (mychain.slc_vtxcheck_angle[i] > 2.9) and not (mychain.slc_vtxcheck_angle[i] < 0.05 and mychain.slc_vtxcheck_angle[i] != -9999 )
         # one_track_cut = not (mychain.slc_ntrack[i] == 0)
         quality_cut = mychain.slc_passed_min_track_quality[i]
         if flashmatch_cut and broken_tracks_cut and quality_cut and dist_cut:
@@ -213,19 +221,20 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
             if option == "bnb":
                 option_check = abs(chain.nu_pdg) != 12
             if option == "nue":
-                event_weight = weight*chain.bnbweight
+                event_weight = weight * chain.bnbweight
                 option_check = abs(chain.nu_pdg) == 12
+                print(chain.E)
 
             most_energetic_shower_id = choose_shower(chain)
             dedx = chain.shower_dEdx[most_energetic_shower_id][2]
 
             if is_active(neutrino_vertex) and track_fidvol and shower_fidvol and option_check:
                 total_events += event_weight
-                fill_kin_branches(chain,chain_numu,event_weight,variables)
+                fill_kin_branches(chain, chain_numu, event_weight, variables)
                 tree.Fill()
 
-
     return total_events
+
 
 cosmic_mc = glob("cosmic_only/*/*.root")
 
@@ -236,7 +245,7 @@ cosmic_mc = glob("cosmic_only/*/*.root")
 # data_ext_scaling_factor = 1.2640
 
 data_ext_scaling_factor = 1.2693
-nue_cosmic = glob("mc_nue_nofidvol/*/*.root")
+nue_cosmic = glob("mc_nue_old/*/*.root")
 bnb_cosmic = glob("mc_bnb_nofidvol/*/*.root")
 data_bnb = glob("data_bnb_nofidvol/*/*.root")
 data_bnbext = glob("data_ext_nofidvol/*/*.root")
@@ -298,12 +307,14 @@ for i in range(chain_pot.GetEntries()):
 
 print("Total POT BNB {0:.2e}".format(total_bnb_pot))
 
-run_subrun_bnb = open("run_subrun_bnb.txt","w")
+run_subrun_bnb = open("run_subrun_bnb.txt", "w")
+
 for i in range(chain_data_bnb_pot.GetEntries()):
     chain_data_bnb_pot.GetEntry(i)
     run_subrun = "%i %i" % (chain_data_bnb_pot.run, chain_data_bnb_pot.subrun)
     run_subrun_list.append(run_subrun)
     print(run_subrun, file=run_subrun_bnb)
+
 run_subrun_bnb.close()
 
 total_data_bnb_pot = 3.787e19
@@ -319,41 +330,47 @@ run_subrun_ext.close()
 
 print("Data EXT scaling factor {0:.2f}".format(data_ext_scaling_factor))
 
-variables = dict(variables+spectators)
+variables = dict(variables + spectators)
 
-cosmic_mc_tree = TTree("cosmic_mc_tree","cosmic_mc_tree")
-mc_tree = TTree("mc_tree","mc_tree")
-bnb_tree = TTree("bnb_tree","bnb_tree")
-bnbext_tree = TTree("bnbext_tree","bnbext_tree")
+cosmic_mc_tree = TTree("cosmic_mc_tree", "cosmic_mc_tree")
+mc_tree = TTree("mc_tree", "mc_tree")
+bnb_tree = TTree("bnb_tree", "bnb_tree")
+bnbext_tree = TTree("bnbext_tree", "bnbext_tree")
 
-for n,b in variables.items():
-    cosmic_mc_tree.Branch(n,b,n+"/f")
-    mc_tree.Branch(n,b,n+"/f")
-    bnb_tree.Branch(n,b,n+"/f")
-    bnbext_tree.Branch(n,b,n+"/f")
+for n, b in variables.items():
+    cosmic_mc_tree.Branch(n, b, n + "/f")
+    mc_tree.Branch(n, b, n + "/f")
+    bnb_tree.Branch(n, b, n + "/f")
+    bnbext_tree.Branch(n, b, n + "/f")
 
 print ("*** MC cosmic sample ***")
-total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu, 1, cosmic_mc_tree)
+total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu, 1,
+                            cosmic_mc_tree)
 print("MC cosmic {} events".format(total_cosmic_mc))
 
 print ("*** MC BNB + cosmic sample ***")
-total_mc = fill_tree(chain, chain_numu, total_pot/total_bnb_pot, mc_tree, "bnb")
+total_mc = fill_tree(chain, chain_numu, total_pot / total_bnb_pot, mc_tree,
+                     "bnb")
 print("MC {0:.0f} events".format(total_mc))
 
 print ("*** MC nu_e + cosmic sample ***")
-total_nu_e = fill_tree(chain_nue, chain_nue_numu, total_pot/total_nue_pot, mc_tree, "nue")
+total_nu_e = fill_tree(chain_nue, chain_nue_numu, total_pot / total_nue_pot,
+                       mc_tree, "nue")
 print("MC nu_e {0:.0f} events".format(total_nu_e))
 
 print ("*** Data BNB sample ***")
-total_data_bnb = fill_tree(chain_data_bnb, chain_data_bnb_numu, total_pot/total_data_bnb_pot, bnb_tree)
+total_data_bnb = fill_tree(chain_data_bnb, chain_data_bnb_numu,
+                           total_pot / total_data_bnb_pot, bnb_tree)
 print("Data BNB {0:.0f} events".format(total_data_bnb))
 
 print ("*** Data EXT sample ***")
-total_data_ext = fill_tree(chain_data_bnbext, chain_data_bnbext_numu, data_ext_scaling_factor*total_pot/total_data_bnb_pot, bnbext_tree)
+total_data_ext = fill_tree(chain_data_bnbext, chain_data_bnbext_numu,
+                           data_ext_scaling_factor * total_pot / total_data_bnb_pot,
+                           bnbext_tree)
 print("Data EXT {0:.0f} events".format(total_data_ext))
-print("Data BNB-EXT {0:.0f} events".format(total_data_bnb-total_data_ext))
+print("Data BNB-EXT {0:.0f} events".format(total_data_bnb - total_data_ext))
 
-print("Ratio (BNB-EXT)/MC {0:.2f}".format((total_data_bnb-total_data_ext)/total_mc))
+print("Ratio (BNB-EXT)/MC {0:.2f}".format((total_data_bnb - total_data_ext) / total_mc))
 
 cosmic_mc_file = TFile("cosmic_mc_file.root", "RECREATE")
 cosmic_mc_tree.Write()
