@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import math
 import ROOT
 import landau
 from glob import glob
@@ -38,15 +37,15 @@ h_dedx_photon = ROOT.TH1F("h_dedx_photon",
                           50, 0, 8)
 
 h_dedx_hits_electron = ROOT.TH1F("h_dedx_hits_electron",
-                                 "Electron hits;dE/dx [MeV/cm];Area normalized",
+                                 "Electron hits;dE/dx [MeV/cm];a.u.",
                                  50, 0, 8)
 
 h_dedx_hits_photon = ROOT.TH1F("h_dedx_hits_photon",
-                               "Photon hits;dE/dx [MeV/cm];Area normalized",
+                               "Photon hits;dE/dx [MeV/cm];a.u.",
                                50, 0, 8)
 
 h_dedx_hits_energy = ROOT.TH2F("h_dedx_hits_energy",
-                               "Electron hits;dE/dx [MeV/cm];#pi/#gamma energy [GeV]",
+                               "Electron hits;dE/dx [MeV/cm];Energy [GeV]",
                                50, 0, 8, 50, 0, 1)
 
 h_p_dedx = ROOT.TH2F("h_dedx_p", ";p [GeV/c];dE/dx [MeV/cm]",
@@ -59,7 +58,7 @@ chain = ROOT.TChain("robertoana/pandoratree")
 for f in nue_cosmic:
     chain.Add(f)
 
-with open("mc_passed.txt","r") as f:
+with open("mc_passed.txt", "r") as f:
     lines = f.readlines()
 
 events = [" ".join(line.split()[:3]) for line in lines]
@@ -73,9 +72,11 @@ for i in range(entries):
     pions = 0
     gamma_energy = 0
     pions_energy = 0
-    run_subrun_event = "{} {} {}".format(int(chain.run), int(chain.subrun), int(chain.event))
+    run_subrun_event = "{} {} {}".format(int(chain.run),
+                                         int(chain.subrun),
+                                         int(chain.event))
     if 1:
-        weight = 1#weights[events.index(run_subrun_event)]
+        weight = 1  # weights[events.index(run_subrun_event)]
 
         for i in range(len(chain.nu_daughters_E)):
             if abs(chain.nu_daughters_pdg[i]) == 11:
@@ -95,18 +96,19 @@ for i in range(entries):
             for ish in range(chain.n_showers):
                 pdg = chain.matched_showers[ish]
                 dedx = chain.shower_dEdx[ish][2]
-                print(chain.matched_showers_process[ish])
                 if abs(pdg) == 22:
 
                     for ihit in range(len(chain.dEdx_hits[ish])):
-                        h_dedx_hits_photon.Fill(chain.dEdx_hits[ish][ihit], weight)
+                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        h_dedx_hits_photon.Fill(hit_dedx, weight)
 
                     h_dedx_photon.Fill(dedx, weight)
 
                 if abs(pdg) == 11:
 
                     for ihit in range(len(chain.dEdx_hits[ish])):
-                        h_dedx_hits_electron.Fill(chain.dEdx_hits[ish][ihit], weight)
+                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        h_dedx_hits_electron.Fill(hit_dedx, weight)
 
                     h_dedx_electron.Fill(dedx, weight)
 
