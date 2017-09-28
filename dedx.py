@@ -95,7 +95,7 @@ for i in range(entries):
             for ish in range(chain.n_showers):
                 pdg = chain.matched_showers[ish]
                 dedx = chain.shower_dEdx[ish][2]
-
+                print(chain.matched_showers_process[ish])
                 if abs(pdg) == 22:
 
                     for ihit in range(len(chain.dEdx_hits[ish])):
