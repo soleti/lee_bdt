@@ -20,10 +20,10 @@ factory = ROOT.TMVA.Factory("TMVAClassification", fout,
                                 "AnalysisType=Classification"]))
 dataloader = ROOT.TMVA.DataLoader("dataset")
 
-for name in variables.keys():
+for name, var in variables:
     dataloader.AddVariable(name, "F")
 
-for name in spectators.keys():
+for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
 sigCut = ROOT.TCut("is_signal > 0.5")
