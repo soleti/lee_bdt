@@ -46,10 +46,10 @@ for i in range(t_data.GetEntries()):
     h_bdt.Fill(BDT_response, t_data.event_weight)
 
     if BDT_response > bdt_cut:
-        print("{} {} {} {}".format(int(tout.run),
-                                   int(tout.subrun),
-                                   int(tout.event),
-                                   tout.event_weight * 2), file = passed_events)
+        print("{} {} {} {}".format(int(t_data.run),
+                                   int(t_data.subrun),
+                                   int(t_data.event),
+                                   t_data.event_weight * 2), file = passed_events)
 
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)

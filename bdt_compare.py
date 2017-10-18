@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import ROOT
 from bdt_common import description, bdt_cut
@@ -69,7 +69,7 @@ legend.Draw()
 line_bdt = ROOT.TLine(bdt_cut, 0, bdt_cut, h_mc_err.GetMaximum()*1.6)
 line_bdt.SetLineWidth(2)
 line_bdt.SetLineStyle(2)
-line_bdt.Draw()
+#line_bdt.Draw()
 
 pad_top.SetLogy()
 c_bdt.cd()

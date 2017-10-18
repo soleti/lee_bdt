@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import ROOT
 import math
