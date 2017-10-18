@@ -4,12 +4,12 @@ import ROOT
 import math
 
 from bdt_common import binning, labels, variables, spectators, bdt_cut
-from bdt_common import description, total_pot
+from bdt_common import description, total_pot, sigmaCalc
 
 from glob import glob
 
 draw_subtraction = False
-
+draw_lee = True
 ROOT.gStyle.SetOptStat(0)
 
 f_data = ROOT.TFile("bnbext_file.root")
@@ -51,8 +51,12 @@ variables_dict = dict(variables)
 histograms = []
 
 for i, n in enumerate(variables_dict.keys()):
+    print(i, labels[n])
+
     h = ROOT.TH1F("h_" + n, labels[n],
                   binning[n][0], binning[n][1], binning[n][2])
+    h.SetLineColor(1)
+    h.SetMarkerStyle(20)
     histograms.append(h)
 
 histo_dict = dict(zip(variables_dict.keys(), histograms))
@@ -70,7 +74,8 @@ for i in range(t_data.GetEntries()):
         print("{} {} {} {}".format(int(t_data.run),
                                    int(t_data.subrun),
                                    int(t_data.event),
-                                   t_data.event_weight * 2), file = passed_events)
+                                   t_data.event_weight * 2),
+              file=passed_events)
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
@@ -90,10 +95,11 @@ for h in histograms:
 
 for i, h in enumerate(histograms):
     h_data = data_files[i].Get(h.GetName())
+    h_data.SetLineColor(1)
+    h_data.SetMarkerStyle(20)
     h_cosmic = cosmic_files[i].Get(h.GetName())
     histograms_data.append(h_data)
     histograms_cosmic.append(h_cosmic)
-
 
 histograms_mc = []
 for h in histograms:
@@ -107,20 +113,24 @@ legend.SetTextFont(63)
 legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot)
 legend.SetTextFont(43)
 
-for j in range(histograms_mc[0].GetNhists()):
-    if histograms_mc[0].GetHists()[j].Integral():
+for j in range(histograms_mc[22].GetNhists()):
+    if histograms_mc[22].GetHists()[j].Integral():
         legend.AddEntry(
-            histograms_mc[0].GetHists()[j],
+            histograms_mc[22].GetHists()[j],
             "{}: {:.0f} events".format(description[j],
-                                       histograms_mc[0].GetHists()[j].
+                                       histograms_mc[22].GetHists()[j].
                                        Integral()),
             "f")
 
-legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
-                .format(histograms_data[0].Integral()), "lep")
+# legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
+#                 .format(histograms_data[22].Integral()), "lep")
+#
+# legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
+#                 .format(histograms[22].Integral()), "f")
 
-legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
-                .format(histograms[0].Integral()), "f")
+for i in range(len(histograms)):
+    histograms_mc[i].GetHists()[2].SetFillStyle(3001)
+
 
 if draw_subtraction:
     for i in range(len(histograms)):
@@ -141,10 +151,10 @@ if draw_subtraction:
 legend.SetNColumns(2)
 
 legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-legend_cosmic.AddEntry(histograms[0], "Data EXT: {:.0f} events"
-                       .format(histograms[0].Integral()), "lep")
+legend_cosmic.AddEntry(histograms[22], "Data EXT: {:.0f} events"
+                       .format(histograms[22].Integral()), "lep")
 legend_cosmic.AddEntry(histograms_cosmic[0],
-                       "CORSIKA Monte Carlo: shape normalized", "f")
+                       "CORSIKA in-time Monte Carlo: integral normalized", "f")
 legend_cosmic.SetNColumns(2)
 canvases = []
 h_errs = []
@@ -152,6 +162,22 @@ h_ratios = []
 pads = []
 lines = []
 canvases_cosmic = []
+
+h_lee = ROOT.TH1F("h_lee", "", binning["reco_energy"][0], binning["reco_energy"][1], binning["reco_energy"][2])
+
+scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913, 2.6504659907742409, 3.2558450032216988, 2.5826310533377432, 2.6614353575699727, 1.4145769564088304, 1.0206172427887652, 0.9972444259255292, 0.79323702430381904, 0.63892043872491167, 0.61676413081900316, 0.3541651442224471, 0.28310400773433003, 0.94342108559739024]
+#scaling = [5.015008606, 4.755966764, 4.240843625, 3.494299576, 2.596148682, 1.715699034, 1.051751175, 0.8966301403, 0.9134166508, 1.010169572, 1.075023103]
+h_lee.SetFillColor(ROOT.kGreen - 2)
+h_lee.SetFillStyle(3005)
+h_lee.SetLineColor(1)
+
+for i in range(len(scaling)):
+    if scaling[i] - 1 > 0:
+        h_lee.SetBinContent(i+1, histograms_mc[22].GetHists()[3].GetBinContent(i+1)*(scaling[i] - 1))
+
+if draw_lee:
+    legend.AddEntry(h_lee, "Low-energy excess: {:.0f}".format(h_lee.Integral()), "f")
+
 for i in range(len(histograms)):
 
     histograms[i].SetLineColor(ROOT.kBlack)
@@ -179,21 +205,26 @@ for i in range(len(histograms)):
 
     c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
 
-    if not draw_subtraction:
-        histograms_mc[i].Add(histograms[i])
+    # if not draw_subtraction:
+    #     histograms_mc[i].Add(histograms[i])
 
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)
     for j in range(1, histograms_mc[i].GetNhists()):
         h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
-    pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
-    pad_top.SetBottomMargin(0)
-    pad_top.Range(-22.21825, -2.003018, 202.5403, 2073.676)
-    pad_top.SetTopMargin(0.2411347)
-    pad_top.Draw()
-    pad_top.cd()
-    pads.append(pad_top)
+    if i == 22 and draw_lee:
+        for s in range(100):
+            print(s*0.01, sigmaCalc(h_lee, h_mc_err, s*0.01))
+        histograms_mc[i].Add(h_lee)
+
+    # pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
+    # pad_top.SetBottomMargin(0)
+    # pad_top.Range(-22.21825, -2.003018, 202.5403, 2073.676)
+    # pad_top.SetTopMargin(0.2411347)
+    # pad_top.Draw()
+    # pad_top.cd()
+    # pads.append(pad_top)
     histograms_mc[i].Draw("hist")
     histograms_mc[i].GetYaxis().SetTitleSize(0.06)
     histograms_mc[i].GetYaxis().SetTitleOffset(0.8)
@@ -206,51 +237,49 @@ for i in range(len(histograms)):
     h_mc_err.SetFillStyle(3002)
     h_mc_err.SetFillColor(1)
     h_mc_err.Draw("e2 same")
-    histograms_data[i].Draw("ep same")
+    #histograms_data[i].Draw("ep same")
     h_errs.append(h_mc_err)
     legend.Draw("same")
     c.cd()
-
-    pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)
-    pad_bottom.Range(-22.5, -0.6346511, 202.5, 1.99)
-
-    pad_bottom.SetFrameBorderMode(0)
-    pad_bottom.SetFrameBorderMode(0)
-    pad_bottom.SetBorderMode(0)
-    pad_bottom.SetTopMargin(0)
-    pad_bottom.SetBottomMargin(0.245614)
-    pad_bottom.Draw()
-    pad_bottom.cd()
-    pads.append(pad_bottom)
-    h_ratio = histograms_data[i].Clone()
-    h_ratios.append(h_ratio)
-
-    h_ratio.SetName("h_ratio%i" % i)
-
-    h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
-    h_ratio.Divide(h_mc_err)
-
-    h_ratio.GetXaxis().SetLabelFont(42)
-    h_ratio.GetXaxis().SetLabelSize(0.13)
-    h_ratio.GetXaxis().SetTitleSize(0.13)
-    h_ratio.GetXaxis().SetTitleOffset(0.91)
-    h_ratio.GetYaxis().SetTitle("BNB / (MC + EXT)")
-    h_ratio.GetYaxis().SetNdivisions(509)
-    h_ratio.GetYaxis().SetLabelFont(42)
-    h_ratio.GetYaxis().SetLabelSize(0.13)
-    h_ratio.GetYaxis().SetTitleSize(0.13)
-    h_ratio.GetYaxis().SetTitleOffset(0.36)
-    h_ratio.Draw("ep")
-    line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
-                      h_ratio.GetXaxis().GetXmax(), 1)
-    line.SetLineWidth(2)
-    line.SetLineStyle(2)
-    line.Draw()
-    lines.append(line)
-    c.cd()
+    #
+    # pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)
+    # pad_bottom.Range(-22.5, -0.6346511, 202.5, 1.99)
+    #
+    # pad_bottom.SetFrameBorderMode(0)
+    # pad_bottom.SetFrameBorderMode(0)
+    # pad_bottom.SetBorderMode(0)
+    # pad_bottom.SetTopMargin(0)
+    # pad_bottom.SetBottomMargin(0.245614)
+    # pad_bottom.Draw()
+    # pad_bottom.cd()
+    # pads.append(pad_bottom)
+    # h_ratio = histograms_data[i].Clone()
+    # h_ratios.append(h_ratio)
+    #
+    # h_ratio.SetName("h_ratio%i" % i)
+    #
+    # h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
+    # h_ratio.Divide(h_mc_err)
+    #
+    # h_ratio.GetXaxis().SetLabelFont(42)
+    # h_ratio.GetXaxis().SetLabelSize(0.13)
+    # h_ratio.GetXaxis().SetTitleSize(0.13)
+    # h_ratio.GetXaxis().SetTitleOffset(0.91)
+    # h_ratio.GetYaxis().SetTitle("BNB / (MC + EXT)")
+    # h_ratio.GetYaxis().SetNdivisions(509)
+    # h_ratio.GetYaxis().SetLabelFont(42)
+    # h_ratio.GetYaxis().SetLabelSize(0.13)
+    # h_ratio.GetYaxis().SetTitleSize(0.13)
+    # h_ratio.GetYaxis().SetTitleOffset(0.36)
+    # h_ratio.Draw("ep")
+    # line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
+    #                   h_ratio.GetXaxis().GetXmax(), 1)
+    # line.SetLineWidth(2)
+    # line.SetLineStyle(2)
+    # line.Draw()
+    # lines.append(line)
+    # c.cd()
     c.Update()
     c.SaveAs("plots/%s.pdf" % histograms[i].GetName())
     canvases.append(c)
-
-
 input()
