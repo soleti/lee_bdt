@@ -1,4 +1,5 @@
 from array import array
+import math
 
 
 def find_interaction(dictionary, interaction):
@@ -7,7 +8,18 @@ def find_interaction(dictionary, interaction):
             return name
 
 
-total_pot = 5e19
+def sigmaCalc(h_signal, h_background, sys_err = 0):
+    chi2 = sum(
+        [h_signal.GetBinContent(i)**2 /
+         (h_background.GetBinContent(i) +
+          math.pow(sys_err * h_background.GetBinContent(i), 2))
+         for i in range(1, h_signal.GetNbinsX() - 1)
+         if h_background.GetBinContent(i) > 0])
+
+    return math.sqrt(chi2)
+
+
+total_pot = 6.6e20
 
 description = ["Other", "Cosmic", "Cosmic contaminated",
                "Beam Intrinsic #nu_{e}",
@@ -77,8 +89,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = -10.5
-
+bdt_cut = 0.5434
 track_length = array("f", [0])
 track_theta = array("f", [0])
 track_phi = array("f", [0])
@@ -158,7 +169,7 @@ variables = [
     ("reco_energy", reco_energy),
     ("shower_open_angle", shower_open_angle),
     ("dedx", dedx),
-    ("numu_score", numu_score)
+    # ("numu_score", numu_score)
 ]
 labels = {
     "n_tracks": ";# tracks;N.Entries / 1",
@@ -202,23 +213,23 @@ binning = {
     "shower_distance": [10, 0, 10],
     "track_distance": [10, 0, 10],
     "track_shower_angle": [10, -1, 1],
-    "track_start_y": [20, y_start, y_end],
-    "track_start_z": [20, z_start, z_end],
-    "track_start_x": [20, x_start, x_end],
-    "track_end_y": [20, y_start, y_end],
-    "track_end_z": [20, z_start, z_end],
-    "track_end_x": [20, x_start, x_end],
-    "shower_start_y": [20, y_start, y_end],
-    "shower_start_z": [20, z_start, z_end],
-    "shower_start_x": [20, x_start, x_end],
-    "shower_end_y": [20, y_start, y_end],
-    "shower_end_z": [20, z_start, z_end],
-    "shower_end_x": [20, x_start, x_end],
+    "track_start_y": [10, y_start, y_end],
+    "track_start_z": [10, z_start, z_end],
+    "track_start_x": [10, x_start, x_end],
+    "track_end_y": [10, y_start, y_end],
+    "track_end_z": [10, z_start, z_end],
+    "track_end_x": [10, x_start, x_end],
+    "shower_start_y": [10, y_start, y_end],
+    "shower_start_z": [10, z_start, z_end],
+    "shower_start_x": [10, x_start, x_end],
+    "shower_end_y": [10, y_start, y_end],
+    "shower_end_z": [10, z_start, z_end],
+    "shower_end_x": [10, x_start, x_end],
     "track_length": [10, 0, 20],
-    "proton_score": [10, 0, 1],
+    "proton_score": [50, 0, 1],
     "shower_energy": [20, 0, 2],
     "pt": [20, 0, 2],
-    "reco_energy": [19, 0.1, 2],
+    "reco_energy": [16, 0.2, 1],
     "shower_open_angle": [23, 0, 46],
     "dedx": [19, 0.3, 6],
     "numu_score": [20, 0, 1]
