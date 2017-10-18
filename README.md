@@ -4,6 +4,7 @@
 
 - ROOT 6.04 or higher with TMVA and pyROOT support
 - Python 3.4 or higher
+- For the dE/dx fitting function (`dedx.py`): Python 2.6 or higher and https://github.com/coreyjadams/landau
 
 ## How to run
 
