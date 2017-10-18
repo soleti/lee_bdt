@@ -1,14 +1,30 @@
-#!/usr/bin/env python3.4
+#!/usr/local/bin/python3
 
 import math
 import ROOT
 from glob import glob
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
-nue_cosmic = glob("nue_efficiency/*/Pandora*.root")
+
+def is_fiducial(point):
+    ok_y = point[1] > y_start + 20 and point[1] < y_end - 20
+    ok_x = point[0] > x_start + 10 and point[0] < x_end - 10
+    ok_z = point[2] > z_start + 10 and point[2] < z_end - 50
+    return ok_y and ok_x and ok_z
+
+
+def is_active(point):
+    ok_y = point[1] > y_start and point[1] < y_end
+    ok_x = point[0] > x_start and point[0] < x_end
+    ok_z = point[2] > z_start and point[2] < z_end
+    return ok_y and ok_x and ok_z
+
+
+nue_cosmic = glob("mc_nue_old/*/Pandora*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -58,7 +74,15 @@ h_y_diff = ROOT.TH1F("h_y_diff",
 h_z_diff = ROOT.TH1F("h_z_diff",
                      ";#Delta z [cm]; N. Entries / 0.2 cm", 50, -5, 5)
 
-is_fiducial = 0
+h_x = ROOT.TH1F("h_x",
+                     ";#Delta x [cm]; N. Entries / 0.2 cm", 50, x_start-40, x_end+40)
+h_y = ROOT.TH1F("h_y",
+                     ";#Delta y [cm]; N. Entries / 0.2 cm", 50, y_start-40, y_end+40)
+h_z = ROOT.TH1F("h_z",
+                     ";#Delta z [cm]; N. Entries / 0.2 cm", 50, z_start-40, z_end+40)
+
+
+fiducial = 0
 eNp_events = 0
 
 passed = 0
@@ -68,6 +92,8 @@ reco_ok = 0
 vertex_ok = 0
 noflash = 0
 entries = chain_nue.GetEntries()
+cc_events = 0
+
 for i in range(entries):
     chain_nue.GetEntry(i)
 
@@ -97,12 +123,22 @@ for i in range(entries):
             pions += 1
 
     eNp = electrons == 1 and photons == 0 and pions == 0 and protons > 0
+    true_neutrino_vertex = [chain_nue.true_vx_sce,
+                            chain_nue.true_vy_sce,
+                            chain_nue.true_vz_sce]
 
-    if eNp and chain_nue.nu_E > 0.1:
+    if chain_nue.category != 4:
+        cc_events += 1
+
+    if eNp and chain_nue.nu_E > 0.1 and is_active(true_neutrino_vertex):
         eNp_events += 1
+        h_x.Fill(true_neutrino_vertex[0])
+        h_y.Fill(true_neutrino_vertex[1])
+        h_z.Fill(true_neutrino_vertex[2])
 
-        if chain_nue.true_nu_is_fiducial:
-            is_fiducial += 1
+
+        if is_fiducial(true_neutrino_vertex):
+            fiducial += 1
 
             p = False
             p_track = False
@@ -182,13 +218,14 @@ for i in range(entries):
 
 
 print("Entries", entries)
+print("CC", cc_events)
 print("1eNp", eNp_events)
-print("1eNp + Is fiducial", is_fiducial)
+print("1eNp + Is fiducial", fiducial)
 
 print("Passed", passed)
 print("Not passed", not_passed)
 
-eff = passed / is_fiducial
+eff = passed / fiducial
 eff_err = math.sqrt((eff * (1 - eff)) / eNp)
 
 p_reco = reco_ok / passed
@@ -196,10 +233,10 @@ p_reco_err = math.sqrt((p_reco * (1 - p_reco)) / passed)
 p_vertex = vertex_ok / passed
 p_vertex_err = math.sqrt((p_vertex * (1 - p_vertex)) / passed)
 
-ep_reco = reco_ok / is_fiducial
-ep_reco_err = math.sqrt((ep_reco * (1 - ep_reco)) / is_fiducial)
-ep_vertex = vertex_ok / is_fiducial
-ep_vertex_err = math.sqrt((ep_vertex * (1 - ep_vertex)) / is_fiducial)
+ep_reco = reco_ok / fiducial
+ep_reco_err = math.sqrt((ep_reco * (1 - ep_reco)) / fiducial)
+ep_vertex = vertex_ok / fiducial
+ep_vertex_err = math.sqrt((ep_vertex * (1 - ep_vertex)) / fiducial)
 
 print("Efficiency: ({0:.1f} +- {1:.1f}) %".format(eff * 100, eff_err * 100))
 print("Reco. purity: ({0:.1f} +- {1:.1f}) %"
@@ -289,15 +326,15 @@ h_dist_nosce.Draw("same")
 c_dist.Update()
 
 c_x = ROOT.TCanvas("c_x", "", 500, 500)
-h_x_diff.Draw()
+h_x.Draw()
 c_x.Update()
 
 c_y = ROOT.TCanvas("c_y", "", 500, 500)
-h_y_diff.Draw()
+h_y.Draw()
 c_y.Update()
 
 c_z = ROOT.TCanvas("c_z", "", 500, 500)
-h_z_diff.Draw()
+h_z.Draw()
 c_z.Update()
 
 

@@ -9,6 +9,8 @@ from bdt_common import interactions
 fout = ROOT.TFile("test.root")
 
 tout = ROOT.TChain("dataset/TestTree")
+ttrain = ROOT.TChain("dataset/TrainTree")
+ttrain.Add("test.root")
 tout.Add("test.root")
 colors = [ROOT.kGray + 2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5,
           ROOT.kBlue - 9, ROOT.kOrange + 3, ROOT.kWhite, ROOT.kRed - 3]
@@ -20,6 +22,7 @@ stacked_histos = []
 
 for name, var in variables:
     tout.SetBranchAddress(name, var)
+    ttrain.SetBranchAddress(name, var)
 
 variables_dict = dict(variables)
 
@@ -69,24 +72,47 @@ h_bdt_stack.Add(h_bdts[6])
 
 passed_events = open("mc_passed.txt", "w")
 
+for i in range(ttrain.GetEntries()):
+    ttrain.GetEntry(i)
+    category = int(ttrain.category)
+
+    if ttrain.BDT > bdt_cut:# and tout.dedx > 1 and tout.dedx < 3 and tout.shower_open_angle < 16 and tout.shower_distance < 3 and tout.track_distance < 3:
+        for name, var in variables:
+            histo_dict[name][category].Fill(var[0], ttrain.event_weight)
+
+        if ttrain.reco_energy > 0.2 and (ttrain.category == 3 or ttrain.category == 4):
+            bkg_types[int(ttrain.interaction_type)] += ttrain.event_weight
+
+nue_selected = 0
+nue_bdt = 0
+
 for i in range(tout.GetEntries()):
     tout.GetEntry(i)
     category = int(tout.category)
 
     h_bdts[category].Fill(tout.BDT, tout.event_weight * 2)
-    if tout.BDT > bdt_cut:
+
+    if tout.category == 2:
+        nue_selected += 2
+
+    if tout.BDT > bdt_cut: # and tout.dedx > 1 and tout.dedx < 3 and tout.shower_open_angle < 16 and tout.shower_distance < 3 and tout.track_distance < 3:
+
+        if tout.category == 2:
+            nue_bdt += 2
+
         # Store interaction types of background events
-        if tout.reco_energy > 0.1 and tout.category == 4 and tout.category != 1 and tout.category != 2:
-            bkg_types[int(tout.interaction_type)] += tout.event_weight * 2
+        if tout.reco_energy > 0.2 and (tout.category == 3 or tout.category == 4):
+            bkg_types[int(tout.interaction_type)] += tout.event_weight
 
         print("{} {} {} {}".format(int(tout.run),
                                    int(tout.subrun),
                                    int(tout.event),
-                                   tout.event_weight * 2), file = passed_events)
+                                   tout.event_weight*2), file=passed_events)
 
         for name, var in variables:
-            histo_dict[name][category].Fill(var[0], tout.event_weight * 2)
+            histo_dict[name][category].Fill(var[0], tout.event_weight)
 
+print(nue_selected, nue_bdt)
 passed_events.close()
 
 f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
