@@ -89,7 +89,8 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.5434
+bdt_cut = 0.472
+#bdt_cut = 0.627
 track_length = array("f", [0])
 track_theta = array("f", [0])
 track_phi = array("f", [0])
@@ -166,10 +167,9 @@ variables = [
     ("shower_start_y", shower_start_y),
     ("shower_start_x", shower_start_x),
     ("shower_start_z", shower_start_z),
-    ("reco_energy", reco_energy),
     ("shower_open_angle", shower_open_angle),
     ("dedx", dedx),
-    # ("numu_score", numu_score)
+    ("reco_energy", reco_energy)
 ]
 labels = {
     "n_tracks": ";# tracks;N.Entries / 1",
@@ -197,10 +197,18 @@ labels = {
     "proton_score": ";Proton score; N. Entries / 0.1",
     "shower_energy": ";Shower energy [GeV]; N. Entries / 0.1 GeV",
     "pt": ";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
-    "reco_energy": ";Reco. energy [GeV]; N. Entries / 0.1 GeV",
+    "reco_energy": ";Reco. energy [GeV]; N. Entries / 0.05 GeV",
     "shower_open_angle": ";Shower open angle [#circ]; N. Entries / 2#circ",
     "dedx": ";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm",
-    "numu_score": ";#nu_{#mu} selection score; N. Entries / 0.01"
+    "numu_score": ";#nu_{#mu} selection score; N. Entries / 0.01",
+    "category": "category",
+    "event_weight": "event_weight",
+    "event": "event",
+    "run": "run",
+    "subrun": "subrun",
+    "interaction_type": "interaction_type",
+    "is_signal": "is_signal",
+    "dedx_hits": "dedx_hits",
 }
 
 binning = {
@@ -232,5 +240,13 @@ binning = {
     "reco_energy": [16, 0.2, 1],
     "shower_open_angle": [23, 0, 46],
     "dedx": [19, 0.3, 6],
-    "numu_score": [20, 0, 1]
+    "numu_score": [20, 0, 1],
+    "category": [7, 0, 7],
+    "event_weight": [20, 0, 100],
+    "event": [20, 0, 10000],
+    "run": [20, 0, 10],
+    "subrun": [20, 0, 1000],
+    "interaction_type": [100, 1000, 1100],
+    "is_signal": [2, 0, 1],
+    "dedx_hits": [200, 0, 1]
 }

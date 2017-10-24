@@ -71,7 +71,7 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
         v_shower) / (v_track.Mag() * v_shower.Mag())
 
     signal = 0
-    if root_chain.category == 2 and root_chain.E < 1:
+    if root_chain.category == 2:
         signal = 1
 
     track_vertex = [
@@ -158,6 +158,7 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
     variables["shower_open_angle"][0] = math.degrees(
         root_chain.shower_open_angle[shower_id])
 
+    # print(numu_selection(numu_chain))
     # if numu_selection(numu_chain) < 1 and numu_selection(numu_chain) > 0:
     #     variables["numu_score"][0] = numu_selection(numu_chain)
     # else:
@@ -213,7 +214,8 @@ def pt_plot(root_chain):
 
 
 def numu_selection(mychain):
-    if mychain.GetEntries() == 0: return 0
+    print(mychain.GetEntries())
+    #if mychain.GetEntries() == 0: return 0
     for i in range(mychain.nslices):
         flashmatch_cut = not (
             mychain.slc_flsmatch_qllx[i] -
@@ -229,8 +231,9 @@ def numu_selection(mychain):
         quality_cut = mychain.slc_passed_min_track_quality[i]
 
         # print(mychain.slc_flsmatch_score[i])
-        # if flashmatch_cut and broken_tracks_cut and quality_cut and dist_cut and mychain.slc_flsmatch_score[i] > 0:
-        if quality_cut:
+        #if flashmatch_cut and broken_tracks_cut and quality_cut and dist_cut and mychain.slc_flsmatch_score[i] > 0:
+        print(quality_cut, flashmatch_cut, broken_tracks_cut, dist_cut)
+        if quality_cut and flashmatch_cut:
             return mychain.slc_flsmatch_score[i]
 
     return 0
@@ -288,18 +291,20 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
             neutrino_vertex = [chain.vx, chain.vy, chain.vz]
 
             shower_vertex_d = math.sqrt(
-                sum([(s - n)**2 for s, n in zip(shower_vertex, neutrino_vertex)]))
+                sum([(s - n)**2 for s, n in
+                     zip(shower_vertex, neutrino_vertex)]))
 
             track_vertex_d = math.sqrt(
-                sum([(t - n)**2 for t, n in zip(track_vertex, neutrino_vertex)]))
+                sum([(t - n)**2 for t, n in
+                     zip(track_vertex, neutrino_vertex)]))
 
-            dedx = chain.shower_dEdx[shower_id][2] < 3.5 and chain.shower_dEdx[shower_id][2] > 1
+            dedx = chain.shower_dEdx[shower_id][2] > 1
             openangle = math.degrees(chain.shower_open_angle[shower_id]) < 15 and math.degrees(chain.shower_open_angle[shower_id]) > 1
             shower_angle = math.degrees(chain.shower_theta[shower_id]) < 80
             track_distance = track_vertex_d < 5
             shower_distance = shower_vertex_d < 7
 
-            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol:# and numu_score <  0.5 and dedx and openangle and shower_angle and track_distance and shower_distance:  # :
+            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol and dedx:# and numu_score <  0.5 and dedx and openangle and shower_angle and track_distance and shower_distance:  # :
                 total_events += event_weight
                 fill_kin_branches(chain, chain_numu, event_weight, variables)
                 tree.Fill()
@@ -307,7 +312,7 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
     return total_events
 
 
-cosmic_mc = glob("cosmic_intime/*/*.root")
+cosmic_mc = glob("cosmic_intime_dedx/*/*.root")
 
 # nue_cosmic = glob("nue_files_6_42_energy/*/*.root")
 # bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
@@ -316,8 +321,8 @@ cosmic_mc = glob("cosmic_intime/*/*.root")
 # data_ext_scaling_factor = 1.2640
 
 data_ext_scaling_factor = 1.299
-nue_cosmic = glob("mc_nue_old/*/*.root")
-bnb_cosmic = glob("mc_bnb_mcc83/*/*.root")
+nue_cosmic = glob("mc_nue_dedx/*/*.root")
+bnb_cosmic = glob("mc_bnb_dedx/*/*.root")
 data_bnb = glob("data_bnb_mcc83/*/*.root")
 data_bnbext = glob("data_ext_mcc83/*/*.root")
 
@@ -416,7 +421,10 @@ for n, b in variables.items():
     bnbext_tree.Branch(n, b, n + "/f")
 
 print("*** MC cosmic sample ***")
-total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu, 1,
+print(chain_data_bnbext.GetEntries() / chain_cosmic_mc.GetEntries())
+print(data_ext_scaling_factor * total_pot / total_data_bnb_pot / 1.3311)
+total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu,
+                            data_ext_scaling_factor * total_pot / total_data_bnb_pot * 1.3311 * chain_data_bnbext.GetEntries() / chain_cosmic_mc.GetEntries(),
                             cosmic_mc_tree, "cosmic")
 print("MC cosmic {} events".format(total_cosmic_mc))
 

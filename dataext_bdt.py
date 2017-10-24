@@ -5,7 +5,7 @@ import math
 
 from bdt_common import binning, labels, variables, spectators, bdt_cut
 from bdt_common import description, total_pot, sigmaCalc
-
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 from glob import glob
 
 draw_subtraction = False
@@ -48,7 +48,7 @@ reader.BookMVA("BDT method",
                "dataset/weights/TMVAClassification_BDT.weights.xml")
 
 
-variables_dict = dict(variables+spectators)
+variables_dict = dict(variables + spectators)
 
 histograms = []
 
@@ -67,6 +67,13 @@ h_bdt = ROOT.TH1F("h_bdt", ";BDT response; N. Entries / 0.05", 40, -1, 1)
 
 passed_events = open("dataext_passed.txt", "w")
 
+h_xy_track_start = ROOT.TH2F("h_xy_track_start", "x [cm]; y [cm]",
+                             10, x_start, x_end, 10, y_start, y_end)
+h_yz_track_start = ROOT.TH2F("h_yz_track_start", "x [cm]; y [cm]",
+                             10, y_start, y_end, 10, z_start, z_end)
+h_xz_track_start = ROOT.TH2F("h_xz_track_start", "x [cm]; y [cm]",
+                             10, x_start, x_end, 10, z_start, z_end)
+
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
@@ -76,12 +83,28 @@ for i in range(t_data.GetEntries()):
         print("{} {} {} {}".format(int(t_data.run),
                                    int(t_data.subrun),
                                    int(t_data.event),
-                                   t_data.event_weight * 2),
+                                   t_data.event_weight),
               file=passed_events)
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
         for name, var in spectators:
             histo_dict[name].Fill(var[0], t_data.event_weight)
+
+    h_xy_track_start.Fill(variables_dict["track_start_x"][0],
+                          variables_dict["track_start_y"][0],
+                          t_data.event_weight)
+    h_yz_track_start.Fill(variables_dict["track_start_y"][0],
+                          variables_dict["track_start_z"][0],
+                          t_data.event_weight)
+    h_xz_track_start.Fill(variables_dict["track_start_x"][0],
+                          variables_dict["track_start_z"][0],
+                          t_data.event_weight)
+
+f_2d = ROOT.TFile("2d_data.root", "RECREATE")
+h_xy_track_start.Write()
+h_xz_track_start.Write()
+h_yz_track_start.Write()
+f_2d.Close()
 
 f_bdt = ROOT.TFile("plots/h_bdt_dataext.root", "RECREATE")
 h_bdt.Write()
@@ -123,14 +146,14 @@ for j in range(histograms_mc[24].GetNhists()):
             histograms_mc[24].GetHists()[j],
             "{}: {:.0f} events".format(description[j],
                                        histograms_mc[24].GetHists()[j].
-                                       Integral(1, 8)),
+                                       Integral()),
             "f")
 
 # legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
 #                 .format(histograms_data[24].Integral()), "lep")
 #
-# legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
-#                 .format(histograms[24].Integral()), "f")
+#legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
+                # .format(histograms[24].Integral()), "f")
 
 for i in range(len(histograms)):
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
@@ -149,11 +172,12 @@ if draw_subtraction:
                 err2 = histograms[i].GetBinError(j)
                 histograms_data[i].SetBinError(j, math.sqrt(err1**2 + err2**2))
 
-    legend.AddEntry(histograms_data[0], "Data BNB - BNB EXT: {:.0f} events"
-                    .format(histograms_data[0].Integral()), "lep")
+    legend.AddEntry(histograms_data[24], "Data BNB - BNB EXT: {:.0f} events"
+                    .format(histograms_data[24].Integral()), "lep")
 
 legend.SetNColumns(2)
-
+legend.AddEntry(histograms_cosmic[0],
+                "Cosmic in-time: {:.0f}".format(histograms_cosmic[24].Integral()), "f")
 legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
 legend_cosmic.AddEntry(histograms[24], "Data EXT: {:.0f} events"
                        .format(histograms[24].Integral()), "lep")
@@ -186,24 +210,25 @@ for i in range(len(histograms)):
 
     histograms[i].SetLineColor(ROOT.kBlack)
 
-    # c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
+    c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
+    # print(histograms[i].Integral() / histograms_cosmic[i].Integral())
     # if histograms_cosmic[i].Integral() > 0:
     #     histograms_cosmic[i].Scale(
     #         histograms[i].Integral() / histograms_cosmic[i].Integral())
-    # histograms_cosmic[i].SetLineColor(ROOT.kBlack)
-    # histograms_cosmic[i].SetFillColor(ROOT.kRed - 3)
-    # histograms_cosmic[i].Draw("hist")
-    #
-    # histograms[i].SetMarkerStyle(20)
-    # histograms[i].Draw("ep same")
-    # legend_cosmic.Draw()
-    #
-    # upper_limit = histograms_cosmic[i].GetMaximum() * 1.3
-    # histograms_cosmic[i].GetYaxis().SetRangeUser(0.01, upper_limit)
-    #
-    # c_cosmic.Update()
-    # c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
-    # canvases_cosmic.append(c_cosmic)
+    histograms_cosmic[i].SetLineColor(ROOT.kBlack)
+    histograms_cosmic[i].SetFillColor(ROOT.kOrange + 1)
+    histograms_cosmic[i].Draw("hist")
+
+    histograms[i].SetMarkerStyle(20)
+    histograms[i].Draw("ep same")
+    legend_cosmic.Draw()
+
+    upper_limit = histograms_cosmic[i].GetMaximum() * 1.3
+    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01, upper_limit)
+
+    c_cosmic.Update()
+    c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
+    canvases_cosmic.append(c_cosmic)
 
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
@@ -211,14 +236,13 @@ for i in range(len(histograms)):
 
     # if not draw_subtraction:
     #     histograms_mc[i].Add(histograms[i])
-
+    histograms_mc[i].Add(histograms_cosmic[i])
     h_mc_err = histograms_mc[i].GetHists()[0].Clone()
     h_mc_err.SetName("h_mc_err%i" % i)
     for j in range(1, histograms_mc[i].GetNhists()):
         h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
     if i == 24 and draw_lee:
-        #for s in range(100):
         print("Sigma", sigmaCalc(h_lee, h_mc_err))
         histograms_mc[i].Add(h_lee)
 
@@ -234,14 +258,13 @@ for i in range(len(histograms)):
     histograms_mc[i].GetYaxis().SetTitleOffset(0.8)
     histograms_mc[i].SetMinimum(0.1)
     histograms_mc[i].SetMaximum(h_mc_err.GetMaximum() * 1.3)
-
     histograms_data[i].SetLineColor(1)
     histograms_data[i].SetMarkerStyle(20)
 
     h_mc_err.SetFillStyle(3002)
     h_mc_err.SetFillColor(1)
-    h_mc_err.Draw("e2 same")
-    #histograms_data[i].Draw("ep same")
+    h_mc_err.Draw("e1 same")
+    # histograms_data[i].Draw("ep same")
     h_errs.append(h_mc_err)
     legend.Draw("same")
     c.cd()
@@ -284,6 +307,6 @@ for i in range(len(histograms)):
     # lines.append(line)
     # c.cd()
     c.Update()
-    c.SaveAs("plots/%s.pdf" % histograms[i].GetName())
+    #c.SaveAs("plots/%s.pdf" % histograms[i].GetName(), "Q")
     canvases.append(c)
 input()

@@ -14,7 +14,8 @@ reader = ROOT.TMVA.Reader(":".join([
 
 for name, var in variables:
     t_data.SetBranchAddress(name, var)
-
+for name, var in spectators:
+    t_data.SetBranchAddress(name, var)
 for name, var in variables:
     reader.AddVariable(name, var)
 
@@ -25,7 +26,7 @@ reader.BookMVA("BDT method",
                "dataset/weights/TMVAClassification_BDT.weights.xml")
 
 
-variables_dict = dict(variables)
+variables_dict = dict(variables+spectators)
 
 histograms = []
 
@@ -49,9 +50,11 @@ for i in range(t_data.GetEntries()):
         print("{} {} {} {}".format(int(t_data.run),
                                    int(t_data.subrun),
                                    int(t_data.event),
-                                   t_data.event_weight * 2), file = passed_events)
+                                   t_data.event_weight), file = passed_events)
 
         for name, var in variables:
+            histo_dict[name].Fill(var[0], t_data.event_weight)
+        for name, var in spectators:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
 f_bdt = ROOT.TFile("plots/h_bdt_data.root", "RECREATE")

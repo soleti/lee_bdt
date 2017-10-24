@@ -23,9 +23,9 @@ def gauss_exp(var, par):
     x = var[0]
 
     if (x - mu) / sigma >= -k:
-        return n*math.exp(-0.5 * ((x - mu) / sigma)**2)
+        return n * math.exp(-0.5 * ((x - mu) / sigma)**2)
     else:
-        return n*math.exp(k**2 / 2 + k * ((x - mu) / sigma))
+        return n * math.exp(k**2 / 2 + k * ((x - mu) / sigma))
 
 ROOT.gStyle.SetPaintTextFormat(".2f")
 ROOT.gStyle.SetNumberContours(999)
@@ -78,6 +78,10 @@ for i in range(10):
                                        30, -1, 1))
 
 l_true_reco = [[], [], [], [], [], [], [], [], [], []]
+h_true_reco_slices = []
+for i in range(len(l_true_reco)):
+    h = ROOT.TH1F("h%i" % i, "", 100, 0, 2)
+    h_true_reco_slices.append(h)
 
 for evt in range(entries):
     chain.GetEntry(evt)
@@ -147,6 +151,7 @@ for evt in range(entries):
                 if tot_energy < 2:
                     h_e_res_intervals[int(tot_energy / 0.2)].Fill(e_res)
                     l_true_reco[int(tot_energy / 0.2)].append(chain.E)
+                    h_true_reco[int(tot_energy / 0.2)].append(chain.E)
 
                 if chosen_showers == e and chosen_tracks == p:
                     perfect_event += 1
