@@ -34,6 +34,8 @@ reader = ROOT.TMVA.Reader(":".join([
 
 for name, var in variables:
     t_data.SetBranchAddress(name, var)
+for name, var in spectators:
+    t_data.SetBranchAddress(name, var)
 
 for name, var in variables:
     reader.AddVariable(name, var)
@@ -46,7 +48,7 @@ reader.BookMVA("BDT method",
                "dataset/weights/TMVAClassification_BDT.weights.xml")
 
 
-variables_dict = dict(variables)
+variables_dict = dict(variables+spectators)
 
 histograms = []
 
@@ -77,6 +79,8 @@ for i in range(t_data.GetEntries()):
                                    t_data.event_weight * 2),
               file=passed_events)
         for name, var in variables:
+            histo_dict[name].Fill(var[0], t_data.event_weight)
+        for name, var in spectators:
             histo_dict[name].Fill(var[0], t_data.event_weight)
 
 f_bdt = ROOT.TFile("plots/h_bdt_dataext.root", "RECREATE")
@@ -113,20 +117,20 @@ legend.SetTextFont(63)
 legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot)
 legend.SetTextFont(43)
 
-for j in range(histograms_mc[22].GetNhists()):
-    if histograms_mc[22].GetHists()[j].Integral():
+for j in range(histograms_mc[24].GetNhists()):
+    if histograms_mc[24].GetHists()[j].Integral():
         legend.AddEntry(
-            histograms_mc[22].GetHists()[j],
+            histograms_mc[24].GetHists()[j],
             "{}: {:.0f} events".format(description[j],
-                                       histograms_mc[22].GetHists()[j].
-                                       Integral()),
+                                       histograms_mc[24].GetHists()[j].
+                                       Integral(1, 8)),
             "f")
 
 # legend.AddEntry(histograms_data[0], "Data BNB: {:.0f} events"
-#                 .format(histograms_data[22].Integral()), "lep")
+#                 .format(histograms_data[24].Integral()), "lep")
 #
 # legend.AddEntry(histograms[0], "Data EXT: {:.0f} events"
-#                 .format(histograms[22].Integral()), "f")
+#                 .format(histograms[24].Integral()), "f")
 
 for i in range(len(histograms)):
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
@@ -151,8 +155,8 @@ if draw_subtraction:
 legend.SetNColumns(2)
 
 legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-legend_cosmic.AddEntry(histograms[22], "Data EXT: {:.0f} events"
-                       .format(histograms[22].Integral()), "lep")
+legend_cosmic.AddEntry(histograms[24], "Data EXT: {:.0f} events"
+                       .format(histograms[24].Integral()), "lep")
 legend_cosmic.AddEntry(histograms_cosmic[0],
                        "CORSIKA in-time Monte Carlo: integral normalized", "f")
 legend_cosmic.SetNColumns(2)
@@ -173,7 +177,7 @@ h_lee.SetLineColor(1)
 
 for i in range(len(scaling)):
     if scaling[i] - 1 > 0:
-        h_lee.SetBinContent(i+1, histograms_mc[22].GetHists()[3].GetBinContent(i+1)*(scaling[i] - 1))
+        h_lee.SetBinContent(i+1, histograms_mc[24].GetHists()[3].GetBinContent(i+1)*(scaling[i] - 1))
 
 if draw_lee:
     legend.AddEntry(h_lee, "Low-energy excess: {:.0f}".format(h_lee.Integral()), "f")
@@ -182,24 +186,24 @@ for i in range(len(histograms)):
 
     histograms[i].SetLineColor(ROOT.kBlack)
 
-    c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
-    if histograms_cosmic[i].Integral() > 0:
-        histograms_cosmic[i].Scale(
-            histograms[i].Integral() / histograms_cosmic[i].Integral())
-    histograms_cosmic[i].SetLineColor(ROOT.kBlack)
-    histograms_cosmic[i].SetFillColor(ROOT.kRed - 3)
-    histograms_cosmic[i].Draw("hist")
-
-    histograms[i].SetMarkerStyle(20)
-    histograms[i].Draw("ep same")
-    legend_cosmic.Draw()
-
-    upper_limit = histograms_cosmic[i].GetMaximum() * 1.3
-    histograms_cosmic[i].GetYaxis().SetRangeUser(0.01, upper_limit)
-
-    c_cosmic.Update()
-    c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
-    canvases_cosmic.append(c_cosmic)
+    # c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
+    # if histograms_cosmic[i].Integral() > 0:
+    #     histograms_cosmic[i].Scale(
+    #         histograms[i].Integral() / histograms_cosmic[i].Integral())
+    # histograms_cosmic[i].SetLineColor(ROOT.kBlack)
+    # histograms_cosmic[i].SetFillColor(ROOT.kRed - 3)
+    # histograms_cosmic[i].Draw("hist")
+    #
+    # histograms[i].SetMarkerStyle(20)
+    # histograms[i].Draw("ep same")
+    # legend_cosmic.Draw()
+    #
+    # upper_limit = histograms_cosmic[i].GetMaximum() * 1.3
+    # histograms_cosmic[i].GetYaxis().SetRangeUser(0.01, upper_limit)
+    #
+    # c_cosmic.Update()
+    # c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms[i].GetName())
+    # canvases_cosmic.append(c_cosmic)
 
     histograms_mc[i].GetHists()[2].SetFillStyle(3001)
 
@@ -213,9 +217,9 @@ for i in range(len(histograms)):
     for j in range(1, histograms_mc[i].GetNhists()):
         h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
-    if i == 22 and draw_lee:
-        for s in range(100):
-            print(s*0.01, sigmaCalc(h_lee, h_mc_err, s*0.01))
+    if i == 24 and draw_lee:
+        #for s in range(100):
+        print("Sigma", sigmaCalc(h_lee, h_mc_err))
         histograms_mc[i].Add(h_lee)
 
     # pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
