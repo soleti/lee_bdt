@@ -25,6 +25,7 @@ def is_active(point):
 
 
 nue_cosmic = glob("mc_nue_old/*/Pandora*.root")
+#nue_cosmic = glob("softmerge.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -123,6 +124,7 @@ for i in range(entries):
             pions += 1
 
     eNp = electrons == 1 and photons == 0 and pions == 0 and protons > 0
+
     true_neutrino_vertex = [chain_nue.true_vx_sce,
                             chain_nue.true_vy_sce,
                             chain_nue.true_vz_sce]
@@ -130,12 +132,13 @@ for i in range(entries):
     if chain_nue.category != 4:
         cc_events += 1
 
-    if eNp and chain_nue.nu_E > 0.1 and is_active(true_neutrino_vertex):
+    if not eNp: print(electrons, photons, protons, pions)
+
+    if eNp and chain_nue.nu_E > 0.1:
         eNp_events += 1
         h_x.Fill(true_neutrino_vertex[0])
         h_y.Fill(true_neutrino_vertex[1])
         h_z.Fill(true_neutrino_vertex[2])
-
 
         if is_fiducial(true_neutrino_vertex):
             fiducial += 1
@@ -226,7 +229,7 @@ print("Passed", passed)
 print("Not passed", not_passed)
 
 eff = passed / fiducial
-eff_err = math.sqrt((eff * (1 - eff)) / eNp)
+eff_err = math.sqrt((eff * (1 - eff)) / fiducial)
 
 p_reco = reco_ok / passed
 p_reco_err = math.sqrt((p_reco * (1 - p_reco)) / passed)
@@ -247,7 +250,7 @@ print("Reco. efficiency x purity: ({0:.1f} +- {1:.1f}) %"
       .format(ep_reco * 100, ep_reco_err * 100))
 print("Vertex efficiency x purity: ({0:.1f} +- {1:.1f}) %"
       .format(ep_vertex * 100, ep_vertex_err * 100))
-f_energy = ROOT.TFile("f_energy.root", "RECREATE")
+f_energy = ROOT.TFile("plots/f_energy.root", "RECREATE")
 e_energy.Write()
 f_energy.Close()
 
@@ -283,21 +286,33 @@ e_energy.Draw("apl")
 p_energy.SetMarkerStyle(22)
 p_energy.SetLineColor(ROOT.kGreen + 1)
 p_energy.SetLineWidth(2)
+f_p_energy = ROOT.TFile("plots/f_p_energy.root", "RECREATE")
+p_energy.Write()
+f_p_energy.Close()
 p_energy.Draw("pl same")
 
 p_dist_energy.SetMarkerStyle(22)
 p_dist_energy.SetLineColor(ROOT.kGreen + 3)
 p_dist_energy.SetLineWidth(2)
+f_p_dist_energy = ROOT.TFile("plots/f_p_dist_energy.root", "RECREATE")
+p_dist_energy.Write()
+f_p_dist_energy.Close()
 p_dist_energy.Draw("pl same")
 
 ep_energy.SetMarkerStyle(23)
 ep_energy.SetLineColor(ROOT.kBlue + 1)
 ep_energy.SetLineWidth(2)
+f_ep_energy = ROOT.TFile("plots/f_ep_energy.root", "RECREATE")
+ep_energy.Write()
+f_ep_energy.Close()
 ep_energy.Draw("pl same")
 
 ep_dist_energy.SetMarkerStyle(23)
 ep_dist_energy.SetLineColor(ROOT.kBlue + 3)
 ep_dist_energy.SetLineWidth(2)
+f_ep_dist_energy = ROOT.TFile("plots/f_ep_dist_energy.root", "RECREATE")
+ep_dist_energy.Write()
+f_ep_dist_energy.Close()
 ep_dist_energy.Draw("pl same")
 
 e_energy.SetMarkerStyle(20)
