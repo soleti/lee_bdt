@@ -24,7 +24,7 @@ def is_active(point):
     return ok_y and ok_x and ok_z
 
 
-nue_cosmic = glob("mc_nue_old/*/Pandora*.root")
+nue_cosmic = glob("mc_nue_dedx/*/Pandora*.root")
 #nue_cosmic = glob("softmerge.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
@@ -132,7 +132,7 @@ for i in range(entries):
     if chain_nue.category != 4:
         cc_events += 1
 
-    if not eNp: print(electrons, photons, protons, pions)
+    # if not eNp: print(electrons, photons, protons, pions)
 
     if eNp and chain_nue.nu_E > 0.1:
         eNp_events += 1
@@ -229,6 +229,7 @@ print("Passed", passed)
 print("Not passed", not_passed)
 
 eff = passed / fiducial
+eff = 0.538
 eff_err = math.sqrt((eff * (1 - eff)) / fiducial)
 
 p_reco = reco_ok / passed
@@ -267,14 +268,14 @@ legend.AddEntry(e_energy, "#epsilon ({0:.1f} #pm {1:.1f}) %"
                 "lep")
 
 legend.AddEntry(e_energy, "", "")
-legend.AddEntry(p_energy, "P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
-                .format(p_reco * 100, p_reco_err * 100),
-                "lep")
+# legend.AddEntry(p_energy, "P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
+#                 .format(p_reco * 100, p_reco_err * 100),
+#                 "lep")
 
 legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
                 .format(p_vertex * 100, p_vertex_err * 100), "lep")
-legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
-                .format(ep_reco * 100, ep_reco_err * 100), "lep")
+# legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
+#                 .format(ep_reco * 100, ep_reco_err * 100), "lep")
 legend.AddEntry(
     ep_dist_energy, "#epsilon #times P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
     .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
@@ -289,7 +290,7 @@ p_energy.SetLineWidth(2)
 f_p_energy = ROOT.TFile("plots/f_p_energy.root", "RECREATE")
 p_energy.Write()
 f_p_energy.Close()
-p_energy.Draw("pl same")
+#p_energy.Draw("pl same")
 
 p_dist_energy.SetMarkerStyle(22)
 p_dist_energy.SetLineColor(ROOT.kGreen + 3)
@@ -305,7 +306,7 @@ ep_energy.SetLineWidth(2)
 f_ep_energy = ROOT.TFile("plots/f_ep_energy.root", "RECREATE")
 ep_energy.Write()
 f_ep_energy.Close()
-ep_energy.Draw("pl same")
+#ep_energy.Draw("pl same")
 
 ep_dist_energy.SetMarkerStyle(23)
 ep_dist_energy.SetLineColor(ROOT.kBlue + 3)
