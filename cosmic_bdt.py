@@ -2,9 +2,9 @@
 
 import ROOT
 
-from bdt_common import binning, labels, variables, spectators, bdt_cut
+from bdt_common import binning, labels, variables, spectators, bdt_cut, manual_cuts
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
-
+from array import array
 f_data = ROOT.TFile("cosmic_mc_file.root")
 t_data = f_data.Get("cosmic_mc_tree")
 
@@ -16,6 +16,10 @@ reader = ROOT.TMVA.Reader(":".join([
 
 for name, var in variables:
     t_data.SetBranchAddress(name, var)
+
+for name, var in spectators:
+    t_data.SetBranchAddress(name, var)
+
 
 for name, var in variables:
     reader.AddVariable(name, var)
@@ -32,8 +36,12 @@ variables_dict = dict(variables + spectators)
 histograms = []
 
 for i, n in enumerate(variables_dict.keys()):
-    h = ROOT.TH1F("h_" + n,
-                  labels[n], binning[n][0], binning[n][1], binning[n][2])
+    if n != "reco_energy":
+        h = ROOT.TH1F("h_%s" % n, labels[n],
+                      binning[n][0], binning[n][1], binning[n][2])
+    else:
+        bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
+        h = ROOT.TH1F("h_%s" % n, labels[n],len(bins)-1, bins)
     histograms.append(h)
 
 histo_dict = dict(zip(variables_dict.keys(), histograms))
@@ -46,8 +54,8 @@ h_xz_track_start = ROOT.TH2F("h_xz_track_start", "x [cm]; y [cm]",
                              10, x_start, x_end, 10, z_start, z_end)
 h_reco = ROOT.TH1F("h_reco", "", 16, 0.2, 1)
 
-for i in range(200):
-    cut = 0.2 + i * 0.004
+for i in range(300):
+    cut = -0.2 + i * 0.004
     h_reco.Reset()
     for i in range(t_data.GetEntries()):
         t_data.GetEntry(i)
@@ -66,11 +74,14 @@ for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
     h_bdt.Fill(BDT_response, t_data.event_weight)
-    if BDT_response > bdt_cut:
+
+
+    if BDT_response > bdt_cut and manual_cuts(t_data):
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
         for name, var in spectators:
             histo_dict[name].Fill(var[0], t_data.event_weight)
+
 
     h_xy_track_start.Fill(variables_dict["track_start_x"][0],
                           variables_dict["track_start_y"][0],
