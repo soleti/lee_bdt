@@ -56,7 +56,7 @@ legend.AddEntry(h_bdt_intime, "Cosmic in-time: %.0f events" %
 
 legend.AddEntry(h_bdt_data, "Data BNB: %.0f events" %
                 h_bdt_data.Integral(), "lep")
-
+# 
 # legend.AddEntry(h_bdt_dataext, "Data EXT: %.0f events" %
 #                (h_bdt_dataext.Integral()), "f")
 legend.SetNColumns(2)
