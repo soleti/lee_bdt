@@ -7,7 +7,19 @@ from array import array
 from glob import glob
 from root_numpy import hist2array
 import numpy as np
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 
+def is_fiducial(point):
+    ok_y = y_start + 20 < point[1] < y_end - 20
+    ok_x = x_start + 10 < point[0] < x_end - 10
+    ok_z = z_start + 10 < point[2] < z_end - 50
+    return ok_y and ok_x and ok_z
+
+def is_active(point):
+    ok_y = y_start < point[1] < y_end
+    ok_x = x_start < point[0] < x_end
+    ok_z = z_start < point[2] < z_end
+    return ok_y and ok_x and ok_z
 
 def gauss_exp(var, par):
     """
@@ -32,7 +44,7 @@ ROOT.gStyle.SetNumberContours(999)
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptFit(0)
 ROOT.gStyle.SetPalette(ROOT.kBird)
-nue_cosmic = glob("nue_efficiency/*/Pandora*.root")
+nue_cosmic = glob("mc_nue_dedx/*/Pandora*.root")
 chain = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -83,6 +95,9 @@ for i in range(len(l_true_reco)):
     h = ROOT.TH1F("h%i" % i, "", 100, 0, 2)
     h_true_reco_slices.append(h)
 
+categories = [0,0,0,0,0,0,0,0]
+categories_passed = [0,0,0,0,0,0,0,0]
+
 for evt in range(entries):
     chain.GetEntry(evt)
 
@@ -113,9 +128,14 @@ for evt in range(entries):
 
     eNp = e == 1 and photons == 0 and pions == 0 and p > 0
 
-    if eNp and chain.nu_E > 0.1:
+    categories[chain.category] += 1
+    if chain.passed:
+        categories_passed[chain.category] += 1
 
-        if chain.true_nu_is_fiducial:
+    neutrino_vertex = [chain.true_vx, chain.true_vy, chain.true_vz]
+
+    if eNp and chain.nu_E > 0.1:
+        if is_active(neutrino_vertex):
             total += 1
             primary_indexes = []
             shower_passed = []
@@ -143,15 +163,14 @@ for evt in range(entries):
 
                 h_e_nu_kin.Fill(chain.nu_E, tot_energy)
 
-                e_res = ((chain.E - 5.23398e-02) / 5.91908e-01 -
+                e_res = ((chain.E - 2.51492e-02) / 6.57431e-01 -
                          tot_energy) / tot_energy
 
                 h_e_res.Fill(e_res)
-
                 if tot_energy < 2:
                     h_e_res_intervals[int(tot_energy / 0.2)].Fill(e_res)
                     l_true_reco[int(tot_energy / 0.2)].append(chain.E)
-                    h_true_reco[int(tot_energy / 0.2)].append(chain.E)
+                    h_true_reco_slices[int(tot_energy / 0.2)].Fill(chain.E)
 
                 if chosen_showers == e and chosen_tracks == p:
                     perfect_event += 1
@@ -190,7 +209,7 @@ for evt in range(entries):
                 else:
                     flash_not_passed += 1
 
-
+print(categories, categories_passed)
 print("Passed event, perfect {:.1f} %".format(perfect_event / total * 100))
 print("Passed event, incomplete {:.1f} %"
       .format(incomplete_event / total * 100))
@@ -209,12 +228,12 @@ print("Not passed event, flash passed, shower ok, no track {:.1f}% "
 print("Not passed event, flash passed, no track, no shower {:.1f}% "
       .format(track_no_shower_no / total * 100))
 
-
 e_values = array("f", [i * 0.2 + 0.1for i in range(10)])
 e_errs = array("f", [0.1] * 16)
 
 median_values = array("f")
 median_errs = array("f")
+
 for i in l_true_reco:
     median_values.append(statistics.median(i))
     median_errs.append(statistics.stdev(i) / math.sqrt(len(i)))
@@ -222,7 +241,6 @@ for i in l_true_reco:
 
 g_e_true_reco = ROOT.TGraphErrors(len(median_values),
                                   e_values, median_values, e_errs, median_errs)
-
 
 a_e_true_reco = np.zeros((16, 16))
 
