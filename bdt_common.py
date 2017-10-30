@@ -1,14 +1,27 @@
 from array import array
 import math
 
-
 def find_interaction(dictionary, interaction):
     for name, id_int in dictionary.items():
         if id_int == interaction:
             return name
 
+def manual_cuts(chain):
+    shower_energy = chain.shower_energy > 0.2
+    dedx = 1.4 < chain.dedx < 3
+    shower_distance = chain.shower_distance < 4
+    track_distance = chain.track_distance < 3
+    proton_score = chain.proton_score > 0.9
+    open_angle = 1 < chain.shower_open_angle < 15
+    shower_theta = chain.shower_theta < 90
+    return shower_energy and dedx and proton_score and open_angle and shower_theta and shower_distance and track_distance
+    #return 1#shower_energy and dedx and shower_distance and track_distance and proton_score and open_angle and shower_theta
 
 def sigmaCalc(h_signal, h_background, sys_err = 0):
+    # for i in range(1, h_signal.GetNbinsX() - 1):
+    #     print(h_background.GetBinContent(i), h_background.GetBinError(i) ** 2 )
+    #     print(h_background.GetBinContent(i)/h_background.GetBinError(i) ** 2 )
+
     chi2 = sum(
         [h_signal.GetBinContent(i)**2 /
          (h_background.GetBinContent(i) +
@@ -19,7 +32,7 @@ def sigmaCalc(h_signal, h_background, sys_err = 0):
     return math.sqrt(chi2)
 
 
-total_pot = 6.6e20
+total_pot = 5e19
 
 description = ["Other", "Cosmic", "Cosmic contaminated",
                "Beam Intrinsic #nu_{e}",
@@ -89,8 +102,8 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.472
-#bdt_cut = 0.627
+#bdt_cut = -10.2
+bdt_cut = -10.47
 track_length = array("f", [0])
 track_theta = array("f", [0])
 track_phi = array("f", [0])
@@ -148,10 +161,8 @@ variables = [
     ("track_length", track_length),
     ("track_theta", track_theta),
     ("track_phi", track_phi),
-    ("shower_energy", shower_energy),
     ("shower_theta", shower_theta),
     ("shower_phi", shower_phi),
-    ("pt", pt),
     ("n_tracks", n_tracks),
     ("n_showers", n_showers),
     ("track_shower_angle", track_shower_angle),
@@ -169,8 +180,11 @@ variables = [
     ("shower_start_z", shower_start_z),
     ("shower_open_angle", shower_open_angle),
     ("dedx", dedx),
-    ("reco_energy", reco_energy)
+    ("reco_energy", reco_energy),
+    ("pt", pt),
+    ("shower_energy", shower_energy)
 ]
+
 labels = {
     "n_tracks": ";# tracks;N.Entries / 1",
     "n_showers": ";# showers;N.Entries / 1",
@@ -234,10 +248,10 @@ binning = {
     "shower_end_z": [10, z_start, z_end],
     "shower_end_x": [10, x_start, x_end],
     "track_length": [10, 0, 20],
-    "proton_score": [50, 0, 1],
-    "shower_energy": [20, 0, 2],
+    "proton_score": [10, 0, 1],
+    "shower_energy": [10, 0, 1],
     "pt": [20, 0, 2],
-    "reco_energy": [16, 0.2, 1],
+    "reco_energy": [40, 0, 2],
     "shower_open_angle": [23, 0, 46],
     "dedx": [19, 0.3, 6],
     "numu_score": [20, 0, 1],
