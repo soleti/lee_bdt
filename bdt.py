@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators
+from bdt_common import variables, spectators, fill_histos, bdt, manual
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -49,3 +49,7 @@ method = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
 factory.TrainAllMethods()
 factory.TestAllMethods()
 factory.EvaluateAllMethods()
+
+print(fill_histos("cosmic_mc", bdt, manual))
+fill_histos("bnb", bdt, manual)
+fill_histos("bnbext", bdt, manual)

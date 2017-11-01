@@ -1,10 +1,94 @@
 from array import array
 import math
+import ROOT
+
+bdt, manual = True, False
+
+
+def fill_histos(tree_name, bdt=True, manual=True):
+    f_data = ROOT.TFile("%s_file.root" % tree_name)
+    t_data = f_data.Get("%s_tree" % tree_name)
+
+    ROOT.TMVA.Tools.Instance()
+    reader = ROOT.TMVA.Reader(":".join([
+        "!V",
+        "!Silent",
+        "Color"]))
+
+    for name, var in variables:
+        t_data.SetBranchAddress(name, var)
+
+    for name, var in spectators:
+        t_data.SetBranchAddress(name, var)
+
+    for name, var in variables:
+        reader.AddVariable(name, var)
+
+    for name, var in spectators:
+        reader.AddSpectator(name, var)
+
+    reader.BookMVA("BDT method",
+                   "dataset/weights/TMVAClassification_BDT.weights.xml")
+
+    variables_dict = dict(variables + spectators)
+
+    histograms = []
+
+    for i, n in enumerate(variables_dict.keys()):
+        if n != "reco_energy":
+            h = ROOT.TH1F("h_%s" % n, labels[n],
+                          binning[n][0], binning[n][1], binning[n][2])
+        else:
+            bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
+            h = ROOT.TH1F("h_%s" % n, labels[n], len(bins) - 1, bins)
+        histograms.append(h)
+
+    histo_dict = dict(zip(variables_dict.keys(), histograms))
+
+    h_bdt = ROOT.TH1F("h_bdt_%s" % tree_name, "BDT response; N. Entries / 0.05", 40, -1, 1)
+    passed_events = 0
+
+    for i in range(t_data.GetEntries()):
+        t_data.GetEntry(i)
+        BDT_response = reader.EvaluateMVA("BDT method")
+        h_bdt.Fill(BDT_response, t_data.event_weight)
+
+        if bdt:
+            apply_bdt = BDT_response > bdt_cut
+        else:
+            apply_bdt = True
+
+        if manual:
+            apply_manual = manual_cuts(t_data)
+        else:
+            apply_manual = True
+
+        if apply_bdt and apply_manual:
+            passed_events += t_data.event_weight
+            for name, var in variables:
+                histo_dict[name].Fill(var[0], t_data.event_weight)
+                print(t_data.reco_energy)
+            for name, var in spectators:
+                histo_dict[name].Fill(var[0], t_data.event_weight)
+
+    f_bdt = ROOT.TFile("plots/h_bdt_%s.root" % tree_name, "RECREATE")
+    h_bdt.Write()
+    f_bdt.Close()
+
+    for h in histograms:
+        f = ROOT.TFile("plots/%s_%s.root" % (h.GetName(), tree_name),
+                       "RECREATE")
+        h.Write()
+        f.Close()
+
+    return passed_events
+
 
 def find_interaction(dictionary, interaction):
     for name, id_int in dictionary.items():
         if id_int == interaction:
             return name
+
 
 def manual_cuts(chain):
     shower_energy = chain.shower_energy > 0.2
@@ -15,13 +99,9 @@ def manual_cuts(chain):
     open_angle = 1 < chain.shower_open_angle < 15
     shower_theta = chain.shower_theta < 90
     return shower_energy and dedx and proton_score and open_angle and shower_theta and shower_distance and track_distance
-    #return 1#shower_energy and dedx and shower_distance and track_distance and proton_score and open_angle and shower_theta
 
-def sigmaCalc(h_signal, h_background, sys_err = 0):
-    # for i in range(1, h_signal.GetNbinsX() - 1):
-    #     print(h_background.GetBinContent(i), h_background.GetBinError(i) ** 2 )
-    #     print(h_background.GetBinContent(i)/h_background.GetBinError(i) ** 2 )
 
+def sigmaCalc(h_signal, h_background, sys_err=0):
     chi2 = sum(
         [h_signal.GetBinContent(i)**2 /
          (h_background.GetBinContent(i) +
@@ -34,8 +114,10 @@ def sigmaCalc(h_signal, h_background, sys_err = 0):
 
 total_pot = 5e19
 
-description = ["Other", "Cosmic", "Cosmic contaminated",
-               "Beam Intrinsic #nu_{e}",
+description = ["Beam Intrinsic #nu_{e}",
+               "Other",
+               "Cosmic",
+               "Cosmic contaminated",
                "Beam Intrinsic #nu_{#mu}",
                "Beam Intrinsic NC",
                "Dirt", "Data"]
@@ -102,8 +184,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-#bdt_cut = -10.2
-bdt_cut = -10.47
+bdt_cut = 0.47
 track_length = array("f", [0])
 track_theta = array("f", [0])
 track_phi = array("f", [0])
