@@ -5,12 +5,12 @@ import math
 
 from bdt_common import binning, labels, variables, spectators, bdt_cut, manual_cuts
 from bdt_common import description, total_pot, sigmaCalc
-from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
+
 from glob import glob
 from array import array
 
 reco_energy_index = 22
-post_scaling = 66/5
+post_scaling = 66 / 5
 total_pot *= post_scaling
 
 draw_subtraction = False
@@ -50,10 +50,8 @@ for name, var in variables:
 for name, var in spectators:
     reader.AddSpectator(name, var)
 
-
 reader.BookMVA("BDT method",
                "dataset/weights/TMVAClassification_BDT.weights.xml")
-
 
 variables_dict = dict(variables + spectators)
 
@@ -67,7 +65,7 @@ for i, n in enumerate(variables_dict.keys()):
                       binning[n][0], binning[n][1], binning[n][2])
     else:
         bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
-        h = ROOT.TH1F("h_%s" % n, labels[n],len(bins)-1, bins)
+        h = ROOT.TH1F("h_%s" % n, labels[n], len(bins) - 1, bins)
     h.SetLineColor(1)
     h.SetMarkerStyle(20)
     histograms.append(h)
@@ -76,46 +74,17 @@ histo_dict = dict(zip(variables_dict.keys(), histograms))
 
 h_bdt = ROOT.TH1F("h_bdt", ";BDT response; N. Entries / 0.05", 40, -1, 1)
 
-passed_events = open("dataext_passed.txt", "w")
-
-h_xy_track_start = ROOT.TH2F("h_xy_track_start", "x [cm]; y [cm]",
-                             10, x_start, x_end, 10, y_start, y_end)
-h_yz_track_start = ROOT.TH2F("h_yz_track_start", "x [cm]; y [cm]",
-                             10, y_start, y_end, 10, z_start, z_end)
-h_xz_track_start = ROOT.TH2F("h_xz_track_start", "x [cm]; y [cm]",
-                             10, x_start, x_end, 10, z_start, z_end)
-
 for i in range(t_data.GetEntries()):
     t_data.GetEntry(i)
     BDT_response = reader.EvaluateMVA("BDT method")
     h_bdt.Fill(BDT_response, t_data.event_weight)
 
     if BDT_response > bdt_cut and manual_cuts(t_data):
-        print("{} {} {} {}".format(int(t_data.run),
-                                   int(t_data.subrun),
-                                   int(t_data.event),
-                                   t_data.event_weight),
-              file=passed_events)
+
         for name, var in variables:
             histo_dict[name].Fill(var[0], t_data.event_weight)
         for name, var in spectators:
             histo_dict[name].Fill(var[0], t_data.event_weight)
-
-    h_xy_track_start.Fill(variables_dict["track_start_x"][0],
-                          variables_dict["track_start_y"][0],
-                          t_data.event_weight)
-    h_yz_track_start.Fill(variables_dict["track_start_y"][0],
-                          variables_dict["track_start_z"][0],
-                          t_data.event_weight)
-    h_xz_track_start.Fill(variables_dict["track_start_x"][0],
-                          variables_dict["track_start_z"][0],
-                          t_data.event_weight)
-
-f_2d = ROOT.TFile("2d_data.root", "RECREATE")
-h_xy_track_start.Write()
-h_xz_track_start.Write()
-h_yz_track_start.Write()
-f_2d.Close()
 
 f_bdt = ROOT.TFile("plots/h_bdt_dataext.root", "RECREATE")
 h_bdt.Write()
@@ -124,12 +93,12 @@ f_bdt.Close()
 histograms_data = []
 data_files = []
 for h in histograms:
-    data_files.append(ROOT.TFile("plots/%s_data.root" % h.GetName()))
+    data_files.append(ROOT.TFile("plots/%s_bnb.root" % h.GetName()))
 
 histograms_cosmic = []
 cosmic_files = []
 for h in histograms:
-    cosmic_files.append(ROOT.TFile("plots/%s_cosmic.root" % h.GetName()))
+    cosmic_files.append(ROOT.TFile("plots/%s_cosmic_mc.root" % h.GetName()))
 
 for i, h in enumerate(histograms):
     h_data = data_files[i].Get(h.GetName())

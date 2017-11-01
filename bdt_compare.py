@@ -6,23 +6,23 @@ from bdt_common import description, bdt_cut, total_pot
 ROOT.gStyle.SetOptStat(0)
 
 c_bdt = ROOT.TCanvas("c_bdt", "BDT response", 900, 44, 700, 645)
-f_bdt_data = ROOT.TFile("plots/h_bdt_data.root")
-h_bdt_data = f_bdt_data.Get("h_bdt")
+f_bdt_data = ROOT.TFile("plots/h_bdt_bnb.root")
+h_bdt_data = f_bdt_data.Get("h_bdt_bnb")
 f_bdt_mc = ROOT.TFile("plots/h_bdt.root")
 h_bdt_mc = f_bdt_mc.Get("h_bdt")
 
-f_bdt_dataext = ROOT.TFile("plots/h_bdt_dataext.root")
-h_bdt_dataext = f_bdt_dataext.Get("h_bdt")
+f_bdt_dataext = ROOT.TFile("plots/h_bdt_bnbext.root")
+h_bdt_dataext = f_bdt_dataext.Get("h_bdt_bnbext")
 
 
-f_bdt_intime = ROOT.TFile("plots/h_bdt_intime.root")
-h_bdt_intime = f_bdt_intime.Get("h_bdt_intime")
+f_bdt_intime = ROOT.TFile("plots/h_bdt_cosmic_mc.root")
+h_bdt_intime = f_bdt_intime.Get("h_bdt_cosmic_mc")
 # for i in range(h_bdt_data.GetNbinsX()):
 #     h_bdt_data.SetBinContent(i,h_bdt_data.GetBinContent(i)-h_bdt_dataext.GetBinContent(i))
 
 # h_bdt_data.Scale(h_bdt_mc.Integral()/h_bdt_data.Integral())
 
-h_bdt_mc.GetHists()[2].SetFillStyle(3001)
+h_bdt_mc.GetHists()[3].SetFillStyle(3001)
 h_bdt_dataext.SetLineColor(1)
 
 legend = ROOT.TLegend(0.09455587, 0.7850208, 0.8923496, 0.9791956, "", "brNDC")
@@ -56,7 +56,7 @@ legend.AddEntry(h_bdt_intime, "Cosmic in-time: %.0f events" %
 
 legend.AddEntry(h_bdt_data, "Data BNB: %.0f events" %
                 h_bdt_data.Integral(), "lep")
-# 
+#
 # legend.AddEntry(h_bdt_dataext, "Data EXT: %.0f events" %
 #                (h_bdt_dataext.Integral()), "f")
 legend.SetNColumns(2)
