@@ -25,7 +25,7 @@ def is_active(point):
 
 
 nue_cosmic = glob("mc_nue_dedx/*/Pandora*.root")
-#nue_cosmic = glob("softmerge.root")
+# nue_cosmic = glob("softmerge.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -75,12 +75,12 @@ h_y_diff = ROOT.TH1F("h_y_diff",
 h_z_diff = ROOT.TH1F("h_z_diff",
                      ";#Delta z [cm]; N. Entries / 0.2 cm", 50, -5, 5)
 
-h_x = ROOT.TH1F("h_x",
-                     ";#Delta x [cm]; N. Entries / 0.2 cm", 50, x_start-40, x_end+40)
-h_y = ROOT.TH1F("h_y",
-                     ";#Delta y [cm]; N. Entries / 0.2 cm", 50, y_start-40, y_end+40)
-h_z = ROOT.TH1F("h_z",
-                     ";#Delta z [cm]; N. Entries / 0.2 cm", 50, z_start-40, z_end+40)
+h_x = ROOT.TH1F("h_x", ";#Delta x [cm]; N. Entries / 0.2 cm",
+                50, x_start - 40, x_end + 40)
+h_y = ROOT.TH1F("h_y", ";#Delta y [cm]; N. Entries / 0.2 cm",
+                50, y_start - 40, y_end + 40)
+h_z = ROOT.TH1F("h_z", ";#Delta z [cm]; N. Entries / 0.2 cm",
+                50, z_start - 40, z_end + 40)
 
 
 fiducial = 0
@@ -239,7 +239,7 @@ p_vertex_err = math.sqrt((p_vertex * (1 - p_vertex)) / passed)
 
 ep_reco = reco_ok / fiducial
 ep_reco_err = math.sqrt((ep_reco * (1 - ep_reco)) / fiducial)
-ep_vertex = vertex_ok / fiducial
+ep_vertex = p_vertex * eff
 ep_vertex_err = math.sqrt((ep_vertex * (1 - ep_vertex)) / fiducial)
 
 print("Efficiency: ({0:.1f} +- {1:.1f}) %".format(eff * 100, eff_err * 100))
@@ -274,8 +274,9 @@ legend.AddEntry(e_energy, "", "")
 
 legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
                 .format(p_vertex * 100, p_vertex_err * 100), "lep")
-# legend.AddEntry(ep_energy, "#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f}) %"
+# legend.AddEntry(ep_energy,"#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f})%"
 #                 .format(ep_reco * 100, ep_reco_err * 100), "lep")
+
 legend.AddEntry(
     ep_dist_energy, "#epsilon #times P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
     .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
@@ -290,7 +291,7 @@ p_energy.SetLineWidth(2)
 f_p_energy = ROOT.TFile("plots/f_p_energy.root", "RECREATE")
 p_energy.Write()
 f_p_energy.Close()
-#p_energy.Draw("pl same")
+# p_energy.Draw("pl same")
 
 p_dist_energy.SetMarkerStyle(22)
 p_dist_energy.SetLineColor(ROOT.kGreen + 3)
@@ -306,7 +307,7 @@ ep_energy.SetLineWidth(2)
 f_ep_energy = ROOT.TFile("plots/f_ep_energy.root", "RECREATE")
 ep_energy.Write()
 f_ep_energy.Close()
-#ep_energy.Draw("pl same")
+# ep_energy.Draw("pl same")
 
 ep_dist_energy.SetMarkerStyle(23)
 ep_dist_energy.SetLineColor(ROOT.kBlue + 3)
