@@ -67,7 +67,6 @@ def fill_histos(tree_name, bdt=True, manual=True):
             passed_events += t_data.event_weight
             for name, var in variables:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
-                print(t_data.reco_energy)
             for name, var in spectators:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
 
