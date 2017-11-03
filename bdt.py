@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators
+from bdt_common import variables, spectators, fill_histos, manual, bdt
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -32,7 +32,7 @@ bgCut = ROOT.TCut("is_signal <= 0.5")
 dataloader.AddSignalTree(t)
 dataloader.AddBackgroundTree(t)
 dataloader.PrepareTrainingAndTestTree(sigCut, bgCut,
-                                      "SplitMode=Random:NormMode=NumEvents:!V")
+                                      "SplitMode=Alternate:NormMode=NumEvents:!V")
 
 method = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                             ":".join([
@@ -49,3 +49,7 @@ method = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
 factory.TrainAllMethods()
 factory.TestAllMethods()
 factory.EvaluateAllMethods()
+
+fill_histos("cosmic_mc", bdt, manual)
+fill_histos("bnb", bdt, manual)
+fill_histos("bnbext", bdt, manual)

@@ -6,7 +6,7 @@ from array import array
 from bdt_common import bdt_cut, binning, labels, variables, spectators
 from bdt_common import sigmaCalc, manual_cuts, bdt, manual
 
-
+print(bdt, manual)
 def fill_histos(chain, histo_dict, h_bdts):
     events = 0
 
@@ -114,7 +114,7 @@ h_sig = ROOT.TH1F("h_sig", "", 16, 0.2, 1)
 best_sigma = 0
 chosen_cut = 0
 
-measure_sigma = False
+measure_sigma = True
 
 if measure_sigma:
     for i in range(200):

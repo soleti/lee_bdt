@@ -3,16 +3,12 @@
 import ROOT
 import math
 
-from bdt_common import variables, spectators, fill_histos
-from bdt_common import description, total_pot, sigmaCalc, bdt, manual
+from bdt_common import variables, spectators
+from bdt_common import description, total_pot, sigmaCalc
 
 from array import array
 
 ROOT.gStyle.SetOptStat(0)
-
-fill_histos("cosmic_mc", bdt, manual)
-fill_histos("bnb", bdt, manual)
-fill_histos("bnbext", bdt, manual)
 
 pads = []
 h_ratios = []
@@ -307,6 +303,8 @@ for i in range(len(variables)):
             draw_ratio(histograms_bnb[i], h_mc_err_sys)
 
         c.Update()
+        c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
+
         canvases.append(c)
 
 for i in range(len(variables)):

@@ -3,7 +3,7 @@
 from ROOT import TChain, TTree, TFile, TVector3
 from glob import glob
 import math
-from bdt_common import total_pot, variables, spectators
+from bdt_common import total_pot, variables, spectators, total_data_bnb_pot
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 
 
@@ -296,13 +296,7 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
                      zip(track_vertex, neutrino_vertex)]))
 
             dedx = chain.shower_dEdx[shower_id][2] > 1
-            track_length = chain.track_len[track_id] < 50
-            shower_energy = 0.15 < chain.shower_energy[shower_id] < 2
-            openangle = math.degrees(chain.shower_open_angle[shower_id]) < 15 and math.degrees(chain.shower_open_angle[shower_id]) > 1
-            shower_angle = math.degrees(chain.shower_theta[shower_id]) < 80
-            track_distance = track_vertex_d < 20
-            shower_distance = shower_vertex_d < 20
-            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol and dedx:  # and numu_score <  0.5 and dedx and openangle and shower_angle and track_distance and shower_distance:  # :
+            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol and dedx:
                 total_events += event_weight
                 fill_kin_branches(chain, chain_numu, event_weight, variables)
                 tree.Fill()
@@ -310,199 +304,97 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
     return total_events
 
 
-cosmic_mc = glob("cosmic_intime_dedx/*/*.root")
-
-# nue_cosmic = glob("nue_files_6_42_energy/*/*.root")
-# bnb_cosmic = glob("nu_files_6_42_energy/*/*.root")
-# data_bnb = glob("data_files_bnb_6_42_energy/*/*.root")
-# data_bnbext = glob("data_files_bnbext_6_42_energy/*/*.root")
-# data_ext_scaling_factor = 1.2640
-
 data_ext_scaling_factor = 1.299
-nue_cosmic = glob("mc_nue_dedx/*/*.root")
-bnb_cosmic = glob("mc_bnb_dedx/*/*.root")
-data_bnb = glob("data_bnb_mcc83/*/*.root")
-data_bnbext = glob("data_ext_mcc83/*/*.root")
-pi0 = glob("pi0/pi0/*/*.root")
+samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data"]
 
-chain_cosmic_mc = TChain("robertoana/pandoratree")
-chain_cosmic_mc_numu = TChain("UBXSec/tree")
+tree_files = [glob("pi0/pi0/*/*.root"),
+              glob("cosmic_intime_dedx/*/*.root"),
+              glob("mc_bnb_dedx/*/*.root"),
+              glob("mc_nue_dedx/*/*.root"),
+              glob("data_bnb_mcc83/*/*.root"),
+              glob("data_ext_mcc83/*/*.root")]
 
-chain_pi0 = TChain("robertoana/pandoratree")
-chain_pi0_pot = TChain("robertoana/pot")
-chain_pi0_numu = TChain("UBXSec/tree")
+chains = []
+chains_numu = []
+chains_pot = []
 
-chain = TChain("robertoana/pandoratree")
-chain_pot = TChain("robertoana/pot")
-chain_numu = TChain("UBXSec/tree")
+for i, files in enumerate(tree_files):
+    chains.append(TChain("robertoana/pandoratree"))
+    chains_numu.append(TChain("UBXSec/tree"))
+    chains_pot.append(TChain("robertoana/pot"))
 
-chain_nue = TChain("robertoana/pandoratree")
-chain_nue_pot = TChain("robertoana/pot")
-chain_nue_numu = TChain("UBXSec/tree")
+    for j, f in enumerate(files):
+        chains[i].Add(f)
+        if i != 1:
+            chains_numu[i].Add(f)
+        chains_pot[i].Add(f)
 
-chain_data_bnb = TChain("robertoana/pandoratree")
-chain_data_bnb_pot = TChain("robertoana/pot")
-chain_data_bnb_numu = TChain("UBXSec/tree")
+pots = []
+for c in chains_pot:
+    total_pot_file = 0
+    for i in range(c.GetEntries()):
+        c.GetEntry(i)
+        total_pot_file += c.pot
 
-chain_data_bnbext = TChain("robertoana/pandoratree")
-chain_data_bnbext_pot = TChain("robertoana/pot")
-chain_data_bnbext_numu = TChain("UBXSec/tree")
+    pots.append(total_pot_file)
 
-for f in pi0:
-    chain_pi0.Add(f)
-    chain_pi0_pot.Add(f)
-    chain_pi0_numu.Add(f)
+pots_dict = dict(zip(samples, pots))
+chains_dict = dict(zip(samples, chains))
+chains_numu_dict = dict(zip(samples, chains_numu))
+chains_pot_dict = dict(zip(samples, chains_pot))
 
-for f in cosmic_mc:
-    chain_cosmic_mc.Add(f)
-    # chain_cosmic_mc_numu.Add(f)
+variables = dict(variables + spectators)
 
-for f in nue_cosmic:
-    chain_nue.Add(f)
-    chain_nue_pot.Add(f)
-    chain_nue_numu.Add(f)
+weights = [total_pot / pots_dict["pi0"],
+           data_ext_scaling_factor * total_pot / total_data_bnb_pot * 1.3311 *
+           chains_dict["ext_data"].GetEntries() / chains_dict["cosmic_mc"].GetEntries(),
+           total_pot / pots_dict["bnb"],
+           total_pot / pots_dict["nue"],
+           total_pot / total_data_bnb_pot,
+           data_ext_scaling_factor * total_pot / total_data_bnb_pot]
 
-for f in bnb_cosmic:
-    chain.Add(f)
-    chain_pot.Add(f)
-    chain_numu.Add(f)
+files = ["pi0_file.root", "cosmic_mc_file.root", "mc_file.root",
+         "bnb_file.root", "bnbext_file.root"]
+tree_names = ["pi0_tree", "cosmic_mc_tree", "mc_tree",
+              "bnb_tree", "bnbext_tree"]
 
-for f in data_bnb:
-    chain_data_bnb.Add(f)
-    chain_data_bnb_pot.Add(f)
-    chain_data_bnb_numu.Add(f)
+trees = []
 
-for f in data_bnbext:
-    chain_data_bnbext.Add(f)
-    chain_data_bnbext_pot.Add(f)
-    chain_data_bnbext_numu.Add(f)
+for t in tree_names:
+    trees.append(TTree(t, t))
 
-run_subrun_list = []
+for n, b in variables.items():
+    for t in trees:
+        t.Branch(n, b, n + "/f")
 
-total_pi0_pot = 0
-for i in range(chain_pi0_pot.GetEntries()):
-    chain_pi0_pot.GetEntry(i)
-    total_pi0_pot += chain_pi0_pot.pot
+associated_trees = [trees[0], trees[1], trees[2], trees[2], trees[3], trees[4]]
 
-total_nue_pot = 0
-for i in range(chain_nue_pot.GetEntries()):
-    chain_nue_pot.GetEntry(i)
-    total_nue_pot += chain_nue_pot.pot
+for i, s in enumerate(samples):
+    print(s)
+    print("Weight", weights[i])
+    print("Events", fill_tree(chains[i], chains_numu[i],
+                              weights[i], associated_trees[i], s))
 
-total_bnb_pot = 0
-for i in range(chain_pot.GetEntries()):
-    chain_pot.GetEntry(i)
-    total_bnb_pot += chain_pot.pot
-
-print(chain.GetEntries())
-print(chain_nue.GetEntries())
-
-print("Total POT BNB {0:.2e}".format(total_bnb_pot))
+for f, t in zip(files, trees):
+    tfile = TFile(f, "RECREATE")
+    t.Write()
+    tfile.Close()
 
 run_subrun_bnb = open("run_subrun_bnb.txt", "w")
 
-for i in range(chain_data_bnb_pot.GetEntries()):
-    chain_data_bnb_pot.GetEntry(i)
-    run_subrun = "%i %i" % (chain_data_bnb_pot.run, chain_data_bnb_pot.subrun)
-    run_subrun_list.append(run_subrun)
+for i in range(chains_pot_dict["bnb_data"].GetEntries()):
+    chains_pot_dict["bnb_data"].GetEntry(i)
+    run_subrun = "%i %i" % (chains_pot_dict["bnb_data"].run,
+                            chains_pot_dict["bnb_data"].subrun)
     print(run_subrun, file=run_subrun_bnb)
 
 run_subrun_bnb.close()
 
-total_data_bnb_pot = 4.758e19
-print("Total data POT BNB {0:.2e}".format(total_data_bnb_pot))
-print(chain_data_bnbext.GetEntries())
 run_subrun_ext = open("run_subrun_ext.txt", "w")
-for i in range(chain_data_bnbext_pot.GetEntries()):
-    chain_data_bnbext_pot.GetEntry(i)
-    run_subrun = "%i %i" % (chain_data_bnbext_pot.run,
-                            chain_data_bnbext_pot.subrun)
-    run_subrun_list.append(run_subrun)
+for i in range(chains_pot_dict["ext_data"].GetEntries()):
+    chains_pot_dict["ext_data"].GetEntry(i)
+    run_subrun = "%i %i" % (chains_pot_dict["ext_data"].run,
+                            chains_pot_dict["ext_data"].subrun)
     print(run_subrun, file=run_subrun_ext)
+
 run_subrun_ext.close()
-
-print("Data EXT scaling factor {0:.2f}".format(data_ext_scaling_factor))
-
-variables = dict(variables + spectators)
-pi0_tree = TTree("pi0_tree", "pi0_tree")
-cosmic_mc_tree = TTree("cosmic_mc_tree", "cosmic_mc_tree")
-mc_tree = TTree("mc_tree", "mc_tree")
-bnb_tree = TTree("bnb_tree", "bnb_tree")
-bnbext_tree = TTree("bnbext_tree", "bnbext_tree")
-
-for n, b in variables.items():
-    pi0_tree.Branch(n, b, n + "/f")
-    cosmic_mc_tree.Branch(n, b, n + "/f")
-    mc_tree.Branch(n, b, n + "/f")
-    bnb_tree.Branch(n, b, n + "/f")
-    bnbext_tree.Branch(n, b, n + "/f")
-
-print("*** pi0 + cosmic sample ***")
-print("Weight {0:.2f}".format(total_pot / total_pi0_pot))
-total_pi0 = fill_tree(chain_pi0, chain_pi0_numu, total_pot / total_pi0_pot,
-                      pi0_tree, "pi0")
-print("Pi0 {0:.0f} events".format(total_pi0))
-
-pi0_file = TFile("pi0_file.root", "RECREATE")
-pi0_tree.Write()
-pi0_file.Close()
-
-
-print("*** MC cosmic sample ***")
-print(chain_cosmic_mc.GetEntries())
-print(chain_data_bnbext.GetEntries() / chain_cosmic_mc.GetEntries())
-print(data_ext_scaling_factor * total_pot / total_data_bnb_pot / 1.3311)
-total_cosmic_mc = fill_tree(chain_cosmic_mc, chain_cosmic_mc_numu,
-                            data_ext_scaling_factor * total_pot / total_data_bnb_pot * 1.3311 * chain_data_bnbext.GetEntries() / chain_cosmic_mc.GetEntries(),
-                            cosmic_mc_tree, "cosmic")
-print("MC cosmic {} events".format(total_cosmic_mc))
-
-
-print("*** MC BNB + cosmic sample ***")
-print("Weight {0:.2f}".format(total_pot / total_bnb_pot))
-total_mc = fill_tree(chain, chain_numu, total_pot / total_bnb_pot, mc_tree,
-                     "bnb")
-print("MC {0:.0f} events".format(total_mc))
-
-print("*** MC nu_e + cosmic sample ***")
-print("Weight {0:.2f}".format(total_pot / total_nue_pot))
-total_nu_e = fill_tree(chain_nue, chain_nue_numu, total_pot / total_nue_pot,
-                       mc_tree, "nue")
-print("MC nu_e {0:.0f} events".format(total_nu_e))
-
-print("*** Data BNB sample ***")
-print("Weight {0:.2f}".format(total_pot / total_data_bnb_pot))
-total_data_bnb = fill_tree(chain_data_bnb, chain_data_bnb_numu,
-                           total_pot / total_data_bnb_pot, bnb_tree)
-print("Data BNB {0:.0f} events".format(total_data_bnb))
-
-print("*** Data EXT sample ***")
-print("Weight {0:.2f}".format(data_ext_scaling_factor *
-                              total_pot / total_data_bnb_pot))
-total_data_ext = fill_tree(
-    chain_data_bnbext,
-    chain_data_bnbext_numu,
-    data_ext_scaling_factor * total_pot / total_data_bnb_pot,
-    bnbext_tree)
-print("Data EXT {0:.0f} events".format(total_data_ext))
-
-bnb_ext = total_data_bnb - total_data_ext
-print("Data BNB-EXT {0:.0f} events".format(bnb_ext))
-
-print("Ratio (BNB-EXT)/MC {0:.2f}".format(bnb_ext / total_mc))
-
-cosmic_mc_file = TFile("cosmic_mc_file.root", "RECREATE")
-cosmic_mc_tree.Write()
-cosmic_mc_file.Close()
-
-mc_file = TFile("mc_file.root", "RECREATE")
-mc_tree.Write()
-mc_file.Close()
-
-bnb_file = TFile("bnb_file.root", "RECREATE")
-bnb_tree.Write()
-bnb_file.Close()
-
-bnbext_file = TFile("bnbext_file.root", "RECREATE")
-bnbext_tree.Write()
-bnbext_file.Close()

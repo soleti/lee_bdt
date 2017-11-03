@@ -4,8 +4,9 @@ import ROOT
 
 bdt, manual = True, False
 
+total_data_bnb_pot = 4.758e19
 
-def fill_histos(tree_name, bdt=True, manual=True):
+def fill_histos(tree_name, bdt, manual):
     f_data = ROOT.TFile("%s_file.root" % tree_name)
     t_data = f_data.Get("%s_tree" % tree_name)
 
