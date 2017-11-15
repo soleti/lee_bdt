@@ -19,12 +19,10 @@ variables = variables + spectators
 reco_energy = list(dict(variables)).index("reco_energy")
 
 histograms_bnb = []
-histograms_cosmic = []
 histograms_bnbext = []
 histograms_mc = []
 
-histograms = [histograms_bnb, histograms_cosmic,
-              histograms_bnbext, histograms_mc]
+histograms = [histograms_bnb, histograms_bnbext, histograms_mc]
 
 post_scaling = 66 / 5
 total_pot *= post_scaling
@@ -102,7 +100,7 @@ def draw_ratio(num, den):
 files = []
 legends = []
 
-samples = ["bnb", "cosmic_mc", "bnbext", "mc"]
+samples = ["bnb", "bnbext", "mc"]
 
 for name, var in variables:
 
@@ -130,16 +128,16 @@ for i, h in enumerate(histograms_mc):
                                            h.GetHists()[j].
                                            Integral() * post_scaling), "f")
 
-    if draw_ext:
-        legends[i].AddEntry(histograms_bnbext[i],
-                            "Data EXT: {:.0f} events"
-                            .format(histograms_bnbext[i].Integral()
-                                    * post_scaling), "f")
-    else:
-        legends[i].AddEntry(histograms_cosmic[i],
-                            "Cosmic in-time: {:.0f} events"
-                            .format(histograms_cosmic[i].Integral()
-                                    * post_scaling), "f")
+    # if draw_ext:
+    #     legends[i].AddEntry(histograms_bnbext[i],
+    #                         "Data EXT: {:.0f} events"
+    #                         .format(histograms_bnbext[i].Integral()
+    #                                 * post_scaling), "f")
+    # else:
+    #     legends[i].AddEntry(histograms_cosmic[i],
+    #                         "Cosmic in-time: {:.0f} events"
+    #                         .format(histograms_cosmic[i].Integral()
+    #                                 * post_scaling), "f")
     if draw_data:
         legends[i].AddEntry(histograms_bnb[i],
                             "Data BNB: {:.0f} events"
@@ -170,12 +168,11 @@ if draw_subtraction:
 
 
 legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-legend_cosmic.AddEntry(histograms_cosmic[reco_energy],
+legend_cosmic.AddEntry(histograms_bnbext[reco_energy],
                        "Data EXT: {:.0f} events"
-                       .format(histograms_cosmic[reco_energy].Integral()
+                       .format(histograms_bnbext[reco_energy].Integral()
                                * post_scaling), "lep")
-histograms_cosmic[0].SetMarkerStyle(20)
-legend_cosmic.AddEntry(histograms_cosmic[0],
+legend_cosmic.AddEntry(histograms_mc[reco_energy].GetHists()[1],
                        "CORSIKA in-time Monte Carlo: integral normalized", "f")
 legend_cosmic.SetNColumns(2)
 
@@ -215,20 +212,19 @@ for i in range(len(variables)):
 
         histograms_bnbext[i].SetLineColor(ROOT.kBlack)
         histograms_bnbext[i].SetMarkerStyle(20)
-        histograms_cosmic[i].SetLineColor(ROOT.kBlack)
-        histograms_cosmic[i].SetFillColor(ROOT.kOrange + 1)
+
         histograms_bnb[i].SetLineColor(1)
         histograms_bnb[i].SetMarkerStyle(20)
 
-        if not draw_subtraction and draw_ext:
-            if i == reco_energy:
-                fix_binning(histograms_cosmic[i])
-            histograms_mc[i].Add(histograms_bnbext[i])
-
-        if not draw_ext:
-            if i == reco_energy:
-                fix_binning(histograms_bnbext[i])
-            histograms_mc[i].Add(histograms_cosmic[i])
+        # if not draw_subtraction and draw_ext:
+        #     if i == reco_energy:
+        #         fix_binning(histograms_cosmic[i])
+        #     histograms_mc[i].Add(histograms_bnbext[i])
+        #
+        # if not draw_ext:
+        #     if i == reco_energy:
+        #         fix_binning(histograms_bnbext[i])
+        #     histograms_mc[i].Add(histograms_cosmic[i])
 
         h_mc_err = histograms_mc[i].GetHists()[0].Clone()
         h_mc_err.SetName("h_mc_err%i" % i)
@@ -307,30 +303,34 @@ for i in range(len(variables)):
 
         canvases.append(c)
 
+h_cosmics = []
 for i in range(len(variables)):
 
     # if i == reco_energy:
     h_ext = histograms_bnbext[i].Clone()
-    h_intime = histograms_cosmic[i].Clone()
-
+    h_intime = histograms_mc[i].GetHists()[1].Clone()
+    if i == reco_energy:
+        fix_binning(h_ext)
     h_ext.Scale(post_scaling)
 
     if h_intime.Integral() > 0:
         c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
-
+        h_cosmics.append(h_ext)
+        h_cosmics.append(h_intime)
         draw_top()
 
         h_intime.Draw("hist")
         h_ext.Draw("ep same")
         set_axis(h_intime)
         legend_cosmic.Draw()
+        print(h_ext.Integral() / h_intime.Integral(), i)
 
         c_cosmic.cd()
         draw_ratio(h_ext, h_intime)
         c_cosmic.cd()
 
         c_cosmic.Update()
-        c_cosmic.SaveAs("plots/%s_cosmic.pdf" % histograms_cosmic[i].GetName())
+        c_cosmic.SaveAs("plots/%s_cosmic.pdf" % h_intime.GetName())
         canvases_cosmic.append(c_cosmic)
 
 input()

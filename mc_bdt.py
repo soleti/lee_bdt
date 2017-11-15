@@ -6,7 +6,9 @@ from array import array
 from bdt_common import bdt_cut, binning, labels, variables, spectators
 from bdt_common import sigmaCalc, manual_cuts, bdt, manual
 
-print(bdt, manual)
+print("BDT: ", bdt, "Manual: ", manual)
+
+
 def fill_histos(chain, histo_dict, h_bdts):
     events = 0
 
@@ -35,6 +37,12 @@ def fill_histos(chain, histo_dict, h_bdts):
             for name, var in spectators:
                 histo_dict[name][category].Fill(var[0], chain.event_weight)
 
+            # if chain.category != 2 and 0 < chain.reco_energy < 2:
+            #     print("nu_mu",
+            #           int(chain.run), int(chain.subrun), int(chain.event),
+            #           int(chain.category),
+            #           inv_interactions[int(chain.interaction_type)])
+
     return events
 
 
@@ -43,11 +51,11 @@ ttrain = ROOT.TChain("dataset/TrainTree")
 ttrain.Add("test.root")
 tout.Add("test.root")
 
-colors = [ROOT.kGray + 2, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5,
+colors = [ROOT.kOrange + 1, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5,
           ROOT.kBlue - 9, ROOT.kOrange + 3, ROOT.kWhite, ROOT.kRed - 3]
 
 kinds = []
-categories = ["other", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data",
+categories = ["intime", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data",
               "mixed"]
 stacked_histos = []
 
@@ -114,7 +122,7 @@ h_sig = ROOT.TH1F("h_sig", "", 16, 0.2, 1)
 best_sigma = 0
 chosen_cut = 0
 
-measure_sigma = True
+measure_sigma = False
 
 if measure_sigma:
     for i in range(200):

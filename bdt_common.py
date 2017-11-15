@@ -2,9 +2,10 @@ from array import array
 import math
 import ROOT
 
-bdt, manual = True, False
+bdt, manual = False, False
 
 total_data_bnb_pot = 4.758e19
+
 
 def fill_histos(tree_name, bdt, manual):
     f_data = ROOT.TFile("%s_file.root" % tree_name)
@@ -40,13 +41,15 @@ def fill_histos(tree_name, bdt, manual):
             h = ROOT.TH1F("h_%s" % n, labels[n],
                           binning[n][0], binning[n][1], binning[n][2])
         else:
-            bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
+            bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4,
+                               0.45, 0.5, 0.6, 0.8, 1])
             h = ROOT.TH1F("h_%s" % n, labels[n], len(bins) - 1, bins)
         histograms.append(h)
 
     histo_dict = dict(zip(variables_dict.keys(), histograms))
 
-    h_bdt = ROOT.TH1F("h_bdt_%s" % tree_name, "BDT response; N. Entries / 0.05", 40, -1, 1)
+    h_bdt = ROOT.TH1F("h_bdt_%s" % tree_name,
+                      "BDT response; N. Entries / 0.05", 40, -1, 1)
     passed_events = 0
 
     for i in range(t_data.GetEntries()):
@@ -64,7 +67,7 @@ def fill_histos(tree_name, bdt, manual):
         else:
             apply_manual = True
 
-        if apply_bdt and apply_manual:
+        if apply_bdt and apply_manual and t_data.shower_energy > 0.2 and 0.2 < t_data.reco_energy < 1:
             passed_events += t_data.event_weight
             for name, var in variables:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
@@ -98,7 +101,23 @@ def manual_cuts(chain):
     proton_score = chain.proton_score > 0.9
     open_angle = 1 < chain.shower_open_angle < 15
     shower_theta = chain.shower_theta < 90
-    return shower_energy and dedx and proton_score and open_angle and shower_theta and shower_distance and track_distance
+
+    # dedx = 0.877 < chain.dedx < 3
+    # proton_score = chain.proton_score > 0.4
+    # shower_distance = chain.shower_distance < 6.525
+    # track_distance = chain.track_distance < 4.41
+    # open_angle = 1 < chain.shower_open_angle < 16
+    # shower_theta = chain.shower_theta < 56
+
+    cuts = [shower_energy, dedx, proton_score, open_angle,
+            shower_theta, shower_distance, track_distance]
+
+    # optimized_cuts = [dedx, proton_score, shower_distance, track_distance,
+    #                   shower_open_angle, pt, shower_theta, track_length]
+
+    passed = len(cuts) == sum(cuts)
+    # passed_optimized = len(optimized_cuts) == sum(optimized_cuts)
+    return passed
 
 
 def sigmaCalc(h_signal, h_background, sys_err=0):
@@ -115,7 +134,7 @@ def sigmaCalc(h_signal, h_background, sys_err=0):
 total_pot = 5e19
 
 description = ["Beam Intrinsic #nu_{e}",
-               "Other",
+               "Cosmic in-time",
                "Cosmic",
                "Cosmic contaminated",
                "Beam Intrinsic #nu_{#mu}",
@@ -176,6 +195,7 @@ interactions = {
     "kInverseMuDecay": 1000 + 99
 }
 
+inv_interactions = {v: k for k, v in interactions.items()}
 
 x_start = 0
 x_end = 256.35
@@ -225,7 +245,8 @@ shower_open_angle = array("f", [0])
 dedx = array("f", [0])
 numu_score = array("f", [0])
 dedx_hits = array("f", [0])
-
+shower_pca = array("f", [0])
+track_pca = array("f", [0])
 
 spectators = [
     ("category", category),
@@ -235,21 +256,14 @@ spectators = [
     ("subrun", subrun),
     ("interaction_type", interaction_type),
     ("is_signal", is_signal),
-    ("dedx_hits", dedx_hits)
-]
+    ("dedx_hits", dedx_hits),
+    ("shower_energy", shower_energy),
+    ("reco_energy", reco_energy),
 
-variables = [
-    ("track_length", track_length),
-    ("track_theta", track_theta),
-    ("track_phi", track_phi),
-    ("shower_theta", shower_theta),
-    ("shower_phi", shower_phi),
-    ("n_tracks", n_tracks),
-    ("n_showers", n_showers),
+    ("pt", pt),
     ("track_shower_angle", track_shower_angle),
-    ("proton_score", proton_score),
-    ("shower_distance", shower_distance),
-    ("track_distance", track_distance),
+
+    ("track_theta", track_theta),
     ("track_start_y", track_start_y),
     ("track_end_y", track_end_y),
     ("track_start_x", track_start_x),
@@ -259,11 +273,23 @@ variables = [
     ("shower_start_y", shower_start_y),
     ("shower_start_x", shower_start_x),
     ("shower_start_z", shower_start_z),
-    ("shower_open_angle", shower_open_angle),
+    ("track_length", track_length),
+    ("track_phi", track_phi),
+    ("shower_phi", shower_phi),
+    ("n_tracks", n_tracks),
+    ("n_showers", n_showers),
+    ("shower_pca", shower_pca),
+    ("track_pca", track_pca)
+]
+
+variables = [
     ("dedx", dedx),
-    ("reco_energy", reco_energy),
-    ("pt", pt),
-    ("shower_energy", shower_energy)
+    ("proton_score", proton_score),
+    ("shower_distance", shower_distance),
+    ("track_distance", track_distance),
+    ("shower_open_angle", shower_open_angle),
+    ("shower_theta", shower_theta),
+
 ]
 
 labels = {
@@ -289,7 +315,7 @@ labels = {
     "shower_end_z": ";Shower end z [cm]",
     "shower_end_x": ";Shower end x [cm]",
     "track_length": ";Track length [cm];N. Entries / 2 cm",
-    "proton_score": ";Proton score; N. Entries / 0.1",
+    "proton_score": ";Proton score; N. Entries / 0.025",
     "shower_energy": ";Shower energy [GeV]; N. Entries / 0.1 GeV",
     "pt": ";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
     "reco_energy": ";Reco. energy [GeV]; N. Entries / 0.05 GeV",
@@ -304,6 +330,9 @@ labels = {
     "interaction_type": "interaction_type",
     "is_signal": "is_signal",
     "dedx_hits": "dedx_hits",
+    "shower_pca": ";Shower PCA;N. Entries / 0.025",
+    "track_pca": ";Track PCA;N. Entries / 0.025"
+
 }
 
 binning = {
@@ -329,7 +358,7 @@ binning = {
     "shower_end_z": [10, z_start, z_end],
     "shower_end_x": [10, x_start, x_end],
     "track_length": [10, 0, 20],
-    "proton_score": [10, 0, 1],
+    "proton_score": [40, 0, 1],
     "shower_energy": [10, 0, 1],
     "pt": [20, 0, 2],
     "reco_energy": [40, 0, 2],
@@ -343,5 +372,7 @@ binning = {
     "subrun": [20, 0, 1000],
     "interaction_type": [100, 1000, 1100],
     "is_signal": [2, 0, 1],
-    "dedx_hits": [200, 0, 1]
+    "dedx_hits": [200, 0, 1],
+    "shower_pca": [500, 0.9, 1],
+    "track_pca": [500, 0.9, 1]
 }

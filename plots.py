@@ -5,6 +5,7 @@ from glob import glob
 import math
 from bdt_common import total_pot, variables, spectators, total_data_bnb_pot
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
+from random import random
 
 
 def is_fiducial(point):
@@ -43,7 +44,7 @@ def choose_track(root_chain):
     return track_id
 
 
-def fill_kin_branches(root_chain, numu_chain, weight, variables):
+def fill_kin_branches(root_chain, numu_chain, weight, variables, option=""):
     longest_track = 0
     longest_track_id = 0
     track_id = 0
@@ -142,7 +143,12 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
     # variables["shower_end_z"][0] = root_chain.shower_end_z[shower_id]
 
     variables["reco_energy"][0] = root_chain.E
-    variables["category"][0] = root_chain.category
+
+    if option == "cosmic_mc":
+        variables["category"][0] = 0
+    else:
+        variables["category"][0] = root_chain.category
+
     variables["event_weight"][0] = weight
     variables["pt"][0] = pt_plot(root_chain)
 
@@ -155,9 +161,15 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables):
     variables["subrun"][0] = root_chain.subrun
     variables["proton_score"][0] = max(0, root_chain.predict_p[track_id])
     variables["interaction_type"][0] = root_chain.interaction_type
-
     variables["shower_open_angle"][0] = math.degrees(
         root_chain.shower_open_angle[shower_id])
+
+    try:
+        variables["shower_pca"][0] = max(0, root_chain.shower_pca[shower_id])
+        variables["track_pca"][0] = max(0, root_chain.track_pca[track_id])
+    except AttributeError:
+        variables["shower_pca"][0] = 0
+        variables["track_pca"][0] = 0
 
     # if numu_selection(numu_chain) < 1 and numu_selection(numu_chain) > 0:
     #     variables["numu_score"][0] = numu_selection(numu_chain)
@@ -266,8 +278,9 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
 
             option_check = True
             event_weight = weight
+
             if option == "bnb":
-                option_check = abs(chain.nu_pdg) != 12
+                option_check = abs(chain.nu_pdg) != 12 # and 111 not in chain.nu_daughters_pdg
             if option == "nue":
                 event_weight = weight * chain.bnbweight
                 option_check = abs(chain.nu_pdg) == 12
@@ -295,10 +308,9 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
                 sum([(t - n)**2 for t, n in
                      zip(track_vertex, neutrino_vertex)]))
 
-            dedx = chain.shower_dEdx[shower_id][2] > 1
-            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol and dedx:
+            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol:
                 total_events += event_weight
-                fill_kin_branches(chain, chain_numu, event_weight, variables)
+                fill_kin_branches(chain, chain_numu, event_weight, variables, option)
                 tree.Fill()
 
     return total_events
@@ -307,17 +319,23 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
 data_ext_scaling_factor = 1.299
 samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data"]
 
-tree_files = [glob("pi0/pi0/*/*.root"),
+tree_files = [glob("pi0/*/*.root"),
               glob("cosmic_intime_dedx/*/*.root"),
-              glob("mc_bnb_dedx/*/*.root"),
-              glob("mc_nue_dedx/*/*.root"),
-              glob("data_bnb_mcc83/*/*.root"),
-              glob("data_ext_mcc83/*/*.root")]
+              glob("mc_bnb_pca/*/*.root"),
+              glob("mc_nue_pca/*/*.root"),
+              glob("data_bnb_dedx/*/*.root"),
+              glob("data_ext_dedx/*/*.root")]
+
+# tree_files = [glob("pi0/*/*.root"),
+#               glob("soft_intime_83.root"),
+#               glob("soft_nu_84.root"),
+#               glob("soft_nue_84.root"),
+#               glob("data_bnb_dedx/*/*.root"),
+#               glob("soft_extbnb_84.root")]
 
 chains = []
 chains_numu = []
 chains_pot = []
-
 for i, files in enumerate(tree_files):
     chains.append(TChain("robertoana/pandoratree"))
     chains_numu.append(TChain("UBXSec/tree"))
@@ -342,11 +360,12 @@ pots_dict = dict(zip(samples, pots))
 chains_dict = dict(zip(samples, chains))
 chains_numu_dict = dict(zip(samples, chains_numu))
 chains_pot_dict = dict(zip(samples, chains_pot))
-
 variables = dict(variables + spectators)
+wouter_scaling = 1.12385
+roberto_scaling = 1.3311
 
 weights = [total_pot / pots_dict["pi0"],
-           data_ext_scaling_factor * total_pot / total_data_bnb_pot * 1.3311 *
+           data_ext_scaling_factor * total_pot / total_data_bnb_pot * roberto_scaling *
            chains_dict["ext_data"].GetEntries() / chains_dict["cosmic_mc"].GetEntries(),
            total_pot / pots_dict["bnb"],
            total_pot / pots_dict["nue"],
@@ -354,9 +373,9 @@ weights = [total_pot / pots_dict["pi0"],
            data_ext_scaling_factor * total_pot / total_data_bnb_pot]
 
 files = ["pi0_file.root", "cosmic_mc_file.root", "mc_file.root",
-         "bnb_file.root", "bnbext_file.root"]
+         "nue_file.root", "bnb_file.root", "bnbext_file.root"]
 tree_names = ["pi0_tree", "cosmic_mc_tree", "mc_tree",
-              "bnb_tree", "bnbext_tree"]
+              "nue_tree", "bnb_tree", "bnbext_tree"]
 
 trees = []
 
@@ -367,13 +386,14 @@ for n, b in variables.items():
     for t in trees:
         t.Branch(n, b, n + "/f")
 
-associated_trees = [trees[0], trees[1], trees[2], trees[2], trees[3], trees[4]]
+samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data"]
+print(chains[0].GetEntries(), pots_dict["pi0"])
 
 for i, s in enumerate(samples):
     print(s)
     print("Weight", weights[i])
     print("Events", fill_tree(chains[i], chains_numu[i],
-                              weights[i], associated_trees[i], s))
+                              weights[i], trees[i], s))
 
 for f, t in zip(files, trees):
     tfile = TFile(f, "RECREATE")
