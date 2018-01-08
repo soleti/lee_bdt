@@ -113,6 +113,8 @@ h_dedx_vertex = ROOT.TH2F("h_dedx_vertex", ";dE/dx [MeV/cm];Distance [cm]",
 h_dedx_nhits = ROOT.TH2F("h_dedx_nhits", ";dE/dx [MeV/cm];N. hits",
                           50, 0, 6, 14, 2, 16)
 
+h_energy_shower = ROOT.TH1F("h_energy_shower",";E_{reco}-E_{true};N. Entries / 0.04 GeV", 50, -1, 1)
+
 if (len(sys.argv) > 1):
     sample = sys.argv[1]
 else:
@@ -123,7 +125,9 @@ weight = 1
 if sample == "mc":
     print("Monte Carlo")
     weigth = 1.37
-    files = glob("mc_bnb_dedx/mc_bnb_dedx2/*/Pandora*.root")
+    files = glob("not_slimmed/*/Pandora*.root")
+
+    # files = glob("mc_bnb_dedx/mc_bnb_dedx2/*/Pandora*.root")
 elif sample == "databnb":
     print("Data BNB")
     weight = 13.87
@@ -256,7 +260,8 @@ for i in range(entries):
                         hit_dedx = chain.dEdx_hits[ish][ihit]
                         h_dedx_hits_other.Fill(hit_dedx, weight)
                 h_dedx_other.Fill(dedx, weight)
-                print(pdg)
+
+
 
         else:
             for ihit in range(len(chain.dEdx_hits[ish])):
@@ -265,6 +270,7 @@ for i in range(entries):
                     h_dedx_hits_data.Fill(hit_dedx, weight)
 
         h_dedx_data.Fill(dedx, weight)
+
 
 histograms_mc = [h_dedx_other, h_dedx_hits_electron, h_dedx_hits_hadron,
                  h_dedx_muon, h_dedx_hits_pion, h_dedx_photon]
@@ -330,12 +336,24 @@ if sample == "mc":
     f_dedx_hits_hadron.Close()
 
 
-    h_dedx_stack = ROOT.THStack("h_dedx_stack", "")
+    h_dedx_stack = ROOT.THStack("h_dedx_stack", ";dE/dx [MeV/cm];a.u.")
     h_dedx_stack.Add(h_dedx_hits_electron)
     h_dedx_stack.Add(h_dedx_hits_muon)
     h_dedx_stack.Add(h_dedx_hits_hadron)
     h_dedx_stack.Add(h_dedx_hits_photon)
     h_dedx_stack.Add(h_dedx_hits_pion)
+
+
+    legend = ROOT.TLegend(0.53,0.48,0.84,0.85)
+    legend.AddEntry(h_dedx_hits_electron, "Electron: {} events".format(h_dedx_hits_electron.Integral()), "f")
+
+    legend.AddEntry(h_dedx_hits_muon, "Muon: {} events".format(h_dedx_hits_muon.Integral()), "f")
+
+    legend.AddEntry(h_dedx_hits_hadron, "Hadron: {} events".format(h_dedx_hits_hadron.Integral()), "f")
+
+    legend.AddEntry(h_dedx_hits_photon, "Photon: {} events".format(h_dedx_hits_photon.Integral()), "f")
+
+    legend.AddEntry(h_dedx_hits_pion, "Pion: {} events".format(h_dedx_hits_pion.Integral()), "f")
 
 
     f_langau = ROOT.TF1("f_langau", langau_lin, 0.5, 3.5, 5)
@@ -360,6 +378,8 @@ if sample == "mc":
                       % f_langau.GetParameter(3), "")
     l_langau.Draw()
     h_dedx_stack.Draw("hist")
+    legend.Draw()
+
     c_dedx_hits.Update()
 
     c_dedx_energy = ROOT.TCanvas("c_dedx_energy")
@@ -373,6 +393,10 @@ if sample == "mc":
     c_dedx_nhits = ROOT.TCanvas("c_dedx_nhits")
     h_dedx_nhits.Draw("colz")
     c_dedx_nhits.Update()
+
+    c_energy = ROOT.TCanvas("c_energy")
+    h_energy_shower.Draw("hist")
+    c_energy.Update()
 
 else:
     c_dedx_hits_data = ROOT.TCanvas("c_dedx_hits_data")

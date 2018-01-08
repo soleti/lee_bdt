@@ -2,8 +2,7 @@ from array import array
 import math
 import ROOT
 
-bdt, manual = False, False
-
+bdt, manual = False, True
 total_data_bnb_pot = 4.758e19
 
 
@@ -67,7 +66,7 @@ def fill_histos(tree_name, bdt, manual):
         else:
             apply_manual = True
 
-        if apply_bdt and apply_manual and t_data.shower_energy > 0.2 and 0.2 < t_data.reco_energy < 1:
+        if apply_bdt and apply_manual and 0.1 < t_data.reco_energy < 1:
             passed_events += t_data.event_weight
             for name, var in variables:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
@@ -96,20 +95,25 @@ def find_interaction(dictionary, interaction):
 def manual_cuts(chain):
     shower_energy = chain.shower_energy > 0.2
     dedx = 1.4 < chain.dedx < 3
-    shower_distance = chain.shower_distance < 4
-    track_distance = chain.track_distance < 3
-    proton_score = chain.proton_score > 0.9
-    open_angle = 1 < chain.shower_open_angle < 15
+    shower_distance = chain.shower_distance < 2.5
+    track_distance = chain.track_distance < 2.5
+    proton_score = chain.proton_score > 0.98
+    open_angle = 2 < chain.shower_open_angle < 15
     shower_theta = chain.shower_theta < 90
+    n_tracks = chain.n_tracks < 3
+    shower_pca = chain.shower_pca < 0.985
+    track_shower_angle = -0.9 < chain.track_shower_angle < 0.9
+    track_theta = chain.track_theta < 130
 
-    # dedx = 0.877 < chain.dedx < 3
-    # proton_score = chain.proton_score > 0.4
-    # shower_distance = chain.shower_distance < 6.525
-    # track_distance = chain.track_distance < 4.41
-    # open_angle = 1 < chain.shower_open_angle < 16
-    # shower_theta = chain.shower_theta < 56
+    dedx = 0.6 < chain.dedx < 3.07
+    proton_score = chain.proton_score > 0.57
+    shower_distance = chain.shower_distance < 2.23
+    track_distance = chain.track_distance < 9.55
+    open_angle = 1 < chain.shower_open_angle < 23.7
+    shower_theta = 15 < chain.shower_theta < 99
 
-    cuts = [shower_energy, dedx, proton_score, open_angle,
+
+    cuts = [dedx, proton_score, open_angle,
             shower_theta, shower_distance, track_distance]
 
     # optimized_cuts = [dedx, proton_score, shower_distance, track_distance,
@@ -131,7 +135,7 @@ def sigmaCalc(h_signal, h_background, sys_err=0):
     return math.sqrt(chi2)
 
 
-total_pot = 5e19
+total_pot = total_data_bnb_pot
 
 description = ["Beam Intrinsic #nu_{e}",
                "Cosmic in-time",
@@ -139,7 +143,9 @@ description = ["Beam Intrinsic #nu_{e}",
                "Cosmic contaminated",
                "Beam Intrinsic #nu_{#mu}",
                "Beam Intrinsic NC",
-               "Dirt", "Data"]
+               "Dirt",
+               "Data",
+               "Low-energy excess"]
 
 interactions = {
     "kQE": 0,
@@ -247,6 +253,8 @@ numu_score = array("f", [0])
 dedx_hits = array("f", [0])
 shower_pca = array("f", [0])
 track_pca = array("f", [0])
+total_shower_energy = array("f", [0])
+total_track_energy = array("f", [0])
 
 spectators = [
     ("category", category),
@@ -279,7 +287,9 @@ spectators = [
     ("n_tracks", n_tracks),
     ("n_showers", n_showers),
     ("shower_pca", shower_pca),
-    ("track_pca", track_pca)
+    ("track_pca", track_pca),
+    ("total_track_energy", total_track_energy),
+    ("numu_score", numu_score)
 ]
 
 variables = [
@@ -289,7 +299,6 @@ variables = [
     ("track_distance", track_distance),
     ("shower_open_angle", shower_open_angle),
     ("shower_theta", shower_theta),
-
 ]
 
 labels = {
@@ -322,48 +331,50 @@ labels = {
     "shower_open_angle": ";Shower open angle [#circ]; N. Entries / 2#circ",
     "dedx": ";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm",
     "numu_score": ";#nu_{#mu} selection score; N. Entries / 0.01",
-    "category": "category",
-    "event_weight": "event_weight",
-    "event": "event",
-    "run": "run",
-    "subrun": "subrun",
-    "interaction_type": "interaction_type",
-    "is_signal": "is_signal",
-    "dedx_hits": "dedx_hits",
+    "category": ";category",
+    "event_weight": ";event_weight",
+    "event": ";event",
+    "run": ";run",
+    "subrun": ";subrun",
+    "interaction_type": ";interaction_type",
+    "is_signal": ";is_signal",
+    "dedx_hits": ";dedx_hits",
     "shower_pca": ";Shower PCA;N. Entries / 0.025",
-    "track_pca": ";Track PCA;N. Entries / 0.025"
+    "track_pca": ";Track PCA;N. Entries / 0.025",
+    "total_shower_energy": ";Total shower E [GeV]; N. Entries / 0.025 GeV",
+    "total_track_energy": ";Total track E [GeV]; N. Entries / 0.025 GeV"
 
 }
 
 binning = {
     "n_tracks": [5, 1, 6],
     "n_showers": [5, 1, 6],
-    "track_theta": [9, 0, 180],
-    "track_phi": [9, -180, 180],
-    "shower_theta": [9, 0, 180],
-    "shower_phi": [9, -180, 180],
-    "shower_distance": [10, 0, 10],
-    "track_distance": [10, 0, 10],
-    "track_shower_angle": [10, -1, 1],
-    "track_start_y": [10, y_start, y_end],
-    "track_start_z": [10, z_start, z_end],
-    "track_start_x": [10, x_start, x_end],
-    "track_end_y": [10, y_start, y_end],
-    "track_end_z": [10, z_start, z_end],
-    "track_end_x": [10, x_start, x_end],
-    "shower_start_y": [10, y_start, y_end],
-    "shower_start_z": [10, z_start, z_end],
-    "shower_start_x": [10, x_start, x_end],
-    "shower_end_y": [10, y_start, y_end],
-    "shower_end_z": [10, z_start, z_end],
-    "shower_end_x": [10, x_start, x_end],
-    "track_length": [10, 0, 20],
-    "proton_score": [40, 0, 1],
-    "shower_energy": [10, 0, 1],
+    "track_theta": [36, 0, 180],
+    "track_phi": [36, -180, 180],
+    "shower_theta": [36, 0, 180],
+    "shower_phi": [36, -180, 180],
+    "shower_distance": [50, 0, 10],
+    "track_distance": [50, 0, 10],
+    "track_shower_angle": [40, -1, 1],
+    "track_start_y": [30, y_start, y_end],
+    "track_start_z": [30, z_start, z_end],
+    "track_start_x": [30, x_start, x_end],
+    "track_end_y": [30, y_start, y_end],
+    "track_end_z": [30, z_start, z_end],
+    "track_end_x": [30, x_start, x_end],
+    "shower_start_y": [30, y_start, y_end],
+    "shower_start_z": [30, z_start, z_end],
+    "shower_start_x": [30, x_start, x_end],
+    "shower_end_y": [30, y_start, y_end],
+    "shower_end_z": [30, z_start, z_end],
+    "shower_end_x": [30, x_start, x_end],
+    "track_length": [40, 0, 200],
+    "proton_score": [40, 0.9, 1],
+    "shower_energy": [40, 0, 1],
     "pt": [20, 0, 2],
     "reco_energy": [40, 0, 2],
-    "shower_open_angle": [23, 0, 46],
-    "dedx": [19, 0.3, 6],
+    "shower_open_angle": [46, 0, 46],
+    "dedx": [38, 0.3, 6],
     "numu_score": [20, 0, 1],
     "category": [7, 0, 7],
     "event_weight": [20, 0, 100],
@@ -373,6 +384,9 @@ binning = {
     "interaction_type": [100, 1000, 1100],
     "is_signal": [2, 0, 1],
     "dedx_hits": [200, 0, 1],
-    "shower_pca": [500, 0.9, 1],
-    "track_pca": [500, 0.9, 1]
+    "shower_pca": [50, 0.9, 1],
+    "track_pca": [50, 0.9, 1],
+    "total_shower_energy": [40, 0, 0.2],
+    "total_track_energy": [40, 0, 0.2]
+
 }

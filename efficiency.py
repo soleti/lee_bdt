@@ -4,10 +4,19 @@ import math
 import ROOT
 from glob import glob
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
-
+from array import array
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
+
+pot = 6.6e20
+
+def fix_binning(histo):
+    width = histo.GetBinWidth(1)
+    for k in range(1, histo.GetNbinsX() + 1):
+        bin_width = histo.GetBinWidth(k)
+        histo.SetBinError(k, histo.GetBinError(k) / (bin_width / width))
+        histo.SetBinContent(k, histo.GetBinContent(k) / (bin_width / width))
 
 
 def is_fiducial(point):
@@ -27,19 +36,27 @@ def is_active(point):
 nue_cosmic = glob("mc_nue_dedx/*/Pandora*.root")
 # nue_cosmic = glob("softmerge.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
+chain_pot = ROOT.TChain("robertoana/pot")
 
 for f in nue_cosmic:
     chain_nue.Add(f)
+    chain_pot.Add(f)
 
+print("entries",chain_nue.GetEntries())
 e_energy = ROOT.TEfficiency("e_energy",
-                            ";#nu_{e} energy [GeV];Fraction", 20, 0, 2)
+                            ";#sum E_{k} [GeV];Fraction", 10, 0.2, 1)
 ep_energy = ROOT.TEfficiency("e_energy",
                              ";#nu_{e} energy [GeV];Efficiency #times Purity",
-                             20, 0, 2)
+                             10, 0.2, 1)
 
 e_proton = ROOT.TEfficiency("e_proton",
                             ";p kinetic energy [GeV];#epsilon #times P_{reco}",
                             20, 0, 0.5)
+
+e_nprotons = ROOT.TEfficiency("e_nprotons",
+                            ";N. of protons;Fraction",
+                            4, 0.5, 4.5)
+
 
 h_dedx_electron = ROOT.TH1F("h_dedx_electron",
                             "Electrons;dE/dx [MeV/cm];Area normalized",
@@ -50,14 +67,14 @@ h_dedx_photon = ROOT.TH1F("h_dedx_photon",
 
 p_energy = ROOT.TEfficiency("p_energy",
                             ";#nu_{e} energy [GeV];Purity",
-                            20, 0, 2)
+                            10, 0.2, 1)
 p_dist_energy = ROOT.TEfficiency("p_dist_energy",
                                  ";#nu_{e} energy [GeV];Purity",
-                                 20, 0, 2)
+                                 10, 0.2, 1)
 ep_dist_energy = ROOT.TEfficiency("p_dist_energy",
                                   ";#nu_{e} energy [GeV];Efficiency #times \
                                   Purity",
-                                  20, 0, 2)
+                                  10, 0.2, 1)
 
 l_e_proton = ROOT.TH2F("l_e_proton",
                        ";Reco. track length [cm];True p kinetic energy [GeV]",
@@ -81,8 +98,9 @@ h_y = ROOT.TH1F("h_y", ";#Delta y [cm]; N. Entries / 0.2 cm",
                 50, y_start - 40, y_end + 40)
 h_z = ROOT.TH1F("h_z", ";#Delta z [cm]; N. Entries / 0.2 cm",
                 50, z_start - 40, z_end + 40)
+bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
-
+h_energy = ROOT.TH1F("h_energy",";Reco. energy [GeV]; N. Entries / 0.05 GeV", 10,0.2,1)
 fiducial = 0
 eNp_events = 0
 
@@ -94,6 +112,12 @@ vertex_ok = 0
 noflash = 0
 entries = chain_nue.GetEntries()
 cc_events = 0
+nue_pot = 0
+for i in range(chain_pot.GetEntries()):
+    chain_pot.GetEntry(i)
+    nue_pot += chain_pot.pot
+
+print("POT", nue_pot, pot, pot/nue_pot)
 
 for i in range(entries):
     chain_nue.GetEntry(i)
@@ -106,7 +130,7 @@ for i in range(entries):
     proton_energy = 0
     for i, energy in enumerate(chain_nue.nu_daughters_E):
         if chain_nue.nu_daughters_pdg[i] == 2212:
-            proton_energy += energy
+            proton_energy += energy - 0.938
             if energy - 0.938 > 0.000005:
                 protons += 1
 
@@ -134,7 +158,7 @@ for i in range(entries):
 
     # if not eNp: print(electrons, photons, protons, pions)
 
-    if eNp and chain_nue.nu_E > 0.1:
+    if eNp and 0.2 < chain_nue.nu_E < 1:
         eNp_events += 1
         h_x.Fill(true_neutrino_vertex[0])
         h_y.Fill(true_neutrino_vertex[1])
@@ -156,15 +180,17 @@ for i in range(entries):
             if p_track and p_shower:
                 p = True
 
-            proton_energy = sum([chain_nue.nu_daughters_E[i]
+            proton_energy = sum([chain_nue.nu_daughters_E[i] - 0.938
                                  for i, pdg in
                                  enumerate(chain_nue.nu_daughters_pdg)
                                  if pdg == 2212])
 
-            electron_energy = max([chain_nue.nu_daughters_E[i]
+            electron_energy = max([chain_nue.nu_daughters_E[i] - 0.51e-3
                                    for i, pdg in
                                    enumerate(chain_nue.nu_daughters_pdg)
                                    if abs(pdg) == 11])
+
+            fp_energy = electron_energy + proton_energy
 
             neutrino_vertex = [chain_nue.vx, chain_nue.vy, chain_nue.vz]
 
@@ -181,6 +207,8 @@ for i in range(entries):
                 dist = math.sqrt(sum([(t - r) ** 2
                                       for t, r in zip(neutrino_vertex,
                                                       true_neutrino_vertex)]))
+                if chain_nue.category == 2:
+                    h_energy.Fill(chain_nue.E, chain_nue.bnbweight)
 
                 passed += 1
                 if p:
@@ -198,8 +226,8 @@ for i in range(entries):
                 h_y_diff.Fill(neutrino_vertex[1] - true_neutrino_vertex[1])
                 h_z_diff.Fill(neutrino_vertex[2] - true_neutrino_vertex[2])
 
-                p_energy.Fill(p_track and p_shower, chain_nue.nu_E)
-                p_dist_energy.Fill(chain_nue.distance < 5, chain_nue.nu_E)
+                p_energy.Fill(p_track and p_shower, fp_energy)
+                p_dist_energy.Fill(chain_nue.distance < 5, fp_energy)
 
             else:
                 not_passed += 1
@@ -208,16 +236,19 @@ for i in range(entries):
 
             if protons == 1:
                 e_proton.Fill(chain_nue.passed and p_track and p_shower,
-                              proton_energy - 0.938)
+                              proton_energy)
 
-            if chain_nue.passed and protons == 1 and dist < 2:
-                l_e_proton.Fill(chain_nue.track_len[0], proton_energy - 0.938)
+            if chain_nue.passed and protons == 1 and p_track:
+                l_e_proton.Fill(chain_nue.track_len[0], proton_energy)
+
+            if chain_nue.passed:
+                e_nprotons.Fill(p_track, protons)
 
             ep_energy.Fill(chain_nue.passed and p_track and p_shower,
-                           chain_nue.nu_E)
+                           fp_energy)
             ep_dist_energy.Fill(chain_nue.passed and chain_nue.distance < 5,
-                                chain_nue.nu_E)
-            e_energy.Fill(chain_nue.passed, chain_nue.nu_E)
+                                fp_energy)
+            e_energy.Fill(chain_nue.passed, fp_energy)
 
 
 print("Entries", entries)
@@ -229,7 +260,6 @@ print("Passed", passed)
 print("Not passed", not_passed)
 
 eff = passed / fiducial
-eff = 0.538
 eff_err = math.sqrt((eff * (1 - eff)) / fiducial)
 
 p_reco = reco_ok / passed
@@ -256,6 +286,8 @@ e_energy.Write()
 f_energy.Close()
 
 pt = ROOT.TPaveText(0.1, 0.91, 0.45, 0.97, "ndc")
+#pt = ROOT.TPaveText(0.098, 0.905, 0.576, 0.989, "ndc")
+
 pt.AddText("MicroBooNE Preliminary")
 pt.SetFillColor(0)
 pt.SetBorderSize(0)
@@ -272,13 +304,13 @@ legend.AddEntry(e_energy, "", "")
 #                 .format(p_reco * 100, p_reco_err * 100),
 #                 "lep")
 
-legend.AddEntry(p_dist_energy, "P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
+legend.AddEntry(p_dist_energy, "P ({0:.1f} #pm {1:.1f}) %"
                 .format(p_vertex * 100, p_vertex_err * 100), "lep")
 # legend.AddEntry(ep_energy,"#epsilon #times P_{{reco}} ({0:.1f} #pm {1:.1f})%"
 #                 .format(ep_reco * 100, ep_reco_err * 100), "lep")
 
 legend.AddEntry(
-    ep_dist_energy, "#epsilon #times P_{{vertex}} ({0:.1f} #pm {1:.1f}) %"
+    ep_dist_energy, "#epsilon #times P ({0:.1f} #pm {1:.1f}) %"
     .format(ep_vertex * 100, ep_vertex_err * 100), "lep")
 
 legend.SetNColumns(2)
@@ -332,6 +364,10 @@ c_proton = ROOT.TCanvas("c_proton")
 e_proton.Draw("apl")
 c_proton.Update()
 
+c_nproton = ROOT.TCanvas("c_proton")
+e_nprotons.Draw("ab")
+c_nproton.Update()
+
 c_lproton = ROOT.TCanvas("c_lproton")
 l_e_proton.Draw("colz")
 c_lproton.Update()
@@ -354,5 +390,14 @@ c_z = ROOT.TCanvas("c_z", "", 500, 500)
 h_z.Draw()
 c_z.Update()
 
+c_spectrum = ROOT.TCanvas("c_spectrum")
+h_energy.Scale(pot/nue_pot)
+print("nu_e events", h_energy.Integral())
+fix_binning(h_energy)
+h_energy.Draw("hist")
+h_energy.SetLineColor(1)
+h_energy.SetFillColor(ROOT.kGreen - 2)
+pt.Draw()
+c_spectrum.Update()
 
 input()

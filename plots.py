@@ -117,6 +117,12 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables, option=""):
         root_chain.track_phi[track_id])
     variables["track_theta"][0] = math.degrees(theta)
     variables["shower_energy"][0] = root_chain.shower_energy[shower_id]
+
+    total_shower_energy = sum(root_chain.shower_energy)
+
+    variables["total_track_energy"][0] = root_chain.E - total_shower_energy
+    variables["total_shower_energy"][0] = total_shower_energy
+
     variables["shower_theta"][0] = math.degrees(
         root_chain.shower_theta[shower_id])
     variables["shower_phi"][0] = math.degrees(
@@ -144,10 +150,16 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables, option=""):
 
     variables["reco_energy"][0] = root_chain.E
 
-    if option == "cosmic_mc":
+    if option == "cosmic_mc" or option == "ext_data":
         variables["category"][0] = 0
+    elif option == "lee":
+        variables["category"][0] = 8
     else:
         variables["category"][0] = root_chain.category
+
+    # if option == "bnb_data" and 0.005 < total_shower_energy < 0.01:
+    #     print("data", root_chain.run, root_chain.subrun, root_chain.event)
+    #     print(root_chain.n_tracks, root_chain.n_showers, shower_vertex_d, root_chain.track_start_z[track_id])
 
     variables["event_weight"][0] = weight
     variables["pt"][0] = pt_plot(root_chain)
@@ -171,10 +183,10 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables, option=""):
         variables["shower_pca"][0] = 0
         variables["track_pca"][0] = 0
 
-    # if numu_selection(numu_chain) < 1 and numu_selection(numu_chain) > 0:
-    #     variables["numu_score"][0] = numu_selection(numu_chain)
-    # else:
-    #     variables["numu_score"][0] = 0
+    if numu_selection(numu_chain) < 1 and numu_selection(numu_chain) > 0:
+        variables["numu_score"][0] = numu_selection(numu_chain)
+    else:
+        variables["numu_score"][0] = 0
     # variables["numu_score"][0] = 0
     dedx = root_chain.shower_dEdx[shower_id][2]
 
@@ -226,7 +238,7 @@ def pt_plot(root_chain):
 
 
 def numu_selection(mychain):
-    # if mychain.GetEntries() == 0: return 0
+    if mychain.GetEntries() == 0: return 0
     for i in range(mychain.nslices):
         flashmatch_cut = not (
             mychain.slc_flsmatch_qllx[i] -
@@ -276,6 +288,7 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
                     chain.shower_start_z[i]]
                 shower_fidvol = shower_fidvol and is_fiducial(shower_start)
 
+
             option_check = True
             event_weight = weight
 
@@ -308,30 +321,56 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
                 sum([(t - n)**2 for t, n in
                      zip(track_vertex, neutrino_vertex)]))
 
-            if option_check and is_fiducial(neutrino_vertex) and shower_fidvol and track_fidvol:
+            pions = 0
+
+            if option_check and is_fiducial(neutrino_vertex) and track_fidvol and shower_fidvol:
                 total_events += event_weight
+
+                if option == "nue" and chain.category == 2:
+                    for i in range(len(chain.nu_daughters_pdg)):
+                        if chain.nu_daughters_pdg[i] == 111 or chain.nu_daughters_pdg[i] == 211:
+                            pions += event_weight
+
                 fill_kin_branches(chain, chain_numu, event_weight, variables, option)
                 tree.Fill()
 
+    print(total_events, pions)
     return total_events
 
 
 data_ext_scaling_factor = 1.299
-samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data"]
+samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("pi0/*/*.root"),
               glob("cosmic_intime_dedx/*/*.root"),
-              glob("mc_bnb_pca/*/*.root"),
+              glob("mc_bnb_slimmed/*/*.root"),
               glob("mc_nue_pca/*/*.root"),
               glob("data_bnb_dedx/*/*.root"),
-              glob("data_ext_dedx/*/*.root")]
+              glob("data_ext_dedx/*/*.root"),
+              glob("lee/*/*.root")]
 
 # tree_files = [glob("pi0/*/*.root"),
-#               glob("soft_intime_83.root"),
-#               glob("soft_nu_84.root"),
-#               glob("soft_nue_84.root"),
+#               glob("wouter_files/soft_intime_83.root"),
+#               glob("wouter_files/soft_nu_84.root"),
+#               glob("wouter_files/soft_nue_84.root"),
 #               glob("data_bnb_dedx/*/*.root"),
-#               glob("soft_extbnb_84.root")]
+#               glob("wouter_files/soft_extbnb_84.root"),
+#               glob("lee/*/*.root")]
+#
+# tree_files = [glob("pi0/*/*.root"),
+#               glob("wouter_files/new_intime_83.root"),
+#               glob("wouter_files/new_nu_83.root"),
+#               glob("wouter_files/new_nue_84.root"),
+#               glob("data_bnb_dedx/*/*.root"),
+#               glob("wouter_files/new_extbnb_84.root"),
+#               glob("lee/*/*.root")]
+#
+# tree_files = [glob("pi0/*/*.root"),
+#               glob("hardcuts/tree_strong_intime_83.root"),
+#               glob("hardcuts/tree_strong_nu_83.root"),
+#               glob("hardcuts/tree_strong_nue_84.root"),
+#               glob("data_bnb_dedx/*/*.root"),
+#               glob("hardcuts/tree_strong_extbnb_84.root")]
 
 chains = []
 chains_numu = []
@@ -343,8 +382,8 @@ for i, files in enumerate(tree_files):
 
     for j, f in enumerate(files):
         chains[i].Add(f)
-        if i != 1:
-            chains_numu[i].Add(f)
+        # if i != 1:
+        #     chains_numu[i].Add(f)
         chains_pot[i].Add(f)
 
 pots = []
@@ -361,21 +400,22 @@ chains_dict = dict(zip(samples, chains))
 chains_numu_dict = dict(zip(samples, chains_numu))
 chains_pot_dict = dict(zip(samples, chains_pot))
 variables = dict(variables + spectators)
-wouter_scaling = 1.12385
-roberto_scaling = 1.3311
+wouter_scaling = 1.2244
+roberto_scaling = 1.350
 
 weights = [total_pot / pots_dict["pi0"],
            data_ext_scaling_factor * total_pot / total_data_bnb_pot * roberto_scaling *
            chains_dict["ext_data"].GetEntries() / chains_dict["cosmic_mc"].GetEntries(),
            total_pot / pots_dict["bnb"],
            total_pot / pots_dict["nue"],
-           total_pot / total_data_bnb_pot,
-           data_ext_scaling_factor * total_pot / total_data_bnb_pot]
+           1,
+           data_ext_scaling_factor,
+           total_pot / pots_dict["lee"]]
 
 files = ["pi0_file.root", "cosmic_mc_file.root", "mc_file.root",
-         "nue_file.root", "bnb_file.root", "bnbext_file.root"]
+         "nue_file.root", "bnb_file.root", "bnbext_file.root", "lee_file.root"]
 tree_names = ["pi0_tree", "cosmic_mc_tree", "mc_tree",
-              "nue_tree", "bnb_tree", "bnbext_tree"]
+              "nue_tree", "bnb_tree", "bnbext_tree", "lee_tree"]
 
 trees = []
 
@@ -386,7 +426,7 @@ for n, b in variables.items():
     for t in trees:
         t.Branch(n, b, n + "/f")
 
-samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data"]
+samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data", "lee"]
 print(chains[0].GetEntries(), pots_dict["pi0"])
 
 for i, s in enumerate(samples):

@@ -9,17 +9,20 @@ from root_numpy import hist2array
 import numpy as np
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 
+
 def is_fiducial(point):
     ok_y = y_start + 20 < point[1] < y_end - 20
     ok_x = x_start + 10 < point[0] < x_end - 10
     ok_z = z_start + 10 < point[2] < z_end - 50
     return ok_y and ok_x and ok_z
 
+
 def is_active(point):
     ok_y = y_start < point[1] < y_end
     ok_x = x_start < point[0] < x_end
     ok_z = z_start < point[2] < z_end
     return ok_y and ok_x and ok_z
+
 
 def gauss_exp(var, par):
     """
@@ -38,6 +41,7 @@ def gauss_exp(var, par):
         return n * math.exp(-0.5 * ((x - mu) / sigma)**2)
     else:
         return n * math.exp(k**2 / 2 + k * ((x - mu) / sigma))
+
 
 ROOT.gStyle.SetPaintTextFormat(".2f")
 ROOT.gStyle.SetNumberContours(999)
@@ -64,15 +68,17 @@ shower_ok_track_no = 0
 track_no_shower_no = 0
 flash_not_passed = 0
 
+bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
+
 h_matrix = ROOT.TH2F("h_matrix",
-                          ";E_{#nu} [GeV];E_{k}^{reco} [GeV]",
-                          16, 0.2, 1, 16, 0.2, 1)
+                          ";E_{k}^{reco} [GeV];E_{#nu} [GeV]",
+                          len(bins) - 1, bins, len(bins) - 1, bins)
 
 h_e_true_reco = ROOT.TH2F("h_e_true_reco", ";E_{k}^{true} [GeV];E_{k}^{reco} [GeV]",
-                          100, 0, 2, 100, 0, 2)
+                          len(bins) - 1, bins, len(bins) - 1, bins)
 
-h_e_true = ROOT.TH1F("h_e_true", "", 16, 0.2, 1)
-h_e_reco = ROOT.TH1F("h_e_reco", "", 16, 0.2, 1)
+h_e_true = ROOT.TH1F("h_e_true", "", len(bins) - 1, bins)
+h_e_reco = ROOT.TH1F("h_e_reco", "", len(bins) - 1, bins)
 
 h_e_res = ROOT.TH1F("h_res",
                     ";(E_{k}^{corr} - E_{k}^{true}) / E_{k}^{true};N. Entries / 0.04",
@@ -80,23 +86,23 @@ h_e_res = ROOT.TH1F("h_res",
 
 h_e_nu_kin = ROOT.TH2F("h_e_nu_kin",
                        ";E_{#nu} [GeV];E_{k}^{true} [GeV]",
-                       100, 0, 2, 100, 0, 2)
+                       100, 0.2, 1, 100, 0.2, 1)
 
 h_e_res_intervals = []
-for i in range(10):
-    interval = "{:.2f}-{:.2f} GeV".format(i * 0.2, (i + 1) * 0.2)
+for i in range(len(bins)-1):
+    interval = "{:.2f}-{:.2f} GeV".format(bins[i], bins[i + 1])
     h_e_res_intervals.append(ROOT.TH1F("h_e_res{}".format(i),
                                        "%s;(E_{corr} - E_{true}) / E_{true};N. Entries / 0.04" % interval,
                                        30, -1, 1))
 
-l_true_reco = [[], [], [], [], [], [], [], [], [], []]
+l_true_reco = [[], [], [], [], [], [], [], [], []]
 h_true_reco_slices = []
 for i in range(len(l_true_reco)):
     h = ROOT.TH1F("h%i" % i, "", 100, 0, 2)
     h_true_reco_slices.append(h)
 
-categories = [0,0,0,0,0,0,0,0]
-categories_passed = [0,0,0,0,0,0,0,0]
+categories = [0, 0, 0, 0, 0, 0, 0, 0]
+categories_passed = [0, 0, 0, 0, 0, 0, 0, 0]
 
 for evt in range(entries):
     chain.GetEntry(evt)
@@ -134,8 +140,8 @@ for evt in range(entries):
 
     neutrino_vertex = [chain.true_vx, chain.true_vy, chain.true_vz]
 
-    if eNp and chain.nu_E > 0.1:
-        if is_active(neutrino_vertex):
+    if eNp and 0.2 < chain.nu_E < 1:
+        if is_fiducial(neutrino_vertex):
             total += 1
             primary_indexes = []
             shower_passed = []
@@ -154,7 +160,7 @@ for evt in range(entries):
                 chosen_showers = shower_passed[candidate_id]
                 chosen_tracks = track_passed[candidate_id]
                 tot_energy = electron_energy + proton_energy
-                h_matrix.Fill(chain.nu_E, chain.E)
+                h_matrix.Fill(chain.E, chain.nu_E)
                 h_e_true_reco.Fill(tot_energy, chain.E)
                 if 0.2 < chain.E < 1:
                     h_e_true.Fill(chain.nu_E)
@@ -167,10 +173,14 @@ for evt in range(entries):
                          tot_energy) / tot_energy
 
                 h_e_res.Fill(e_res)
-                if tot_energy < 2:
-                    h_e_res_intervals[int(tot_energy / 0.2)].Fill(e_res)
-                    l_true_reco[int(tot_energy / 0.2)].append(chain.E)
-                    h_true_reco_slices[int(tot_energy / 0.2)].Fill(chain.E)
+                if tot_energy < 1:
+                    for i, bin in enumerate(bins):
+                        if tot_energy > bin:
+                            index = i
+
+                    h_e_res_intervals[index].Fill(e_res)
+                    l_true_reco[index].append(chain.E)
+                    h_true_reco_slices[index].Fill(chain.E)
 
                 if chosen_showers == e and chosen_tracks == p:
                     perfect_event += 1
@@ -210,6 +220,7 @@ for evt in range(entries):
                     flash_not_passed += 1
 
 print(categories, categories_passed)
+print(total, perfect_event, incomplete_event, splitted_event, wrong_event, flash_not_passed)
 print("Passed event, perfect {:.1f} %".format(perfect_event / total * 100))
 print("Passed event, incomplete {:.1f} %"
       .format(incomplete_event / total * 100))
@@ -228,59 +239,64 @@ print("Not passed event, flash passed, shower ok, no track {:.1f}% "
 print("Not passed event, flash passed, no track, no shower {:.1f}% "
       .format(track_no_shower_no / total * 100))
 
-e_values = array("f", [i * 0.2 + 0.1for i in range(10)])
-e_errs = array("f", [0.1] * 16)
+e_values = array("f", ([bins[i]+(bins[i+1]-bins[i])/2 for i in range(len(bins)-1)]))
+e_errs = array("f", ([(bins[i+1]-bins[i])/2 for i in range(len(bins)-1)]))
 
 median_values = array("f")
 median_errs = array("f")
-
 for i in l_true_reco:
     median_values.append(statistics.median(i))
     median_errs.append(statistics.stdev(i) / math.sqrt(len(i)))
 
-
 g_e_true_reco = ROOT.TGraphErrors(len(median_values),
                                   e_values, median_values, e_errs, median_errs)
 
-a_e_true_reco = np.zeros((16, 16))
+a_e_true_reco = np.zeros((len(bins)-1, len(bins)-1))
 
 matrix = h_matrix.Clone()
-for i in range(1,h_matrix.GetNbinsX()+1):
-    row_sum = sum([h_matrix.GetBinContent(i, j) for j in range(1,h_matrix.GetNbinsY()+1)])
-    for j in range(1,h_matrix.GetNbinsY()+1):
-        a_e_true_reco[j-1][i-1] = h_matrix.GetBinContent(i, j)/row_sum
-        matrix.SetBinContent(i, j, h_matrix.GetBinContent(i, j)/row_sum)
+for i in range(1, h_matrix.GetNbinsX() + 1):
+    row_sum = sum([h_matrix.GetBinContent(i, j)
+                   for j in range(1, h_matrix.GetNbinsY() + 1)])
+
+    for j in range(1, h_matrix.GetNbinsY() + 1):
+        a_e_true_reco[j - 1][i - 1] = h_matrix.GetBinContent(i, j) / row_sum
+        matrix.SetBinContent(i, j, h_matrix.GetBinContent(i, j) / row_sum)
 
 c_e_2d = ROOT.TCanvas("c_e_2d")
+matrix.GetYaxis().SetTitleOffset(0.9)
 matrix.Draw("colz text")
 
 a_e_true = hist2array(h_e_true)
-for i in range(1, h_e_true.GetNbinsX()+1):
-    a_e_true[i-1] = h_e_true.GetBinContent(i)
+for i in range(1, h_e_true.GetNbinsX() + 1):
+    a_e_true[i - 1] = h_e_true.GetBinContent(i)
 
 a_e_reco = hist2array(h_e_reco)
-for i in range(1, h_e_reco.GetNbinsX()+1):
-    a_e_reco[i-1] = h_e_reco.GetBinContent(i)
+for i in range(1, h_e_reco.GetNbinsX() + 1):
+    a_e_reco[i - 1] = h_e_reco.GetBinContent(i)
 
 true_scaling = np.array([5.015008606, 4.755966764, 4.240843625, 3.494299576,
                          2.596148682, 1.715699034, 1.051751175, 1.051751175,
                          0.896630140, 0.896630140, 0.896630140, 0.896630140,
                          0.913416650, 0.913416650, 0.913416650, 0.913416650])
 
-print(a_e_true, a_e_reco)
+
 print("IS WORKING? ", np.dot(a_e_true_reco, a_e_true) == a_e_reco)
+print("IS WORKING? ", np.dot(a_e_true_reco, a_e_reco) == a_e_true)
+
 h_matrix.GetYaxis().SetTitleOffset(0.8)
 
 c_e_2d.Update()
 
 c_e_lin = ROOT.TCanvas("c_e_lin")
 h_e_true_reco.Draw("colz")
+h_e_true_reco.GetYaxis().SetTitleOffset(0.9)
 g_e_true_reco.Draw("ep same")
 g_e_true_reco.SetLineWidth(2)
 g_e_true_reco.SetMarkerStyle(20)
 f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 2)
 f_line.SetParNames("m", "q")
-l_e_true_reco = ROOT.TLegend(0.14, 0.71, 0.49, 0.85)
+l_e_true_reco = ROOT.TLegend(0.099, 0.913, 0.900, 0.968)
+l_e_true_reco.SetNColumns(2)
 l_e_true_reco.AddEntry(g_e_true_reco, "Median values", "lep")
 g_e_true_reco.Fit(f_line)
 l_e_true_reco.AddEntry(f_line, "E_{k}^{reco} = %.2f E_{k}^{true} + %.2f GeV" %
@@ -294,9 +310,9 @@ f_gausexp = ROOT.TF1("f_gausexp", gauss_exp, -1, 1, 4)
 h_e_res.Draw("ep")
 h_e_res.SetMarkerStyle(20)
 
-f_gausexp.SetParLimits(2, 0, 2)
+f_gausexp.SetParLimits(2, 0, 0.6)
 f_gausexp.SetParLimits(3, 0, 1)
-f_gausexp.SetParLimits(1, -1, 1)
+f_gausexp.SetParLimits(1, -0.3, 0.3)
 f_gausexp.SetParameters(250, 0, 0.13, 0.18)
 f_gausexp.SetParNames("A", "#mu", "#sigma", "k")
 h_e_res.Fit(f_gausexp, "RQ", "", -0.6, 0.4)
@@ -325,8 +341,13 @@ sigma = []
 sigma_err = []
 
 
-for i in range(1,10):
-    c_e_res_intervals.cd(i)
+for i in range(len(bins)-1):
+    c_e_res_intervals.cd(i+1)
+    f_gausexp.SetParameters(h_e_res_intervals[i].GetMaximum(),
+                            h_e_res_intervals[i].GetMean(),
+                            h_e_res_intervals[i].GetRMS(),
+                            0.18)
+
     h_e_res_intervals[i].Fit(f_gausexp, "RQ", "", -0.6, 0.4)
 
     legends.append(ROOT.TLegend(0.58, 0.77, 0.86, 0.85))
@@ -334,8 +355,8 @@ for i in range(1,10):
             (f_gausexp.GetParameter(1),
             f_gausexp.GetParameter(2),
             f_gausexp.GetParameter(3)), "")
-    sigma.append(f_gausexp.GetParameter(2)*100)
-    sigma_err.append(f_gausexp.GetParError(2)*100)
+    sigma.append(f_gausexp.GetParameter(2) * 100)
+    sigma_err.append(f_gausexp.GetParError(2) * 100)
     h_e_res_intervals[i].SetMarkerStyle(20)
     h_e_res_intervals[i].SetLineColor(ROOT.kBlack)
     h_e_res_intervals[i].Draw("ep")
@@ -347,8 +368,10 @@ c_sigmas = ROOT.TCanvas("c_sigmas")
 sigma_array = array("f", sigma)
 sigma_err_array = array("f", sigma_err)
 
-e_values = array("f", [i * 0.2 + 0.1 for i in range(1, 10)])
-e_errs = array("f", [0.1] * len(sigma_array))
+e_values = array("f", [bins[i] + (bins[i + 1] - bins[i]) / 2
+                       for i in range(len(bins) - 1)])
+e_errs = array("f", [(bins[i + 1] - bins[i]) / 2
+                     for i in range(len(bins) - 1)])
 
 f_res = ROOT.TF1("f_res", "sqrt(([0]/sqrt(x))**2+([1]/x)**2+[2]**2)", 0, 2)
 f_res.SetParNames("a", "b", "c")
@@ -376,11 +399,12 @@ c_sigmas.Update()
 
 c_e_nu = ROOT.TCanvas("c_e_nu")
 h_e_nu_kin.Draw("colz")
+h_e_nu_kin.GetYaxis().SetTitleOffset(0.9)
 c_e_nu.Update()
 
-c= ROOT.TCanvas("c")
+c = ROOT.TCanvas("c")
 h_e_true.Draw()
-h_e_reco.SetLineColor(ROOT.kRed+1)
+h_e_reco.SetLineColor(ROOT.kRed + 1)
 h_e_reco.Draw("same")
 c.Update()
 input()
