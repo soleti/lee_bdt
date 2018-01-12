@@ -7,8 +7,8 @@ from array import array
 from glob import glob
 from root_numpy import hist2array
 import numpy as np
-from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
-
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end, bins
+import pickle
 
 def is_fiducial(point):
     ok_y = y_start + 20 < point[1] < y_end - 20
@@ -68,7 +68,6 @@ shower_ok_track_no = 0
 track_no_shower_no = 0
 flash_not_passed = 0
 
-bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
 h_matrix = ROOT.TH2F("h_matrix",
                           ";E_{k}^{reco} [GeV];E_{#nu} [GeV]",
@@ -86,7 +85,7 @@ h_e_res = ROOT.TH1F("h_res",
 
 h_e_nu_kin = ROOT.TH2F("h_e_nu_kin",
                        ";E_{#nu} [GeV];E_{k}^{true} [GeV]",
-                       100, 0.2, 1, 100, 0.2, 1)
+                       100, 0, 1, 100, 0, 1)
 
 h_e_res_intervals = []
 for i in range(len(bins)-1):
@@ -95,7 +94,7 @@ for i in range(len(bins)-1):
                                        "%s;(E_{corr} - E_{true}) / E_{true};N. Entries / 0.04" % interval,
                                        30, -1, 1))
 
-l_true_reco = [[], [], [], [], [], [], [], [], []]
+l_true_reco = [[], [], [], [], [], [], [], [], [], [], [], [], [], []]
 h_true_reco_slices = []
 for i in range(len(l_true_reco)):
     h = ROOT.TH1F("h%i" % i, "", 100, 0, 2)
@@ -140,7 +139,7 @@ for evt in range(entries):
 
     neutrino_vertex = [chain.true_vx, chain.true_vy, chain.true_vz]
 
-    if eNp and 0.2 < chain.nu_E < 1:
+    if eNp and bins[0] < chain.nu_E < bins[-1]:
         if is_fiducial(neutrino_vertex):
             total += 1
             primary_indexes = []
@@ -160,12 +159,14 @@ for evt in range(entries):
                 chosen_showers = shower_passed[candidate_id]
                 chosen_tracks = track_passed[candidate_id]
                 tot_energy = electron_energy + proton_energy
-                h_matrix.Fill(chain.E, chain.nu_E)
+
                 h_e_true_reco.Fill(tot_energy, chain.E)
-                if 0.2 < chain.E < 1:
+
+                if bins[0] < chain.E < bins[-1]:
                     h_e_true.Fill(chain.nu_E)
-                if 0.2 < chain.nu_E < 1:
-                    h_e_reco.Fill(chain.E)
+                    h_matrix.Fill(chain.E, chain.nu_E)
+
+                h_e_reco.Fill(chain.E)
 
                 h_e_nu_kin.Fill(chain.nu_E, tot_energy)
 
@@ -173,11 +174,10 @@ for evt in range(entries):
                          tot_energy) / tot_energy
 
                 h_e_res.Fill(e_res)
-                if tot_energy < 1:
+                if tot_energy < bins[-1]:
                     for i, bin in enumerate(bins):
                         if tot_energy > bin:
                             index = i
-
                     h_e_res_intervals[index].Fill(e_res)
                     l_true_reco[index].append(chain.E)
                     h_true_reco_slices[index].Fill(chain.E)
@@ -245,8 +245,10 @@ e_errs = array("f", ([(bins[i+1]-bins[i])/2 for i in range(len(bins)-1)]))
 median_values = array("f")
 median_errs = array("f")
 for i in l_true_reco:
-    median_values.append(statistics.median(i))
-    median_errs.append(statistics.stdev(i) / math.sqrt(len(i)))
+    if len(i) > 0:
+        median_values.append(statistics.median(i))
+        median_errs.append(statistics.stdev(i) / math.sqrt(len(i)))
+
 
 g_e_true_reco = ROOT.TGraphErrors(len(median_values),
                                   e_values, median_values, e_errs, median_errs)
@@ -267,12 +269,7 @@ matrix.GetYaxis().SetTitleOffset(0.9)
 matrix.Draw("colz text")
 
 a_e_true = hist2array(h_e_true)
-for i in range(1, h_e_true.GetNbinsX() + 1):
-    a_e_true[i - 1] = h_e_true.GetBinContent(i)
-
 a_e_reco = hist2array(h_e_reco)
-for i in range(1, h_e_reco.GetNbinsX() + 1):
-    a_e_reco[i - 1] = h_e_reco.GetBinContent(i)
 
 true_scaling = np.array([5.015008606, 4.755966764, 4.240843625, 3.494299576,
                          2.596148682, 1.715699034, 1.051751175, 1.051751175,
@@ -282,6 +279,10 @@ true_scaling = np.array([5.015008606, 4.755966764, 4.240843625, 3.494299576,
 
 print("IS WORKING? ", np.dot(a_e_true_reco, a_e_true) == a_e_reco)
 print("IS WORKING? ", np.dot(a_e_true_reco, a_e_reco) == a_e_true)
+print(np.dot(a_e_true_reco, a_e_reco))
+print(a_e_true)
+with open("a_e_true_reco.bin", "wb") as f:
+    pickle.dump(a_e_true_reco, f, pickle.HIGHEST_PROTOCOL)
 
 h_matrix.GetYaxis().SetTitleOffset(0.8)
 
@@ -310,8 +311,8 @@ f_gausexp = ROOT.TF1("f_gausexp", gauss_exp, -1, 1, 4)
 h_e_res.Draw("ep")
 h_e_res.SetMarkerStyle(20)
 
-f_gausexp.SetParLimits(2, 0, 0.6)
-f_gausexp.SetParLimits(3, 0, 1)
+f_gausexp.SetParLimits(2, 0.001, 0.6)
+f_gausexp.SetParLimits(3, 0.001, 1)
 f_gausexp.SetParLimits(1, -0.3, 0.3)
 f_gausexp.SetParameters(250, 0, 0.13, 0.18)
 f_gausexp.SetParNames("A", "#mu", "#sigma", "k")
@@ -348,7 +349,7 @@ for i in range(len(bins)-1):
                             h_e_res_intervals[i].GetRMS(),
                             0.18)
 
-    h_e_res_intervals[i].Fit(f_gausexp, "RQ", "", -0.6, 0.4)
+    #h_e_res_intervals[i].Fit(f_gausexp, "RQ", "", -0.6, 0.4)
 
     legends.append(ROOT.TLegend(0.58, 0.77, 0.86, 0.85))
     legends[-1].AddEntry(f_gausexp, "#mu = %.2f, #sigma = %.2f, k = %.2f" %

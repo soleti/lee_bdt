@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators, fill_histos, manual, bdt
+from bdt_common import variables, spectators, fill_histos, manual, bdt, bins
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -39,8 +39,8 @@ for name, var in variables:
 for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
-sigCut = ROOT.TCut("is_signal > 0.5 && reco_energy > 0.2 && reco_energy < 0.6 && shower_energy > 0.1")
-bgCut = ROOT.TCut("(is_signal <= 0.5 && reco_energy > 0.2 && reco_energy < 0.6 && shower_energy > 0.1)")#" || (is_signal > 0.5 && (reco_energy < 0.2 || reco_energy > 0.6))")
+sigCut = ROOT.TCut("is_signal > 0.5 && reco_energy > %.2f && reco_energy < %.2f" % (bins[0], bins[-1]))
+bgCut = ROOT.TCut("is_signal <= 0.5 && reco_energy > %.2f && reco_energy < %.2f" % (bins[0], bins[-1]))#" || (is_signal > 0.5 && (reco_energy < 0.2 || reco_energy > 0.6))")
 
 
 dataloader.AddSignalTree(t_nue)
@@ -53,16 +53,16 @@ dataloader.PrepareTrainingAndTestTree(sigCut, bgCut,
                                           "SplitMode=Alternate",
                                           "NormMode=NumEvents:!V"]))
 
-method_cuts = factory.BookMethod(dataloader, ROOT.TMVA.Types.kCuts, "Cuts",
-                                 ":".join([
-                                     "!H:!V",
-                                     "FitMethod=GA",
-                                     "EffSel",
-                                     "CutRangeMin[0]=0:CutRangeMax[0]=6",
-                                     "CutRangeMin[1]=0:CutRangeMax[1]=1",
-                                     "VarProp[1]=FSmart",
-                                     "CutRangeMin[2]=0:CutRangeMax[2]=10",
-                                     "CutRangeMin[3]=0:CutRangeMax[3]=10"]))
+# method_cuts = factory.BookMethod(dataloader, ROOT.TMVA.Types.kCuts, "Cuts",
+#                                  ":".join([
+#                                      "!H:!V",
+#                                      "FitMethod=GA",
+#                                      "EffSel",
+#                                      "CutRangeMin[0]=0:CutRangeMax[0]=6",
+#                                      "CutRangeMin[1]=0:CutRangeMax[1]=1",
+#                                      "VarProp[1]=FSmart",
+#                                      "CutRangeMin[2]=0:CutRangeMax[2]=10",
+#                                      "CutRangeMin[3]=0:CutRangeMax[3]=10"]))
 
 method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                                 ":".join([

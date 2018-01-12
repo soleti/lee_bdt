@@ -2,10 +2,11 @@
 
 import ROOT
 import math
-
-from bdt_common import variables, spectators
+import numpy as np
+from bdt_common import variables, spectators, bins, colors
 from bdt_common import description, total_pot, sigmaCalc, total_data_bnb_pot
-
+from root_numpy import hist2array
+import pickle
 from array import array
 
 ROOT.gStyle.SetOptStat(0)
@@ -25,13 +26,13 @@ histograms_lee = []
 
 histograms = [histograms_bnb, histograms_bnbext, histograms_mc, histograms_lee]
 
-post_scaling = 6.6e20 / total_data_bnb_pot
+post_scaling = 1#6.6e20 / total_data_bnb_pot
 total_pot *= post_scaling
 
 draw_subtraction = False
 draw_ext = False
-draw_lee = True
-draw_data = False
+draw_lee = False
+draw_data = True
 
 
 def set_axis(histo):
@@ -41,8 +42,7 @@ def set_axis(histo):
     histo.SetMaximum(histo.GetMaximum() * 1.3)
 
 
-def fix_binning(histo):
-    width = histo.GetBinWidth(1)
+def fix_binning(histo, width=0.05):
     for k in range(1, histo.GetNbinsX() + 1):
         bin_width = histo.GetBinWidth(k)
         histo.SetBinError(k, histo.GetBinError(k) / (bin_width / width))
@@ -147,7 +147,7 @@ for i, h in enumerate(histograms_mc):
     if draw_lee:
         histograms_lee[i].SetLineColor(ROOT.kBlack)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 2)
-        histograms_lee[i].SetFillStyle(3001)
+        histograms_lee[i].SetFillStyle(3002)
         if i != reco_energy:
             legends[i].AddEntry(histograms_lee[i],
                                 "Low-energy excess: {:.0f} events"
@@ -156,7 +156,7 @@ for i, h in enumerate(histograms_mc):
 
 
 for h in histograms_mc:
-    h.GetHists()[3].SetFillStyle(3001)
+    h.GetHists()[3].SetFillStyle(3002)
 
 
 if draw_subtraction:
@@ -191,16 +191,15 @@ h_errs_sys = []
 
 canvases_cosmic = []
 paves = []
-bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
 h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
 
-scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
+scaling = [0,0,0,6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
            2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
            2, 1, 1, 1, 1]
 
 h_lee.SetFillColor(ROOT.kGreen - 2)
-h_lee.SetFillStyle(3005)
+h_lee.SetFillStyle(3002)
 h_lee.SetLineColor(1)
 for i in range(len(scaling)):
     if scaling[i] - 1 > 0:
@@ -230,6 +229,34 @@ pt.SetShadowColor(0)
 pt.Draw()
 canvases.append(pt)
 c_energy.Update()
+
+h_true_e = ROOT.THStack("h_true_e", ";#nu_{e} energy [GeV]; N. Entries / 0.05 GeV")
+with open("a_e_true_reco.bin", "rb") as f:
+    a_e_true_reco = pickle.load(f)
+
+clones = []
+for j in range(histograms_mc[reco_energy].GetNhists()):
+    h_clone = histograms_mc[reco_energy].GetHists()[j].Clone()
+    h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, 0, len(bins) - 1)
+    a_e_reco = hist2array(h_clone)
+    a_true = np.dot(a_e_true_reco, a_e_reco)
+
+    for i in range(1, h_clone.GetNbinsX()+1):
+        h_clone.SetBinContent(i, a_e_reco[i - 1])
+        h_clone.SetBinError(i, math.sqrt(a_e_reco[i - 1]))
+    fix_binning(h_clone)
+    h_clone.Scale(post_scaling)
+    ax = h_fixed.GetXaxis()
+    for i in range(1, h_clone.GetNbinsX() + 1):
+        h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
+        h_fixed.GetXaxis().SetBinLabel(i, "")
+
+    h_fixed.SetLineColor(ROOT.kBlack)
+    h_fixed.SetFillColor(h_clone.GetFillColor())
+    h_fixed.SetFillStyle(h_clone.GetFillStyle())
+
+    clones.append(h_clone)
+    h_true_e.Add(h_fixed)
 
 for i in range(len(variables)):
     if histograms_mc[i].GetHists()[0].Integral() > 0:
@@ -345,6 +372,19 @@ for i in range(len(variables)):
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
 
         canvases.append(c)
+
+c_true = ROOT.TCanvas("c_true")
+h_true_e.Draw("hist")
+legends[reco_energy].Draw()
+c_true.SetTopMargin(0.2274194)
+
+ax = ROOT.TGaxis(0, 0, len(bins) - 1, 0, 0, len(bins) - 1 , 515, "")
+for i, bin in enumerate(bins):
+    ax.ChangeLabel(i+1, -1, -1, -1, -1, -1, "{0}".format(str(round(bin, 2) if bin % 1 else int(bin))))
+ax.SetLabelFont(42)
+ax.SetLabelSize(0.05)
+ax.Draw()
+c_true.Update()
 
 h_cosmics = []
 draw_cosmic = False

@@ -2,8 +2,23 @@ from array import array
 import math
 import ROOT
 
-bdt, manual = False, True
-total_data_bnb_pot = 4.758e19
+# colors = [239 172 58, 231 98 61, 144 175 61, 95 130 179, 96 158 198, 196 109 39, 255 255 255, 231 98 61]
+
+colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
+          ROOT.TColor.GetColor("#62b570"), ROOT.TColor.GetColor("#8779b1"),
+          ROOT.TColor.GetColor("#609ec6"), ROOT.TColor.GetColor("#c46d27"),
+          ROOT.TColor.GetColor("#ffffff"), ROOT.TColor.GetColor("#e7623d")]
+
+bdt, manual = False, False
+
+# Number to be obtained from Zarko's POT counting tool
+total_data_bnb_pot = 4.868e+19#4.758e19
+
+# bins = array("f", [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35,
+#                    0.4, 0.45, 0.5, 0.6, 0.8, 1, 2, 3])
+
+bins = array("f", [0.1, 0.2, 0.25, 0.3, 0.35,
+                   0.4, 0.45, 0.5, 0.6, 0.8, 1, 2])
 
 
 def fill_histos(tree_name, bdt, manual):
@@ -40,8 +55,6 @@ def fill_histos(tree_name, bdt, manual):
             h = ROOT.TH1F("h_%s" % n, labels[n],
                           binning[n][0], binning[n][1], binning[n][2])
         else:
-            bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4,
-                               0.45, 0.5, 0.6, 0.8, 1])
             h = ROOT.TH1F("h_%s" % n, labels[n], len(bins) - 1, bins)
         histograms.append(h)
 
@@ -66,7 +79,7 @@ def fill_histos(tree_name, bdt, manual):
         else:
             apply_manual = True
 
-        if apply_bdt and apply_manual and 0.1 < t_data.reco_energy < 1:
+        if apply_bdt and apply_manual and bins[0] < t_data.reco_energy < bins[-1]:
             passed_events += t_data.event_weight
             for name, var in variables:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
@@ -105,15 +118,15 @@ def manual_cuts(chain):
     track_shower_angle = -0.9 < chain.track_shower_angle < 0.9
     track_theta = chain.track_theta < 130
 
-    dedx = 0.6 < chain.dedx < 3.07
-    proton_score = chain.proton_score > 0.57
-    shower_distance = chain.shower_distance < 2.23
-    track_distance = chain.track_distance < 9.55
-    open_angle = 1 < chain.shower_open_angle < 23.7
-    shower_theta = 15 < chain.shower_theta < 99
+    # dedx = 0.6 < chain.dedx < 3.07
+    # proton_score = chain.proton_score > 0.57
+    # shower_distance = chain.shower_distance < 2.23
+    # track_distance = chain.track_distance < 9.55
+    # open_angle = 1 < chain.shower_open_angle < 23.7
+    # shower_theta = 15 < chain.shower_theta < 99
 
 
-    cuts = [dedx, proton_score, open_angle,
+    cuts = [shower_energy, dedx, proton_score, open_angle,
             shower_theta, shower_distance, track_distance]
 
     # optimized_cuts = [dedx, proton_score, shower_distance, track_distance,
@@ -289,7 +302,8 @@ spectators = [
     ("shower_pca", shower_pca),
     ("track_pca", track_pca),
     ("total_track_energy", total_track_energy),
-    ("numu_score", numu_score)
+    ("numu_score", numu_score),
+    ("total_shower_energy", total_shower_energy)
 ]
 
 variables = [

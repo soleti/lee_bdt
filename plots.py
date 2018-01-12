@@ -288,12 +288,11 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
                     chain.shower_start_z[i]]
                 shower_fidvol = shower_fidvol and is_fiducial(shower_start)
 
-
             option_check = True
             event_weight = weight
 
             if option == "bnb":
-                option_check = abs(chain.nu_pdg) != 12 # and 111 not in chain.nu_daughters_pdg
+                option_check = abs(chain.nu_pdg) != 12
             if option == "nue":
                 event_weight = weight * chain.bnbweight
                 option_check = abs(chain.nu_pdg) == 12
@@ -345,32 +344,9 @@ tree_files = [glob("pi0/*/*.root"),
               glob("cosmic_intime_dedx/*/*.root"),
               glob("mc_bnb_slimmed/*/*.root"),
               glob("mc_nue_pca/*/*.root"),
-              glob("data_bnb_dedx/*/*.root"),
+              glob("data_bnb_mcc85/*/*.root"),
               glob("data_ext_dedx/*/*.root"),
               glob("lee/*/*.root")]
-
-# tree_files = [glob("pi0/*/*.root"),
-#               glob("wouter_files/soft_intime_83.root"),
-#               glob("wouter_files/soft_nu_84.root"),
-#               glob("wouter_files/soft_nue_84.root"),
-#               glob("data_bnb_dedx/*/*.root"),
-#               glob("wouter_files/soft_extbnb_84.root"),
-#               glob("lee/*/*.root")]
-#
-# tree_files = [glob("pi0/*/*.root"),
-#               glob("wouter_files/new_intime_83.root"),
-#               glob("wouter_files/new_nu_83.root"),
-#               glob("wouter_files/new_nue_84.root"),
-#               glob("data_bnb_dedx/*/*.root"),
-#               glob("wouter_files/new_extbnb_84.root"),
-#               glob("lee/*/*.root")]
-#
-# tree_files = [glob("pi0/*/*.root"),
-#               glob("hardcuts/tree_strong_intime_83.root"),
-#               glob("hardcuts/tree_strong_nu_83.root"),
-#               glob("hardcuts/tree_strong_nue_84.root"),
-#               glob("data_bnb_dedx/*/*.root"),
-#               glob("hardcuts/tree_strong_extbnb_84.root")]
 
 chains = []
 chains_numu = []
@@ -440,6 +416,8 @@ for f, t in zip(files, trees):
     t.Write()
     tfile.Close()
 
+
+# Files needed for Zarko's POT counting tool
 run_subrun_bnb = open("run_subrun_bnb.txt", "w")
 
 for i in range(chains_pot_dict["bnb_data"].GetEntries()):

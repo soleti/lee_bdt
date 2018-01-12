@@ -4,7 +4,7 @@ import ROOT
 from array import array
 
 from bdt_common import bdt_cut, binning, labels, variables, spectators
-from bdt_common import sigmaCalc, manual_cuts, bdt, manual
+from bdt_common import sigmaCalc, manual_cuts, bdt, manual, bins, colors
 
 print("BDT: ", bdt, "Manual: ", manual)
 
@@ -28,7 +28,7 @@ def fill_histos(chain, histo_dict, h_bdts):
             apply_manual = True
 
         if apply_bdt and apply_manual:
-            if chain.category == 2 and 0 < chain.reco_energy < 2:
+            if chain.category == 2 and bins[0] < chain.reco_energy < bins[-1]:
                 events += ttrain.event_weight
 
             for name, var in variables:
@@ -51,9 +51,6 @@ ttrain = ROOT.TChain("dataset/TrainTree")
 ttrain.Add("test.root")
 tout.Add("test.root")
 
-colors = [ROOT.kOrange + 1, ROOT.kRed - 3, ROOT.kGreen - 2, ROOT.kBlue - 5,
-          ROOT.kBlue - 9, ROOT.kOrange + 3, ROOT.kWhite, ROOT.kRed - 3]
-
 kinds = []
 categories = ["intime", "cosmic", "nu_e", "nu_mu", "nc", "dirt", "data",
               "mixed"]
@@ -68,7 +65,6 @@ for name, var in spectators:
     ttrain.SetBranchAddress(name, var)
 
 variables_dict = dict(variables + spectators)
-bins = array("f", [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
 for i, n in enumerate(variables_dict.keys()):
     histos = []
