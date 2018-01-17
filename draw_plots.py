@@ -37,19 +37,19 @@ else:
 total_pot *= POST_SCALING
 
 
-def set_axis(histo):
-    histo.GetYaxis().SetTitleSize(0.06)
-    histo.GetYaxis().SetTitleOffset(0.8)
-    histo.SetMinimum(0.1)
-    histo.SetMaximum(histo.GetMaximum() * 1.3)
+def set_axis(histogram):
+    histogram.GetYaxis().SetTitleSize(0.06)
+    histogram.GetYaxis().SetTitleOffset(0.8)
+    histogram.SetMinimum(0.1)
+    histogram.SetMaximum(histogram.GetMaximum() * 1.3)
 
 
-def fix_binning(histo, width=0.05):
-    for bin_i in range(1, histo.GetNbinsX() + 1):
-        bin_width = histo.GetBinWidth(bin_i)
-        histo.SetBinError(bin_i, histo.GetBinError(
+def fix_binning(histogram, width=0.05):
+    for bin_i in range(1, histogram.GetNbinsX() + 1):
+        bin_width = histogram.GetBinWidth(bin_i)
+        histogram.SetBinError(bin_i, histogram.GetBinError(
             bin_i) / (bin_width / width))
-        histo.SetBinContent(bin_i, histo.GetBinContent(
+        histogram.SetBinContent(bin_i, histogram.GetBinContent(
             bin_i) / (bin_width / width))
 
 
@@ -90,10 +90,10 @@ def draw_ratio(num, den):
     h_ratio.GetYaxis().SetTitle("Data / MC")
     h_ratio.GetYaxis().SetNdivisions(509)
     h_ratio.GetYaxis().SetLabelFont(42)
-    h_ratio.GetYaxis().SetLabelSize(        0.13)
+    h_ratio.GetYaxis().SetLabelSize(0.13)
     h_ratio.GetYaxis().SetTitleSize(0.13)
     h_ratio.GetYaxis().SetTitleOffset(0.36)
-    h_ratio.Draw("ep")          
+    h_ratio.Draw("ep")
     line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
                       h_ratio.GetXaxis().GetXmax(), 1)
     line.SetLineWidth(2)
@@ -101,8 +101,6 @@ def draw_ratio(num, den):
     line.Draw()
     OBJECTS.append(line)
 
-
-files = []
 legends = []
 
 samples = ["bnb", "bnbext", "mc", "lee"]
@@ -112,7 +110,7 @@ for name, var in VARIABLES:
     for histos, s in zip(histograms, samples):
         f = ROOT.TFile("plots/h_%s_%s.root" % (name, s))
         h = f.Get("h_%s" % name)
-        files.append(f)
+        OBJECTS.append(f)
         histos.append(h)
 
     legend = ROOT.TLegend(0.094555, 0.78502, 0.89234, 0.97919, "", "brNDC")
@@ -163,9 +161,7 @@ if DRAW_SUBTRACTION:
                 err2 = h_ext.GetBinError(i)
                 h_bnb.SetBinError(i, math.sqrt(err1**2 + err2**2))
 
-        leg.AddEntry(h_bnb, "Data BNB - BNB EXT: {:.0f} events"
-                            .format(h_bnb.Integral() * POST_SCALING),
-                            "lep")
+        leg.AddEntry(h_bnb, "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING),  "lep")
 
 
 h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
@@ -369,16 +365,11 @@ c_true.Update()
 if DRAW_COSMIC:
 
     legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY],
-                       "Data EXT: {:.0f} events"
-                       .format(histograms_bnbext[RECO_ENERGY].Integral()
-                               * POST_SCALING), "lep")
-    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1],
-                       "CORSIKA in-time Monte Carlo: integral normalized", "f")
+    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} events".format(histograms_bnbext[RECO_ENERGY].Integral() * POST_SCALING), "lep")
+    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1], "CORSIKA in-time Monte Carlo: integral normalized", "f")
     legend_cosmic.SetNColumns(2)
 
     for i in range(len(VARIABLES)):
-        # if i == RECO_ENERGY:
         h_ext = histograms_bnbext[i].Clone()
         h_intime = histograms_mc[i].GetHists()[1].Clone()
         if i == RECO_ENERGY:
