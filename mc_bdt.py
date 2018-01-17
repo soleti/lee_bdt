@@ -1,7 +1,6 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from array import array
 
 from bdt_common import bdt_cut, binning, labels, variables, spectators
 from bdt_common import sigmaCalc, manual_cuts, bdt, manual, bins, colors
@@ -80,12 +79,12 @@ for i, n in enumerate(variables_dict.keys()):
         histos.append(h)
 
     h_stack.Add(histos[2])
-    h_stack.Add(histos[0])
-    h_stack.Add(histos[1])
-    h_stack.Add(histos[7])
     h_stack.Add(histos[3])
     h_stack.Add(histos[4])
     h_stack.Add(histos[5])
+    h_stack.Add(histos[7])
+    h_stack.Add(histos[1])
+    h_stack.Add(histos[0])
     h_stack.Add(histos[6])
 
     stacked_histos.append(h_stack)

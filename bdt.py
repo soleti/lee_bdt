@@ -8,9 +8,9 @@ f_input = ROOT.TFile("mc_file.root")
 t = ROOT.TTree()
 t = f_input.Get("mc_tree")
 
-f_cosmic = ROOT.TFile("cosmic_mc_file.root")
+f_cosmic = ROOT.TFile("bnbext_file.root")
 t_cosmic = ROOT.TTree()
-t_cosmic = f_cosmic.Get("cosmic_mc_tree")
+t_cosmic = f_cosmic.Get("bnbext_tree")
 
 f_nue = ROOT.TFile("nue_file.root")
 t_nue = ROOT.TTree()

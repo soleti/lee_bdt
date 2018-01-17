@@ -1,13 +1,13 @@
 #!/usr/local/bin/python3
 
-import ROOT
-import math
-import numpy as np
-from bdt_common import variables, spectators, bins, colors
-from bdt_common import description, total_pot, sigmaCalc, total_data_bnb_pot
-from root_numpy import hist2array
 import pickle
-from array import array
+import math
+import ROOT
+import numpy as np
+
+from root_numpy import hist2array
+from bdt_common import variables, spectators, bins, total_data_bnb_pot
+from bdt_common import description, total_pot, sigmaCalc
 
 ROOT.gStyle.SetOptStat(0)
 
@@ -33,6 +33,7 @@ draw_subtraction = False
 draw_ext = False
 draw_lee = False
 draw_data = True
+draw_cosmic = False
 
 
 def set_axis(histo):
@@ -43,10 +44,12 @@ def set_axis(histo):
 
 
 def fix_binning(histo, width=0.05):
-    for k in range(1, histo.GetNbinsX() + 1):
-        bin_width = histo.GetBinWidth(k)
-        histo.SetBinError(k, histo.GetBinError(k) / (bin_width / width))
-        histo.SetBinContent(k, histo.GetBinContent(k) / (bin_width / width))
+    for bin_i in range(1, histo.GetNbinsX() + 1):
+        bin_width = histo.GetBinWidth(bin_i)
+        histo.SetBinError(bin_i, histo.GetBinError(
+            bin_i) / (bin_width / width))
+        histo.SetBinContent(bin_i, histo.GetBinContent(
+            bin_i) / (bin_width / width))
 
 
 def draw_top():
@@ -156,7 +159,7 @@ for i, h in enumerate(histograms_mc):
 
 
 for h in histograms_mc:
-    h.GetHists()[3].SetFillStyle(3002)
+    h.GetHists()[4].SetFillStyle(3002)
 
 
 if draw_subtraction:
@@ -171,9 +174,10 @@ if draw_subtraction:
                 err2 = histograms_bnbext[i].GetBinError(j)
                 histograms_bnb[i].SetBinError(j, math.sqrt(err1**2 + err2**2))
 
-        legends[i].AddEntry(histograms_bnb[i], "Data BNB - BNB EXT: {:.0f} events"
-                           .format(histograms_bnb[i].Integral() * post_scaling),
-                           "lep")
+        legends[i].AddEntry(histograms_bnb[i],
+                            "Data BNB - BNB EXT: {:.0f} events"
+                            .format(histograms_bnb[i].Integral() * post_scaling),
+                            "lep")
 
 
 legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
@@ -194,24 +198,25 @@ paves = []
 
 h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
 
-scaling = [0,0,0,6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
+scaling = [0, 0, 0, 6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
            2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
            2, 1, 1, 1, 1]
 
 h_lee.SetFillColor(ROOT.kGreen - 2)
 h_lee.SetFillStyle(3002)
 h_lee.SetLineColor(1)
-for i in range(len(scaling)):
+for i, scale in enumerate(scaling):
     if scaling[i] - 1 > 0:
         h_lee.SetBinContent(i + 1, histograms_mc[reco_energy].GetHists()[0].
-                            GetBinContent(i + 1) * (scaling[i] - 1))
+                            GetBinContent(i + 1) * (scale - 1))
 
 histograms_lee[reco_energy] = h_lee
 
-legends[reco_energy].AddEntry(histograms_lee[reco_energy],
-                              "Low-energy excess: {:.0f} events"
-                              .format(histograms_lee[reco_energy].Integral()
-                                      * post_scaling), "f")
+if draw_lee:
+    legends[reco_energy].AddEntry(histograms_lee[reco_energy],
+                                  "Low-energy excess: {:.0f} events"
+                                  .format(histograms_lee[reco_energy].Integral() * post_scaling),
+                                  "f")
 
 c_energy = ROOT.TCanvas("c_energy")
 canvases.append(c_energy)
@@ -227,10 +232,11 @@ pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
 pt.Draw()
+
 canvases.append(pt)
 c_energy.Update()
 
-h_true_e = ROOT.THStack("h_true_e", ";#nu_{e} energy [GeV]; N. Entries / 0.05 GeV")
+h_true_e = ROOT.THStack("h_true_e", ";Reco. energy [GeV]; N. Entries / 0.05 GeV")
 with open("a_e_true_reco.bin", "rb") as f:
     a_e_true_reco = pickle.load(f)
 
@@ -241,8 +247,8 @@ for j in range(histograms_mc[reco_energy].GetNhists()):
     a_e_reco = hist2array(h_clone)
     a_true = np.dot(a_e_true_reco, a_e_reco)
 
-    for i in range(1, h_clone.GetNbinsX()+1):
-        h_clone.SetBinContent(i, a_e_reco[i - 1])
+    for i in range(1, h_clone.GetNbinsX() + 1):
+        h_clone.SetBinContent(i, a_true[i - 1])
         h_clone.SetBinError(i, math.sqrt(a_e_reco[i - 1]))
     fix_binning(h_clone)
     h_clone.Scale(post_scaling)
@@ -365,9 +371,10 @@ for i in range(len(variables)):
 
         if draw_data:
             if i == reco_energy:
-                print("Data/MC ratio: ", histograms_bnb[i].Integral()/h_mc_err_sys.Integral())
+                print("Data/MC ratio: ",
+                      histograms_bnb[i].Integral() / h_mc_err_sys.Integral())
             draw_ratio(histograms_bnb[i], h_mc_err_sys)
-        #histograms_bnb[i].Draw("same")
+
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
 
@@ -378,16 +385,17 @@ h_true_e.Draw("hist")
 legends[reco_energy].Draw()
 c_true.SetTopMargin(0.2274194)
 
-ax = ROOT.TGaxis(0, 0, len(bins) - 1, 0, 0, len(bins) - 1 , 515, "")
-for i, bin in enumerate(bins):
-    ax.ChangeLabel(i+1, -1, -1, -1, -1, -1, "{0}".format(str(round(bin, 2) if bin % 1 else int(bin))))
+ax = ROOT.TGaxis(0, 0, len(bins) - 1, 0, 0, len(bins) - 1, 515, "")
+for i, i_bin in enumerate(bins):
+    ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
+                   "{0}".format(str(round(i_bin, 2) if i_bin % 1 else int(i_bin))))
 ax.SetLabelFont(42)
 ax.SetLabelSize(0.05)
 ax.Draw()
 c_true.Update()
 
 h_cosmics = []
-draw_cosmic = False
+
 if draw_cosmic:
     for i in range(len(variables)):
         # if i == reco_energy:
@@ -398,7 +406,7 @@ if draw_cosmic:
         h_ext.Scale(post_scaling)
 
         if h_intime.Integral() > 0:
-            c_cosmic = ROOT.TCanvas("c{}_canvas".format(i), "", 900, 44, 700, 645)
+            c_cosmic = ROOT.TCanvas("c{}_c".format(i), "", 900, 44, 700, 645)
             h_cosmics.append(h_ext)
             h_cosmics.append(h_intime)
             draw_top()

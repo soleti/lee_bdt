@@ -157,10 +157,6 @@ def fill_kin_branches(root_chain, numu_chain, weight, variables, option=""):
     else:
         variables["category"][0] = root_chain.category
 
-    # if option == "bnb_data" and 0.005 < total_shower_energy < 0.01:
-    #     print("data", root_chain.run, root_chain.subrun, root_chain.event)
-    #     print(root_chain.n_tracks, root_chain.n_showers, shower_vertex_d, root_chain.track_start_z[track_id])
-
     variables["event_weight"][0] = weight
     variables["pt"][0] = pt_plot(root_chain)
 
@@ -337,15 +333,15 @@ def fill_tree(chain, chain_numu, weight, tree, option=""):
     return total_events
 
 
-data_ext_scaling_factor = 1.299
+data_ext_scaling_factor = 0.15513#0.616#1.299
 samples = ["pi0", "cosmic_mc", "bnb", "nue", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("pi0/*/*.root"),
-              glob("cosmic_intime_dedx/*/*.root"),
-              glob("mc_bnb_slimmed/*/*.root"),
-              glob("mc_nue_pca/*/*.root"),
+              glob("cosmic_intime_mcc86/*/*.root"),
+              glob("mc_bnb_mcc86/*/*.root"),
+              glob("mc_nue_mcc86/*/*.root"),
               glob("data_bnb_mcc85/*/*.root"),
-              glob("data_ext_dedx/*/*.root"),
+              glob("data_ext_mcc85/*/*.root"),
               glob("lee/*/*.root")]
 
 chains = []
@@ -376,11 +372,10 @@ chains_dict = dict(zip(samples, chains))
 chains_numu_dict = dict(zip(samples, chains_numu))
 chains_pot_dict = dict(zip(samples, chains_pot))
 variables = dict(variables + spectators)
-wouter_scaling = 1.2244
-roberto_scaling = 1.350
+ext_mc_scaling = 3.793
 
 weights = [total_pot / pots_dict["pi0"],
-           data_ext_scaling_factor * total_pot / total_data_bnb_pot * roberto_scaling *
+           data_ext_scaling_factor * total_pot / total_data_bnb_pot * ext_mc_scaling *
            chains_dict["ext_data"].GetEntries() / chains_dict["cosmic_mc"].GetEntries(),
            total_pot / pots_dict["bnb"],
            total_pot / pots_dict["nue"],

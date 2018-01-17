@@ -12,13 +12,13 @@ colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
 bdt, manual = False, False
 
 # Number to be obtained from Zarko's POT counting tool
-total_data_bnb_pot = 4.868e+19#4.758e19
+total_data_bnb_pot = 4.947e+19#4.868e+19#
 
 # bins = array("f", [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35,
 #                    0.4, 0.45, 0.5, 0.6, 0.8, 1, 2, 3])
 
-bins = array("f", [0.1, 0.2, 0.25, 0.3, 0.35,
-                   0.4, 0.45, 0.5, 0.6, 0.8, 1, 2])
+bins = array("f", [0.2, 0.25, 0.3, 0.35,
+                   0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
 
 def fill_histos(tree_name, bdt, manual):
@@ -125,7 +125,6 @@ def manual_cuts(chain):
     # open_angle = 1 < chain.shower_open_angle < 23.7
     # shower_theta = 15 < chain.shower_theta < 99
 
-
     cuts = [shower_energy, dedx, proton_score, open_angle,
             shower_theta, shower_distance, track_distance]
 
@@ -151,12 +150,12 @@ def sigmaCalc(h_signal, h_background, sys_err=0):
 total_pot = total_data_bnb_pot
 
 description = ["Beam Intrinsic #nu_{e}",
-               "Cosmic in-time",
-               "Cosmic",
-               "Cosmic contaminated",
                "Beam Intrinsic #nu_{#mu}",
                "Beam Intrinsic NC",
                "Dirt",
+               "Cosmic contaminated",
+               "Cosmic",
+               "Cosmic in-time",
                "Data",
                "Low-energy excess"]
 
@@ -318,13 +317,13 @@ variables = [
 labels = {
     "n_tracks": ";# tracks;N.Entries / 1",
     "n_showers": ";# showers;N.Entries / 1",
-    "track_theta": ";Track #theta [#circ];N. Entries / 20#circ",
-    "track_phi": ";Track #phi [#circ];N. Entries / 40#circ",
-    "shower_theta": ";Shower #theta [#circ];N. Entries / 20#circ",
-    "shower_phi": ";Shower #phi [#circ];N. Entries / 40#circ",
-    "shower_distance": ";Shower distance [cm];N. Entries / 1 cm",
-    "track_distance": ";Track distance [cm];N. Entries / 1 cm",
-    "track_shower_angle": ";cos#theta [#circ];N. Entries / 0.2",
+    "track_theta": ";Track #theta [#circ];N. Entries / 5#circ",
+    "track_phi": ";Track #phi [#circ];N. Entries / 10#circ",
+    "shower_theta": ";Shower #theta [#circ];N. Entries / 5#circ",
+    "shower_phi": ";Shower #phi [#circ];N. Entries / 10#circ",
+    "shower_distance": ";Shower distance [cm];N. Entries / 0.2 cm",
+    "track_distance": ";Track distance [cm];N. Entries / 0.2 cm",
+    "track_shower_angle": ";cos#theta [#circ];N. Entries / 0.05",
     "track_start_y": ";Track start y [cm];",
     "track_start_z": ";Track start z [cm];",
     "track_start_x": ";Track start x [cm];",
@@ -337,13 +336,13 @@ labels = {
     "shower_end_y": ";Shower end y [cm]",
     "shower_end_z": ";Shower end z [cm]",
     "shower_end_x": ";Shower end x [cm]",
-    "track_length": ";Track length [cm];N. Entries / 2 cm",
-    "proton_score": ";Proton score; N. Entries / 0.025",
-    "shower_energy": ";Shower energy [GeV]; N. Entries / 0.1 GeV",
+    "track_length": ";Track length [cm];N. Entries / 5 cm",
+    "proton_score": ";Proton score; N. Entries / 0.0025",
+    "shower_energy": ";Shower energy [GeV]; N. Entries / 0.025 GeV",
     "pt": ";p_{t} [GeV/c];N. Entries / 0.1 GeV/c",
     "reco_energy": ";Reco. energy [GeV]; N. Entries / 0.05 GeV",
     "shower_open_angle": ";Shower open angle [#circ]; N. Entries / 2#circ",
-    "dedx": ";dE/dx [MeV/cm]; N. Entries / 0.3 MeV/cm",
+    "dedx": ";dE/dx [MeV/cm]; N. Entries / 0.15 MeV/cm",
     "numu_score": ";#nu_{#mu} selection score; N. Entries / 0.01",
     "category": ";category",
     "event_weight": ";event_weight",

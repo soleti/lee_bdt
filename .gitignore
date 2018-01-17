@@ -4,7 +4,10 @@
 *.txt
 *.pdf
 *.png
+a_e_true_reco.bin
 dataset
 *.ipynb*
 __pycache__
+a.py
+*.json
 eff_comparison.py
