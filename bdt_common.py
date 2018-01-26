@@ -2,7 +2,9 @@ from array import array
 import math
 import ROOT
 
-# colors = [239 172 58, 231 98 61, 144 175 61, 95 130 179, 96 158 198, 196 109 39, 255 255 255, 231 98 61]
+ELECTRON_MASS = 0.51e-3
+PROTON_MASS = 0.938
+
 
 colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#62b570"), ROOT.TColor.GetColor("#8779b1"),
@@ -12,14 +14,20 @@ colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
 bdt, manual = False, False
 
 # Number to be obtained from Zarko's POT counting tool
-total_data_bnb_pot = 4.947e+19#4.868e+19#
+total_data_bnb_pot_mcc83 = 4.903e+19
+total_data_bnb_pot_mcc86 = 4.947e+19
+total_data_bnb_pot = total_data_bnb_pot_mcc86
 
-# bins = array("f", [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35,
-#                    0.4, 0.45, 0.5, 0.6, 0.8, 1, 2, 3])
 
 bins = array("f", [0.2, 0.25, 0.3, 0.35,
                    0.4, 0.45, 0.5, 0.6, 0.8, 1])
 
+
+def is_fiducial(point):
+    ok_y = point[1] > y_start + 20 and point[1] < y_end - 20
+    ok_x = point[0] > x_start + 10 and point[0] < x_end - 10
+    ok_z = point[2] > z_start + 10 and point[2] < z_end - 50
+    return ok_y and ok_x and ok_z
 
 def fill_histos(tree_name, bdt, manual):
     f_data = ROOT.TFile("%s_file.root" % tree_name)
@@ -79,7 +87,7 @@ def fill_histos(tree_name, bdt, manual):
         else:
             apply_manual = True
 
-        if apply_bdt and apply_manual and bins[0] < t_data.reco_energy < bins[-1]:
+        if apply_bdt and apply_manual and bins[0] < t_data.reco_energy < bins[-1] and t_data.track_hits > 5 and t_data.shower_hits > 5 and t_data.total_shower_energy > 0.02 and t_data.total_track_energy > 0.02:
             passed_events += t_data.event_weight
             for name, var in variables:
                 histo_dict[name].Fill(var[0], t_data.event_weight)
@@ -108,10 +116,10 @@ def find_interaction(dictionary, interaction):
 def manual_cuts(chain):
     shower_energy = chain.shower_energy > 0.2
     dedx = 1.4 < chain.dedx < 3
-    shower_distance = chain.shower_distance < 2.5
-    track_distance = chain.track_distance < 2.5
-    proton_score = chain.proton_score > 0.98
-    open_angle = 2 < chain.shower_open_angle < 15
+    shower_distance = chain.shower_distance < 4
+    track_distance = chain.track_distance < 4
+    proton_score = chain.proton_score > 0.9
+    open_angle = chain.shower_open_angle < 15
     shower_theta = chain.shower_theta < 90
     n_tracks = chain.n_tracks < 3
     shower_pca = chain.shower_pca < 0.985
@@ -141,7 +149,7 @@ def sigmaCalc(h_signal, h_background, sys_err=0):
         [h_signal.GetBinContent(i)**2 /
          (h_background.GetBinContent(i) +
           math.pow(sys_err * h_background.GetBinContent(i), 2))
-         for i in range(1, h_signal.GetNbinsX() - 1)
+         for i in range(1, h_signal.GetNbinsX() + 1)
          if h_background.GetBinContent(i) > 0])
 
     return math.sqrt(chi2)
@@ -267,6 +275,10 @@ shower_pca = array("f", [0])
 track_pca = array("f", [0])
 total_shower_energy = array("f", [0])
 total_track_energy = array("f", [0])
+track_energy = array("f", [0])
+
+shower_hits = array("f", [0])
+track_hits = array("f", [0])
 
 spectators = [
     ("category", category),
@@ -301,8 +313,12 @@ spectators = [
     ("shower_pca", shower_pca),
     ("track_pca", track_pca),
     ("total_track_energy", total_track_energy),
+    ("track_energy", total_track_energy),
     ("numu_score", numu_score),
-    ("total_shower_energy", total_shower_energy)
+    ("total_shower_energy", total_shower_energy),
+    ("shower_hits", shower_hits),
+    ("track_hits", track_hits)
+
 ]
 
 variables = [
@@ -355,7 +371,10 @@ labels = {
     "shower_pca": ";Shower PCA;N. Entries / 0.025",
     "track_pca": ";Track PCA;N. Entries / 0.025",
     "total_shower_energy": ";Total shower E [GeV]; N. Entries / 0.025 GeV",
-    "total_track_energy": ";Total track E [GeV]; N. Entries / 0.025 GeV"
+    "total_track_energy": ";Total track E [GeV]; N. Entries / 0.025 GeV",
+    "shower_hits": ";Shower hits; N. Entries / 1 ",
+    "track_hits": ";Track hits; N. Entries / 1 ",
+    "track_energy": ";Total track E [GeV]; N. Entries / 0.025 GeV",
 
 }
 
@@ -400,6 +419,9 @@ binning = {
     "shower_pca": [50, 0.9, 1],
     "track_pca": [50, 0.9, 1],
     "total_shower_energy": [40, 0, 0.2],
-    "total_track_energy": [40, 0, 0.2]
+    "total_track_energy": [40, 0, 0.2],
+    "shower_hits": [40,0,40],
+    "track_hits": [40,0,40],
+    "track_energy": [40, 0, 0.2]
 
 }

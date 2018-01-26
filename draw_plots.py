@@ -11,6 +11,8 @@ from bdt_common import description, total_pot, sigmaCalc
 
 ROOT.gStyle.SetOptStat(0)
 
+SYS_ERR = 0.1
+
 DRAW_SUBTRACTION = False
 DRAW_EXT = False
 DRAW_LEE = False
@@ -37,11 +39,14 @@ else:
 total_pot *= POST_SCALING
 
 
-def set_axis(histogram):
+def set_axis(histogram, y_max = 0):
     histogram.GetYaxis().SetTitleSize(0.06)
     histogram.GetYaxis().SetTitleOffset(0.8)
-    histogram.SetMinimum(0.1)
-    histogram.SetMaximum(histogram.GetMaximum() * 1.3)
+    histogram.SetMinimum(0.01)
+    if y_max != 0:
+        histogram.SetMaximum(y_max)
+    else:
+        histogram.SetMaximum(histogram.GetMaximum() * 1.3)
 
 
 def fix_binning(histogram, width=0.05):
@@ -76,12 +81,23 @@ def draw_ratio(num, den):
     pad_bottom.cd()
     OBJECTS.append(pad_bottom)
     h_ratio = num.Clone()
+    h_ratio_sys = num.Clone()
+    den_sys = den.Clone()
+    den_sys.SetName("den_sys%i" % i)
+    for k in range(1, den_sys.GetNbinsX() + 1):
+        stat_err = den_sys.GetBinError(k)
+        sys_err = SYS_ERR * den_sys.GetBinContent(k)
+        den_sys.SetBinError(k, math.sqrt(stat_err**2 + sys_err**2))
+
     OBJECTS.append(h_ratio)
+    OBJECTS.append(h_ratio_sys)
 
     h_ratio.SetName("h_ratio%i" % i)
+    h_ratio_sys.SetName("h_ratio_sys%i" % i)
 
     h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
     h_ratio.Divide(den)
+    h_ratio_sys.Divide(den_sys)
 
     h_ratio.GetXaxis().SetLabelFont(42)
     h_ratio.GetXaxis().SetLabelSize(0.13)
@@ -93,7 +109,18 @@ def draw_ratio(num, den):
     h_ratio.GetYaxis().SetLabelSize(0.13)
     h_ratio.GetYaxis().SetTitleSize(0.13)
     h_ratio.GetYaxis().SetTitleOffset(0.36)
-    h_ratio.Draw("ep")
+
+    h_ratio.Draw("hist")
+    h_ratio.SetMarkerSize(0)
+    h_ratio_2 = h_ratio.Clone()
+    h_ratio_2.SetFillStyle(3002)
+    h_ratio_2.SetFillColor(1)
+    h_ratio_2.SetName("h_ratio_2%i" % i)
+    OBJECTS.append(h_ratio_2)
+    h_ratio_2.Draw("e2 same")
+    h_ratio_sys.Draw("e1 same")
+    h_ratio_sys.SetMarkerSize(0)
+
     line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
                       h_ratio.GetXaxis().GetXmax(), 1)
     line.SetLineWidth(2)
@@ -101,8 +128,9 @@ def draw_ratio(num, den):
     line.Draw()
     OBJECTS.append(line)
 
-legends = []
 
+legends = []
+l_errs = []
 samples = ["bnb", "bnbext", "mc", "lee"]
 
 for name, var in VARIABLES:
@@ -119,7 +147,12 @@ for name, var in VARIABLES:
     legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot)
     legend.SetTextFont(43)
     legend.SetNColumns(2)
+    l_err = ROOT.TLegend(0.4713467, 0.5990783, 0.7421203,
+                         0.6935484, "", "brNDC")
+    l_err.SetTextSize(18)
+    l_err.SetTextFont(43)
 
+    l_errs.append(l_err)
     legends.append(legend)
 
 for i, h in enumerate(histograms_mc):
@@ -161,7 +194,8 @@ if DRAW_SUBTRACTION:
                 err2 = h_ext.GetBinError(i)
                 h_bnb.SetBinError(i, math.sqrt(err1**2 + err2**2))
 
-        leg.AddEntry(h_bnb, "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING),  "lep")
+        leg.AddEntry(
+            h_bnb, "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING), "lep")
 
 
 h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
@@ -200,6 +234,7 @@ pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
 pt.Draw()
+
 
 OBJECTS.append(pt)
 c_energy.Update()
@@ -249,22 +284,16 @@ for i in range(len(VARIABLES)):
         h_mc_err_sys = h_mc_err.Clone()
         h_mc_err_sys.SetName("h_mc_err_sys%i" % i)
         for k in range(1, h_mc_err.GetNbinsX() + 1):
-            new_err = h_mc_err.GetBinContent(k)
-            h_mc_err_sys.SetBinError(k, math.sqrt(new_err))
-
-        h_mc_err_stat = h_mc_err_sys.Clone()
-        h_mc_err_stat.SetName("h_mc_err_stat%i" % i)
-        for k in range(1, h_mc_err_stat.GetNbinsX() + 1):
-            sys_err = (0.2 * h_mc_err_sys.GetBinContent(k))**2
-            new_err = h_mc_err_sys.GetBinError(k)**2 + sys_err
-            h_mc_err_stat.SetBinError(k, math.sqrt(new_err))
+            stat_err = h_mc_err.GetBinError(k)
+            sys_err = SYS_ERR * h_mc_err.GetBinContent(k)
+            h_mc_err_sys.SetBinError(k, math.sqrt(stat_err**2 + sys_err**2))
 
         if DRAW_LEE:
             histograms_lee[i].Scale(POST_SCALING)
             if i == RECO_ENERGY:
                 fix_binning(histograms_lee[i])
-                print("Sigma stat", sigmaCalc(histograms_lee[i], h_mc_err_nobinning))
-                print("Sigma 20 sys", sigmaCalc(histograms_lee[i], h_mc_err_nobinning, 0.2))
+                print("Sigma stat", sigmaCalc(
+                    histograms_lee[i], h_mc_err_nobinning))
 
             histograms_mc[i].Add(histograms_lee[i])
 
@@ -274,7 +303,11 @@ for i in range(len(VARIABLES)):
             c.SetTopMargin(0.2274194)
 
         histograms_mc[i].Draw("hist")
-        set_axis(histograms_mc[i])
+
+        if DRAW_DATA:
+            set_axis(histograms_mc[i], histograms_bnb[i].GetMaximum() * 1.35)
+        else:
+            set_axis(histograms_mc[i])
 
         if i == RECO_ENERGY:
             new_max = h_mc_err.GetMaximum() + histograms_lee[i].GetMaximum()
@@ -284,27 +317,28 @@ for i in range(len(VARIABLES)):
         h_mc_err.SetFillColor(1)
         h_mc_err_sys.SetFillStyle(3002)
         h_mc_err_sys.SetFillColor(1)
-        if i == RECO_ENERGY:
-            h_mc_err_sys.Draw("e1 same")
-        else:
-            h_mc_err.Draw("e1 same")
+        l_errs[i].AddEntry(h_mc_err, "Stat. uncertainties", "lf")
+        l_errs[i].AddEntry(h_mc_err_sys, "Stat. #oplus 10% sys. uncertainties", "le")
+        l_errs[i].Draw("same")
+        h_mc_err.Draw("e2 same")
+
+        h_mc_err_sys.Draw("e1 same")
 
         if DRAW_DATA:
             if i == RECO_ENERGY:
                 fix_binning(histograms_bnb[i])
 
-            # histograms_bnb[i].Scale(POST_SCALING)
             p_chi2 = ROOT.TPaveText(0.65, 0.62, 0.86, 0.73, "NDC")
-            p_chi2.AddText("#chi^{2} / ndf = %.2f" % histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
+            p_chi2.AddText("#chi^{2} / ndf = %.2f" %
+                           histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
             histograms_bnb[i].Draw("ep same")
-            p_chi2.Draw("same")
+            # p_chi2.Draw("same")
             p_chi2.SetFillStyle(0)
             p_chi2.SetBorderSize(0)
             OBJECTS.append(p_chi2)
 
         OBJECTS.append(h_mc_err)
         OBJECTS.append(h_mc_err_sys)
-        OBJECTS.append(h_mc_err_stat)
 
         legends[i].Draw("same")
         c.cd()
@@ -313,7 +347,7 @@ for i in range(len(VARIABLES)):
             if i == RECO_ENERGY:
                 print("Data/MC ratio: ",
                       histograms_bnb[i].Integral() / h_mc_err_sys.Integral())
-            draw_ratio(histograms_bnb[i], h_mc_err_sys)
+            draw_ratio(histograms_bnb[i], h_mc_err)
 
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
@@ -363,10 +397,11 @@ ax.Draw()
 c_true.Update()
 
 if DRAW_COSMIC:
-
     legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} events".format(histograms_bnbext[RECO_ENERGY].Integral() * POST_SCALING), "lep")
-    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1], "CORSIKA in-time Monte Carlo: integral normalized", "f")
+    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} events".format(
+        histograms_bnbext[RECO_ENERGY].Integral() * POST_SCALING), "lep")
+    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[
+                           1], "CORSIKA in-time Monte Carlo: integral normalized", "f")
     legend_cosmic.SetNColumns(2)
 
     for i in range(len(VARIABLES)):

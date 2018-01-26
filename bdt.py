@@ -39,8 +39,10 @@ for name, var in variables:
 for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
-sigCut = ROOT.TCut("is_signal > 0.5 && reco_energy > %.2f && reco_energy < %.2f" % (bins[0], bins[-1]))
-bgCut = ROOT.TCut("is_signal <= 0.5 && reco_energy > %.2f && reco_energy < %.2f" % (bins[0], bins[-1]))#" || (is_signal > 0.5 && (reco_energy < 0.2 || reco_energy > 0.6))")
+sigCut = ROOT.TCut(
+    "is_signal > 0.5 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 5  && total_track_energy > 0.02 && total_shower_energy > 0.02" % (bins[0], bins[-1]))
+bgCut = ROOT.TCut("is_signal <= 0.5 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 5 && total_shower_energy > 0.02 && total_track_energy > 0.02" % (
+    bins[0], bins[-1]))  # " || (is_signal > 0.5 && (reco_energy < 0.2 || reco_energy > 0.6))")
 
 
 dataloader.AddSignalTree(t_nue)
