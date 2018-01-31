@@ -44,7 +44,9 @@ def is_active(point):
     return ok_y and ok_x and ok_z
 
 
-nue_cosmic = glob("mc_bnb_mcc86_2/*/Pandora*.root") + glob("mc_nue_mcc86_2/*/*.root")
+# nue_cosmic = glob("mc_bnb_mcc86_2/*/Pandora*.root") + glob("mc_nue_mcc86_2/*/*.root")
+nue_cosmic = glob("mc_nue_mcc86_tune2/*/*.root")
+
 random.shuffle(nue_cosmic)
 # nue_cosmic = glob("softmerge.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")

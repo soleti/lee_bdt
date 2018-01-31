@@ -11,19 +11,12 @@ h_bdt_data = f_bdt_data.Get("h_bdt_bnb")
 f_bdt_mc = ROOT.TFile("plots/h_bdt.root")
 h_bdt_mc = f_bdt_mc.Get("h_bdt")
 
-f_bdt_dataext = ROOT.TFile("plots/h_bdt_bnbext.root")
-h_bdt_dataext = f_bdt_dataext.Get("h_bdt_bnbext")
-
-
-f_bdt_intime = ROOT.TFile("plots/h_bdt_cosmic_mc.root")
-h_bdt_intime = f_bdt_intime.Get("h_bdt_cosmic_mc")
 # for i in range(h_bdt_data.GetNbinsX()):
 #     h_bdt_data.SetBinContent(i,h_bdt_data.GetBinContent(i)-h_bdt_dataext.GetBinContent(i))
 
 # h_bdt_data.Scale(h_bdt_mc.Integral()/h_bdt_data.Integral())
 
-h_bdt_mc.GetHists()[3].SetFillStyle(3001)
-h_bdt_dataext.SetLineColor(1)
+h_bdt_mc.GetHists()[4].SetFillStyle(3001)
 
 legend = ROOT.TLegend(0.09455587, 0.7850208, 0.8923496, 0.9791956, "", "brNDC")
 legend.SetTextSize(16)
@@ -37,11 +30,6 @@ for j in range(h_bdt_mc.GetNhists()):
                         (description[j], h_bdt_mc.GetHists()[j].Integral()),
                         "f")
 
-print(h_bdt_dataext.Integral() / h_bdt_intime.Integral())
-h_bdt_intime.SetFillColor(ROOT.kOrange + 1)
-h_bdt_intime.SetLineColor(ROOT.kBlack)
-
-h_bdt_mc.Add(h_bdt_intime)
 h_mc_err = h_bdt_mc.GetHists()[0].Clone()
 h_mc_err.SetName("h_bdt_mc_err")
 
@@ -50,9 +38,6 @@ for i in range(1, h_bdt_mc.GetNhists()):
 
 h_mc_err.SetFillStyle(3002)
 h_mc_err.SetFillColor(1)
-
-legend.AddEntry(h_bdt_intime, "Cosmic in-time: %.0f events" %
-                h_bdt_intime.Integral(), "f")
 
 legend.AddEntry(h_bdt_data, "Data BNB: %.0f events" %
                 h_bdt_data.Integral(), "lep")
@@ -105,13 +90,18 @@ h_ratio.GetXaxis().SetLabelFont(42)
 h_ratio.GetXaxis().SetLabelSize(0.13)
 h_ratio.GetXaxis().SetTitleSize(0.13)
 h_ratio.GetXaxis().SetTitleOffset(0.91)
-h_ratio.GetYaxis().SetTitle("BNB/(MC+EXT)")
+h_ratio.GetYaxis().SetTitle("Data / MC")
 h_ratio.GetYaxis().SetNdivisions(509)
 h_ratio.GetYaxis().SetLabelFont(42)
 h_ratio.GetYaxis().SetLabelSize(0.13)
 h_ratio.GetYaxis().SetTitleSize(0.13)
 h_ratio.GetYaxis().SetTitleOffset(0.36)
-h_ratio.Draw("ep")
+h_ratio.SetMarkerSize(0)
+h_ratio.Draw("hist")
+h_ratio_clone = h_ratio.Clone()
+h_ratio_clone.Draw("e2 same")
+h_ratio_clone.SetFillStyle(3002)
+h_ratio_clone.SetFillColor(1)
 
 line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
                   h_ratio.GetXaxis().GetXmax(), 1)

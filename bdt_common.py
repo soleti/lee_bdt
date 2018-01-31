@@ -11,7 +11,7 @@ colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#609ec6"), ROOT.TColor.GetColor("#c46d27"),
           ROOT.TColor.GetColor("#ffffff"), ROOT.TColor.GetColor("#e7623d")]
 
-bdt, manual = False, False
+bdt, manual = False, True
 
 # Number to be obtained from Zarko's POT counting tool
 total_data_bnb_pot_mcc83 = 4.903e+19
@@ -29,7 +29,8 @@ def is_fiducial(point):
     ok_z = point[2] > z_start + 10 and point[2] < z_end - 50
     return ok_y and ok_x and ok_z
 
-def fill_histos(tree_name, bdt, manual):
+
+def fill_histos_data(tree_name, bdt, manual):
     f_data = ROOT.TFile("%s_file.root" % tree_name)
     t_data = f_data.Get("%s_tree" % tree_name)
 
@@ -75,24 +76,25 @@ def fill_histos(tree_name, bdt, manual):
     for i in range(t_data.GetEntries()):
         t_data.GetEntry(i)
         BDT_response = reader.EvaluateMVA("BDT method")
-        h_bdt.Fill(BDT_response, t_data.event_weight)
+        if bins[0] < t_data.reco_energy < bins[-1] and t_data.track_hits > 5 and t_data.shower_hits > 5 and t_data.total_shower_energy > 0.02 and t_data.total_track_energy > 0.02:
+            h_bdt.Fill(BDT_response, t_data.event_weight)
 
-        if bdt:
-            apply_bdt = BDT_response > bdt_cut
-        else:
-            apply_bdt = True
+            if bdt:
+                apply_bdt = BDT_response > bdt_cut
+            else:
+                apply_bdt = True
 
-        if manual:
-            apply_manual = manual_cuts(t_data)
-        else:
-            apply_manual = True
+            if manual:
+                apply_manual = manual_cuts(t_data)
+            else:
+                apply_manual = True
 
-        if apply_bdt and apply_manual and bins[0] < t_data.reco_energy < bins[-1] and t_data.track_hits > 5 and t_data.shower_hits > 5 and t_data.total_shower_energy > 0.02 and t_data.total_track_energy > 0.02:
-            passed_events += t_data.event_weight
-            for name, var in variables:
-                histo_dict[name].Fill(var[0], t_data.event_weight)
-            for name, var in spectators:
-                histo_dict[name].Fill(var[0], t_data.event_weight)
+            if apply_bdt and apply_manual:
+                passed_events += t_data.event_weight
+                for name, var in variables:
+                    histo_dict[name].Fill(var[0], t_data.event_weight)
+                for name, var in spectators:
+                    histo_dict[name].Fill(var[0], t_data.event_weight)
 
     f_bdt = ROOT.TFile("plots/h_bdt_%s.root" % tree_name, "RECREATE")
     h_bdt.Write()
@@ -136,11 +138,22 @@ def manual_cuts(chain):
     cuts = [shower_energy, dedx, proton_score, open_angle,
             shower_theta, shower_distance, track_distance]
 
-    # optimized_cuts = [dedx, proton_score, shower_distance, track_distance,
-    #                   shower_open_angle, pt, shower_theta, track_length]
+    dedx = 0.8576 < chain.dedx < 5.907
+    proton_score = 0.1426 < chain.proton_score < 1
+    shower_distance = 0.01 < chain.shower_distance < 4
+    track_distance = 3.0483806859534085e-03 < chain.track_distance < 8.9818492209332348e+00
+    shower_open_angle = 1.1999870880917283e+00 < chain.shower_open_angle < 3.3774471946669600e+01
+    shower_theta = 1.7068450029571980e+00 < chain.shower_theta < 1.7098164676405759e+02
+    track_phi = -1.7474272785368544e+02 < chain.track_phi < 180
+    shower_phi = -180 < chain.shower_phi < 170
+    track_theta = 1.1442699092190036e+01 < chain.track_theta < 1.6352903537803476e+02
+    track_shower_angle = -1 < chain.track_shower_angle < 9.4899730606947252e-01
+
+    optimized_cuts = [dedx, proton_score, shower_distance, track_distance,
+                      shower_open_angle, shower_theta, track_phi, shower_phi, track_theta, track_shower_angle]
 
     passed = len(cuts) == sum(cuts)
-    # passed_optimized = len(optimized_cuts) == sum(optimized_cuts)
+    passed_optimized = len(optimized_cuts) == sum(optimized_cuts)
     return passed
 
 
@@ -230,7 +243,7 @@ y_end = 116.5
 z_start = 0
 z_end = 1036.8
 
-bdt_cut = 0.47
+bdt_cut = 0.524
 track_length = array("f", [0])
 track_theta = array("f", [0])
 track_phi = array("f", [0])
@@ -291,11 +304,7 @@ spectators = [
     ("dedx_hits", dedx_hits),
     ("shower_energy", shower_energy),
     ("reco_energy", reco_energy),
-
     ("pt", pt),
-    ("track_shower_angle", track_shower_angle),
-
-    ("track_theta", track_theta),
     ("track_start_y", track_start_y),
     ("track_end_y", track_end_y),
     ("track_start_x", track_start_x),
@@ -305,20 +314,17 @@ spectators = [
     ("shower_start_y", shower_start_y),
     ("shower_start_x", shower_start_x),
     ("shower_start_z", shower_start_z),
-    ("track_length", track_length),
-    ("track_phi", track_phi),
-    ("shower_phi", shower_phi),
     ("n_tracks", n_tracks),
     ("n_showers", n_showers),
-    ("shower_pca", shower_pca),
-    ("track_pca", track_pca),
     ("total_track_energy", total_track_energy),
     ("track_energy", total_track_energy),
     ("numu_score", numu_score),
     ("total_shower_energy", total_shower_energy),
+    ("shower_phi", shower_phi),
+    ("track_phi", track_phi),
+
     ("shower_hits", shower_hits),
     ("track_hits", track_hits)
-
 ]
 
 variables = [
@@ -328,6 +334,11 @@ variables = [
     ("track_distance", track_distance),
     ("shower_open_angle", shower_open_angle),
     ("shower_theta", shower_theta),
+    ("track_theta", track_theta),
+    ("track_length", track_length),
+    ("track_shower_angle", track_shower_angle),
+    ("shower_pca", shower_pca),
+    ("track_pca", track_pca),
 ]
 
 labels = {
@@ -420,7 +431,7 @@ binning = {
     "track_pca": [50, 0.9, 1],
     "total_shower_energy": [40, 0, 0.2],
     "total_track_energy": [40, 0, 0.2],
-    "shower_hits": [40,0,40],
+    "shower_hits": [40,0,400],
     "track_hits": [40,0,40],
     "track_energy": [40, 0, 0.2]
 
