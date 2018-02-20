@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators, manual, bdt, bins
+from bdt_common import variables, spectators, manual, bdt, bins, SIGNAL_INTERVAL
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -39,11 +39,10 @@ for name, var in variables:
 for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
-sigCut = ROOT.TCut(
-    "is_signal > 0.5 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 5  && shower_energy > 0.02 && total_track_energy > 0.02 " % (bins[0], bins[-1]))
-bgCut = ROOT.TCut("is_signal <= 0.5 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 5 && shower_energy > 0.02 && total_track_energy > 0.02" % (
-    bins[0], bins[-1]))  # " || (is_signal > 0.5 && (reco_energy < 0.2 || reco_energy > 0.6))")
 
+sigCut = ROOT.TCut("category == 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 70 && shower_energy > 0.1 && total_track_energy > 0.02 && dedx < 3.5 && shower_distance < 5 && track_distance < 5" % (0.2, 0.6))
+bgCut = ROOT.TCut("category != 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 70 && shower_energy > 0.1 && total_track_energy > 0.02 && dedx < 3.5 && shower_distance < 5 && track_distance < 5" % (
+    0.2, 0.6))
 
 dataloader.AddSignalTree(t_nue)
 dataloader.AddBackgroundTree(t_nue)
@@ -73,9 +72,9 @@ dataloader.PrepareTrainingAndTestTree(sigCut, bgCut,
 
 method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                                 ":".join([
-                                    "!H:!V:NTrees=50",
-                                    "MinNodeSize=2.5%",
-                                    "MaxDepth=3",
+                                    "!H:!V:NTrees=100",
+                                    "MinNodeSize=5%",
+                                    "MaxDepth=5",
                                     "BoostType=AdaBoost",
                                     "AdaBoostBeta=0.5",
                                     "UseBaggedBoost",
@@ -83,16 +82,10 @@ method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                                     "SeparationType=GiniIndex",
                                     "nCuts=20"]))
 
-method_likelihood = factory.BookMethod(dataloader, ROOT.TMVA.Types.kLikelihood,
-                                       "Likelihood",
-                                       ":".join(["!H:!V",
-                                                 "TransformOutput",
-                                                 "PDFInterpol=Spline2",
-                                                 "NSmoothSig[0]=20",
-                                                 "NSmoothBkg[0]=20",
-                                                 "NSmooth=1",
-                                                 "NAvEvtPerBin=50"]))
-
+# method_svm = factory.BookMethod(dataloader, ROOT.TMVA.Types.kSVM, "SVM",
+#                                 ":".join([
+#                                     "Gamma=0.5",
+#                                     "C=10"]))
 factory.TrainAllMethods()
 factory.TestAllMethods()
 factory.EvaluateAllMethods()

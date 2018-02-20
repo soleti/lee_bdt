@@ -16,7 +16,7 @@ h_bdt_mc = f_bdt_mc.Get("h_bdt")
 
 # h_bdt_data.Scale(h_bdt_mc.Integral()/h_bdt_data.Integral())
 
-h_bdt_mc.GetHists()[4].SetFillStyle(3001)
+h_bdt_mc.GetHists()[5].SetFillStyle(3001)
 
 legend = ROOT.TLegend(0.09455587, 0.7850208, 0.8923496, 0.9791956, "", "brNDC")
 legend.SetTextSize(16)
@@ -26,7 +26,7 @@ legend.SetTextFont(43)
 for j in range(h_bdt_mc.GetNhists()):
     if h_bdt_mc.GetHists()[j].Integral():
         legend.AddEntry(h_bdt_mc.GetHists()[j],
-                        "%s: %.0f events" %
+                        "%s: %.1f events" %
                         (description[j], h_bdt_mc.GetHists()[j].Integral()),
                         "f")
 
@@ -67,7 +67,7 @@ legend.Draw()
 line_bdt = ROOT.TLine(bdt_cut, 0, bdt_cut, h_mc_err.GetMaximum() * 1.6)
 line_bdt.SetLineWidth(2)
 line_bdt.SetLineStyle(2)
-line_bdt.Draw()
+# line_bdt.Draw()
 
 pad_top.SetLogy()
 c_bdt.cd()

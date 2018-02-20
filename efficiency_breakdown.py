@@ -9,6 +9,26 @@ from root_numpy import hist2array
 import numpy as np
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end, bins
 import pickle
+from proton_energy import length2energy
+
+def choose_plane(root_chain):
+    total_hits = [0, 0, 0]
+    shower_hits = [0, 0, 0]
+    track_hits = [0, 0, 0]
+
+    for i_sh in range(root_chain.n_showers):
+        for i_plane in range(len(root_chain.shower_nhits[i_sh])):
+            total_hits[i_plane] += root_chain.shower_nhits[i_sh][i_plane]
+            shower_hits[i_plane] += root_chain.shower_nhits[i_sh][i_plane]
+
+    for i_tr in range(root_chain.n_tracks):
+        for i_plane in range(len(root_chain.track_nhits[i_tr])):
+            total_hits[i_plane] += root_chain.track_nhits[i_tr][i_plane]
+            track_hits[i_plane] += root_chain.track_nhits[i_tr][i_plane]
+
+    product = [t * s for t, s in zip(track_hits, shower_hits)]
+
+    return product.index(max(product))
 
 def is_fiducial(point):
     ok_y = y_start + 20 < point[1] < y_end - 20
@@ -48,7 +68,7 @@ ROOT.gStyle.SetNumberContours(999)
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptFit(0)
 ROOT.gStyle.SetPalette(ROOT.kBird)
-nue_cosmic = glob("mc_nue_dedx/*/Pandora*.root")
+nue_cosmic = glob("mc_nue_1e0p/*.root")
 chain = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -74,7 +94,7 @@ h_matrix = ROOT.TH2F("h_matrix",
                           len(bins) - 1, bins, len(bins) - 1, bins)
 
 h_e_true_reco = ROOT.TH2F("h_e_true_reco", ";E_{k}^{true} [GeV];E_{k}^{reco} [GeV]",
-                          len(bins) - 1, bins, len(bins) - 1, bins)
+                          50, 0, 2, 50, 0, 2)
 
 h_e_true = ROOT.TH1F("h_e_true", "", len(bins) - 1, bins)
 h_e_reco = ROOT.TH1F("h_e_reco", "", len(bins) - 1, bins)
@@ -94,7 +114,7 @@ for i in range(len(bins)-1):
                                        "%s;(E_{corr} - E_{true}) / E_{true};N. Entries / 0.04" % interval,
                                        30, -1, 1))
 
-l_true_reco = [[], [], [], [], [], [], [], [], [], [], [], [], [], []]
+l_true_reco = [[] for i in range(len(bins) - 1)]
 h_true_reco_slices = []
 for i in range(len(l_true_reco)):
     h = ROOT.TH1F("h%i" % i, "", 100, 0, 2)
@@ -102,6 +122,9 @@ for i in range(len(l_true_reco)):
 
 categories = [0, 0, 0, 0, 0, 0, 0, 0]
 categories_passed = [0, 0, 0, 0, 0, 0, 0, 0]
+
+PROTON_THRESHOLD = 0.040
+ELECTRON_THRESHOLD = 0.020
 
 for evt in range(entries):
     chain.GetEntry(evt)
@@ -114,12 +137,12 @@ for evt in range(entries):
     proton_energy = 0
     for i, energy in enumerate(chain.nu_daughters_E):
         if abs(chain.nu_daughters_pdg[i]) == 2212:
-            if energy - 0.938 > 0.000005:
+            if energy - 0.938 > PROTON_THRESHOLD:
                 proton_energy += energy - 0.938
                 p += 1
 
         if abs(chain.nu_daughters_pdg[i]) == 11:
-            if energy > 0.00003:
+            if energy > ELECTRON_THRESHOLD:
                 electron_energy += energy
                 e += 1
 
@@ -142,35 +165,26 @@ for evt in range(entries):
     if eNp and bins[0] < chain.nu_E < bins[-1]:
         if is_fiducial(neutrino_vertex):
             total += 1
-            primary_indexes = []
-            shower_passed = []
-            track_passed = []
-            flash_passed = []
 
-            for i in range(chain.n_primaries):
-                primary_indexes.append(chain.primary_indexes[i])
-                shower_passed.append(chain.shower_passed[i])
-                track_passed.append(chain.track_passed[i])
-                flash_passed.append(chain.flash_passed[i] + 1)
+            if chain.passed and chain.category == 2:
 
-            if chain.passed:
-                candidate_id = primary_indexes.index(chain.chosen_candidate)
-
-                chosen_showers = shower_passed[candidate_id]
-                chosen_tracks = track_passed[candidate_id]
                 tot_energy = electron_energy + proton_energy
+                hit_index = choose_plane(chain)
+                total_shower_energy = sum([chain.shower_energy[i_sh][hit_index] for i_sh in range(chain.n_showers)])
+                total_track_energy_length = sum([length2energy(chain.track_len[i_tr]) for i_tr in range(chain.n_tracks)])
 
-                h_e_true_reco.Fill(tot_energy, chain.E)
+                reco_energy = total_shower_energy + total_track_energy_length
+                h_e_true_reco.Fill(tot_energy, reco_energy)
 
-                if bins[0] < chain.E < bins[-1]:
+                if bins[0] < reco_energy < bins[-1]:
                     h_e_true.Fill(chain.nu_E)
-                    h_matrix.Fill(chain.E, chain.nu_E)
+                    h_matrix.Fill(reco_energy, chain.nu_E)
 
-                h_e_reco.Fill(chain.E)
+                h_e_reco.Fill(reco_energy)
 
                 h_e_nu_kin.Fill(chain.nu_E, tot_energy)
 
-                e_res = ((chain.E - 2.51492e-02) / 6.57431e-01 -
+                e_res = ((reco_energy - (8.49139e-03)) / 7.53310e-01 -
                          tot_energy) / tot_energy
 
                 h_e_res.Fill(e_res)
@@ -179,45 +193,15 @@ for evt in range(entries):
                         if tot_energy > bin:
                             index = i
                     h_e_res_intervals[index].Fill(e_res)
-                    l_true_reco[index].append(chain.E)
-                    h_true_reco_slices[index].Fill(chain.E)
+                    l_true_reco[index].append(reco_energy)
+                    h_true_reco_slices[index].Fill(reco_energy)
 
-                if chosen_showers == e and chosen_tracks == p:
-                    perfect_event += 1
-                elif chosen_showers > 0 or chosen_tracks > 0:
-                    if chosen_showers < e or chosen_tracks < p:
-                        incomplete_event += 1
-                    elif chosen_showers >= e or chosen_tracks >= p:
-                        splitted_event += 1
                 else:
                     wrong_event += 1
             else:
                 find_track = False
                 find_shower = False
-                if 1 in flash_passed:
-                    for i in range(chain.n_primaries):
-                        if track_passed[i] > 0:
-                            find_track = True
-                            if track_passed[i] > 1:
-                                track_ok_shower_mis += 1
-                                break
-                            else:
-                                track_ok_shower_no += 1
-                                break
-                        if shower_passed[i] > 0:
-                            find_shower = True
-                            if shower_passed[i] > 1:
-                                shower_ok_track_mis += 1
-                                break
-                            else:
-                                shower_ok_track_no += 1
-                                break
 
-                    if not find_track and not find_shower:
-                        track_no_shower_no += 1
-
-                else:
-                    flash_not_passed += 1
 
 print(categories, categories_passed)
 print(total, perfect_event, incomplete_event, splitted_event, wrong_event, flash_not_passed)
@@ -244,12 +228,17 @@ e_errs = array("f", ([(bins[i+1]-bins[i])/2 for i in range(len(bins)-1)]))
 
 median_values = array("f")
 median_errs = array("f")
-for i in l_true_reco:
-    if len(i) > 0:
-        median_values.append(statistics.median(i))
-        median_errs.append(statistics.stdev(i) / math.sqrt(len(i)))
+for h in h_true_reco_slices:
+    median_values.append(h.GetMaximumBin() * 0.02 - 0.01)
+    print(h.GetMaximumBin(), h.GetMaximum(), h.GetBinContent(h.GetMaximumBin()))
+    median_errs.append(h.GetRMS())
+print(e_values)
 
+c1 = ROOT.TCanvas("c1")
+h_true_reco_slices[2].Draw()
+c1.Update()
 
+print(median_values)
 g_e_true_reco = ROOT.TGraphErrors(len(median_values),
                                   e_values, median_values, e_errs, median_errs)
 
@@ -298,7 +287,7 @@ f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 2)
 f_line.SetParNames("m", "q")
 l_e_true_reco = ROOT.TLegend(0.099, 0.913, 0.900, 0.968)
 l_e_true_reco.SetNColumns(2)
-l_e_true_reco.AddEntry(g_e_true_reco, "Median values", "lep")
+l_e_true_reco.AddEntry(g_e_true_reco, "Most probable values", "lep")
 g_e_true_reco.Fit(f_line)
 l_e_true_reco.AddEntry(f_line, "E_{k}^{reco} = %.2f E_{k}^{true} + %.2f GeV" %
                        (f_line.GetParameter(0), f_line.GetParameter(1)), "l")
@@ -349,7 +338,8 @@ for i in range(len(bins)-1):
                             h_e_res_intervals[i].GetRMS(),
                             0.18)
 
-    #h_e_res_intervals[i].Fit(f_gausexp, "RQ", "", -0.6, 0.4)
+    h_e_res_intervals[i].Fit(
+        f_gausexp, "RQ", "", h_e_res_intervals[i].GetMean() - h_e_res_intervals[i].GetRMS(), max(h_e_res_intervals[i].GetMean() + h_e_res_intervals[i].GetRMS(), 0.3))
 
     legends.append(ROOT.TLegend(0.58, 0.77, 0.86, 0.85))
     legends[-1].AddEntry(f_gausexp, "#mu = %.2f, #sigma = %.2f, k = %.2f" %
