@@ -11,3 +11,9 @@ __pycache__
 a.py
 *.json
 eff_comparison.py
+data_bnb_1e0p/
+data_ext_1e0p/
+mc_bnb_1e0p/
+mc_bnb_1e0p_tune2/
+mc_nue_1e0p/
+mc_nue_1e0p_tune2/
