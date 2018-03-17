@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators, manual, bdt, bins, SIGNAL_INTERVAL
+from bdt_common import variables, spectators, manual, bdt, bins, SIGNAL_INTERVAL, binning
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -40,9 +40,9 @@ for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
 
-sigCut = ROOT.TCut("category == 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 70 && shower_energy > 0.1 && total_track_energy > 0.02 && dedx < 3.5 && shower_distance < 5 && track_distance < 5" % (0.2, 0.6))
-bgCut = ROOT.TCut("category != 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 70 && shower_energy > 0.1 && total_track_energy > 0.02 && dedx < 3.5 && shower_distance < 5 && track_distance < 5" % (
-    0.2, 0.6))
+sigCut = ROOT.TCut(
+    "category == 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 40 && shower_energy > 0.1 && total_shower_energy > 0.1" % (0, 3))
+bgCut = ROOT.TCut("category != 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 40 && shower_energy > 0.1 && total_shower_energy > 0.1" % (0, 3))
 
 dataloader.AddSignalTree(t_nue)
 dataloader.AddBackgroundTree(t_nue)
@@ -72,7 +72,7 @@ dataloader.PrepareTrainingAndTestTree(sigCut, bgCut,
 
 method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                                 ":".join([
-                                    "!H:!V:NTrees=100",
+                                    "!H:!V:NTrees=600",
                                     "MinNodeSize=5%",
                                     "MaxDepth=5",
                                     "BoostType=AdaBoost",
@@ -82,10 +82,21 @@ method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT",
                                     "SeparationType=GiniIndex",
                                     "nCuts=20"]))
 
-# method_svm = factory.BookMethod(dataloader, ROOT.TMVA.Types.kSVM, "SVM",
-#                                 ":".join([
-#                                     "Gamma=0.5",
-#                                     "C=10"]))
+# method_likelihood2 = factory.BookMethod(dataloader, ROOT.TMVA.Types.kPDERS, "PDERS",
+#                                        ":".join(["V", "H"]))
+
+# method_likelihood = factory.BookMethod(dataloader, ROOT.TMVA.Types.kLikelihood, "Likelihood",
+#                                        ":".join(["V", "H"]))
+
+var_list = [var[0] for var in variables]
+range_min = ["CutRangeMin[%i]=%.2f" % (var_list.index(var), binning[var][1]) for var in var_list]
+range_max = ["CutRangeMax[%i]=%.2f" % (var_list.index(var), binning[var][2]) for var in var_list]
+
+cuts_min = ":".join(range_min)
+cuts_max = ":".join(range_max)
+
+# method_cuts = factory.BookMethod(dataloader, ROOT.TMVA.Types.kCuts, "Cuts")
+
 factory.TrainAllMethods()
 factory.TestAllMethods()
 factory.EvaluateAllMethods()

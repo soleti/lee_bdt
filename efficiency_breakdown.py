@@ -68,7 +68,7 @@ ROOT.gStyle.SetNumberContours(999)
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptFit(0)
 ROOT.gStyle.SetPalette(ROOT.kBird)
-nue_cosmic = glob("mc_nue_1e0p/*.root")
+nue_cosmic = glob("mc_nue_ubxsec/*.root")
 chain = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -178,9 +178,11 @@ for evt in range(entries):
 
                 if bins[0] < reco_energy < bins[-1]:
                     h_e_true.Fill(chain.nu_E)
-                    h_matrix.Fill(reco_energy, chain.nu_E)
+                    # h_matrix.Fill(reco_energy, chain.nu_E)
+                    h_matrix.Fill(chain.nu_E, reco_energy)
 
-                h_e_reco.Fill(reco_energy)
+
+                    h_e_reco.Fill(reco_energy)
 
                 h_e_nu_kin.Fill(chain.nu_E, tot_energy)
 
@@ -259,12 +261,17 @@ matrix.Draw("colz text")
 
 a_e_true = hist2array(h_e_true)
 a_e_reco = hist2array(h_e_reco)
+bins = array("f", [0.200,  0.300,  0.375,  0.475,  0.550,  0.675, 0.800,
+                   0.950,  1.100,   1.300,  1.500,  3.000])
 
+# Bin edges = {200, 250, 300, 350, 400, 450, 500, 600,  800., 1000, 1500, 2000}
+
+# lee signal scaling = {5.015008606  4.755966764  4.240843625  3.494299576  2.596148682  1.715699034  1.051751175  0.8966301403  0.9134166508  1.010169572  1.075023103}
 true_scaling = np.array([5.015008606, 4.755966764, 4.240843625, 3.494299576,
                          2.596148682, 1.715699034, 1.051751175, 1.051751175,
-                         0.896630140, 0.896630140, 0.896630140, 0.896630140,
-                         0.913416650, 0.913416650, 0.913416650, 0.913416650])
+                         1, 1, 1, 1])
 
+print(np.dot(a_e_true_reco, a_e_true), a_e_reco)
 
 print("IS WORKING? ", np.dot(a_e_true_reco, a_e_true) == a_e_reco)
 print("IS WORKING? ", np.dot(a_e_true_reco, a_e_reco) == a_e_true)

@@ -62,7 +62,7 @@ def is_active(point):
     return ok_y and ok_x and ok_z
 
 
-nue_cosmic = glob("mc_nue_1e0p_tune2/*.root")# + glob("mc_bnb_mcc86_2/*/Pandora*.root")
+nue_cosmic = glob("mc_nue_ubxec/*.root")# + glob("mc_bnb_mcc86_2/*/Pandora*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -260,7 +260,12 @@ for i in range(entries):
                     showers_check = False
 
                 efficiency_condition = showers_check and chain_nue.passed and chain_nue.category == 2
-                reco_condition = (protons + electrons) == (chain_nue.nu_matched_showers + chain_nue.nu_matched_tracks)
+                matched_proton_showers = sum(1 for pdg in chain_nue.matched_showers if pdg == 2212)
+                matched_proton_tracks = sum(1 for pdg in chain_nue.matched_tracks if pdg == 2212)
+                proton_condition = matched_proton_showers + matched_proton_tracks >= protons
+                matched_electron_showers = sum(1 for pdg in chain_nue.matched_showers if pdg == 11)
+                electron_condition = matched_electron_showers >= electrons
+                reco_condition = electron_condition and proton_condition
                 ep_energy.Fill(efficiency_condition and reco_condition and chain_nue.distance < 5, fp_energy)
                 ep_dist_energy.Fill(efficiency_condition and chain_nue.distance < 5, fp_energy)
                 e_energy.Fill(efficiency_condition, fp_energy)

@@ -4,7 +4,7 @@ import ROOT
 
 from bdt_common import bdt_cut, binning, labels, variables, spectators, fill_histos_data
 from bdt_common import sigmaCalc, manual_cuts, bdt, manual, bins, colors
-from bdt_common import pre_cuts
+from bdt_common import pre_cuts, rectangular_cut
 
 print("BDT: ", bdt, "Manual: ", manual)
 
@@ -30,12 +30,19 @@ def fill_histos(chain, histo_dict, h_bdts):
 
     reader.BookMVA("BDT method",
                    "dataset/weights/TMVAClassification_BDT.weights.xml")
+    # reader.BookMVA("Likelihood method",
+    #                "dataset/weights/TMVAClassification_Likelihood.weights.xml")
+    # reader.BookMVA("Cuts method",
+    #                 "dataset/weights/TMVAClassification_Cuts.weights.xml")
 
+    correction_factor = 1
     for i in range(chain.GetEntries()):
         chain.GetEntry(i)
         category = int(chain.category)
 
         BDT_response = reader.EvaluateMVA("BDT method")
+        # likelihood_response = reader.EvaluateMVA("Likelihood method")
+        # cuts_response = reader.EvaluateMVA("Cuts method", rectangular_cut)
         if pre_cuts(chain):
             h_bdts[category].Fill(BDT_response, chain.event_weight)
         else:
@@ -56,14 +63,25 @@ def fill_histos(chain, histo_dict, h_bdts):
                 histo_dict[name][category].Fill(var[0], chain.event_weight)
 
             for name, var in spectators:
-                histo_dict[name][category].Fill(var[0], chain.event_weight)
+                if name == "reco_energy":
+                    # histo_dict[name][category].Fill(correction_factor * (0.917*chain.total_track_energy_length + chain.total_shower_energy_y), chain.event_weight)
+                    histo_dict[name][category].Fill(chain.reco_energy, chain.event_weight)
 
+                elif name == "total_shower_energy_y":
+                    histo_dict[name][category].Fill(var[0], chain.event_weight)
+                elif name == "total_track_energy_length":
+                    histo_dict[name][category].Fill(var[0], chain.event_weight)
+                else:
+                    histo_dict[name][category].Fill(var[0], chain.event_weight)
+
+                
             # if chain.category != 2 and 0 < chain.reco_energy < 2:
             #     print("nu_mu",
             #           int(chain.run), int(chain.subrun), int(chain.event),
             #           int(chain.category),
             #           inv_interactions[int(chain.interaction_type)])
 
+print("LEE events", fill_histos_data("lee", bdt, manual))
 
 
 mc_chain = ROOT.TChain("mc_tree")
@@ -106,6 +124,8 @@ for i, n in enumerate(variables_dict.keys()):
 
     stacked_histos.append(h_stack)
     kinds.append(histos)
+
+
 
 histo_dict = dict(zip(variables_dict.keys(), kinds))
 
@@ -157,37 +177,36 @@ for name, var in variables:
 for name, var in spectators:
     t_data.SetBranchAddress(name, var)
 
-variables_dict = dict(variables + spectators)
-histo2D = []
-for i, n in enumerate(variables_dict.keys()):
-    h = ROOT.TH2F("h%s" % n, ";%s;Reco. energy" % n, 
-                  100, binning[n][1], binning[n][2], 100, 0.2, 3,)
-    histo2D.append(h)
+# variables_dict = dict(variables + spectators)
+# histo2D = []
+# for i, n in enumerate(variables_dict.keys()):
+#     h = ROOT.TH2F("h%s" % n, ";%s;Reco. energy" % n, 
+#                   100, binning[n][1], binning[n][2], 1, 0.375, 0.475)
+#     histo2D.append(h)
 
-histo2d_dict = dict(zip(variables_dict.keys(), histo2D))
+# histo2d_dict = dict(zip(variables_dict.keys(), histo2D))
 
-for i in range(t_data.GetEntries()):
-    t_data.GetEntry(i)
-    if pre_cuts(t_data) and manual_cuts(t_data):
-        for name, var in variables:
-            histo2d_dict[name].Fill(
-                var[0], t_data.reco_energy, t_data.event_weight)
-        for name, var in spectators:
-            if spectators != "reco_energy":
-                histo2d_dict[name].Fill(
-                    var[0], t_data.reco_energy, t_data.event_weight)
+# for i in range(t_data.GetEntries()):
+#     t_data.GetEntry(i)
+#     if pre_cuts(t_data) and manual_cuts(t_data):
+#         for name, var in variables:
+#             histo2d_dict[name].Fill(
+#                 var[0], t_data.reco_energy, t_data.event_weight)
+#         for name, var in spectators:
+#             if spectators != "reco_energy":
+#                 histo2d_dict[name].Fill(
+#                     var[0], t_data.reco_energy, t_data.event_weight)
 
-OBJECTS = []
-for h in histo2d_dict:
-    c = ROOT.TCanvas(h)
-    histo2d_dict[h].SetMarkerStyle(20)
+# OBJECTS = []
+# for h in histo2d_dict:
+#     c = ROOT.TCanvas(h)
+#     histo2d_dict[h].SetMarkerStyle(20)
 
-    histo2d_dict[h].Draw()
-    c.Update()
-    OBJECTS.append(c)
+#     histo2d_dict[h].Draw()
+#     c.Update()
+#     OBJECTS.append(c)
 
-fill_histos_data("bnb", bdt, manual)
+print("Data events", fill_histos_data("bnb", bdt, manual))
 
 # fill_histos_data("bnbext", bdt, manual)
-# fill_histos_data("lee", bdt, manual)
 input()
