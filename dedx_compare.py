@@ -20,7 +20,7 @@ for i, c in enumerate(categories):
     h.SetFillColor(colors[i])
     print(h.Integral())
     l_datamc.AddEntry(h, "%s: %.1f %%" % (h.GetTitle(),
-                                          h.Integral() * 100 / 197306.0), "f")
+                                          h.Integral()), "f")
     total += h.Integral()
     h_stack.Add(h)
 print(total)

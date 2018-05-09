@@ -11,6 +11,8 @@ h_bdt_data = f_bdt_data.Get("h_bdt_bnb")
 f_bdt_mc = ROOT.TFile("plots/h_bdt.root")
 h_bdt_mc = f_bdt_mc.Get("h_bdt")
 
+f_bdt_lee = ROOT.TFile("plots/h_bdt_lee.root")
+h_bdt_lee = f_bdt_lee.Get("h_bdt_lee")
 # for i in range(h_bdt_data.GetNbinsX()):
 #     h_bdt_data.SetBinContent(i,h_bdt_data.GetBinContent(i)-h_bdt_dataext.GetBinContent(i))
 
@@ -52,16 +54,17 @@ legend.SetNColumns(2)
 # pad_top.SetTopMargin(0.2411347)
 # pad_top.Draw()
 # pad_top.cd()
-
-h_bdt_mc.Draw("hist")
-h_mc_err.Draw("e2 same")
+h_bdt_mc.Add(h_bdt_lee)
+h_bdt_lee.Draw("hist")
+# h_bdt_mc.Draw("hist")
+# h_mc_err.Draw("e2 same")
 
 h_bdt_data.SetMarkerStyle(20)
 h_bdt_data.SetLineColor(1)
-h_bdt_mc.GetYaxis().SetTitleOffset(0.8)
-h_bdt_mc.GetYaxis().SetTitleSize(0.06)
+# h_bdt_mc.GetYaxis().SetTitleOffset(0.8)
+# h_bdt_mc.GetYaxis().SetTitleSize(0.06)
 
-h_bdt_data.Draw("ep same")
+# h_bdt_data.Draw("ep same")
 legend.Draw()
 
 line_bdt = ROOT.TLine(bdt_cut, 0, bdt_cut, h_mc_err.GetMaximum() * 1.6)

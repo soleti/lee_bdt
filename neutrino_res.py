@@ -2,9 +2,15 @@
 
 import ROOT
 from glob import glob
-from bdt_common import is_fiducial, gauss_exp, printProgressBar
+from bdt_common import is_fiducial, gauss_exp, printProgressBar, choose_shower, bins, pre_cuts, manual_cuts
 from array import array
+from root_numpy import hist2array
 from proton_energy import length2energy
+import math
+import pickle
+import numpy as np
+
+
 ROOT.gStyle.SetOptTitle(1)
 ROOT.gStyle.SetTitleFillColor(ROOT.kWhite)
 ROOT.gStyle.SetOptStat(0)
@@ -14,60 +20,97 @@ ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
 PROTON_MASS = 0.938
 
-nue_cosmic = glob("mc_nue_ubxsec/*.root")
+nue_cosmic = glob("mc_nue_cali/*.root")
 c = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
     c.Add(f)
 
 entries = c.GetEntries()
-n_bins = 10
 h_reco_nu = []
 h_true_nu = []
 
 h_res_nu = []
 h_res_nu_total = ROOT.TH1F("h_res_nu_total",
-                                 ";(#nu_{E_{reco}} - #nu_{E})/#nu_{E}[GeV]; N. Entries / 0.0125",
-                                 80, -0.5, 0.5)
+                           ";(E_{dep} - E_{reco})/E_{dep}[GeV]; N. Entries / 0.0125",
+                           80, -0.5, 0.5)
 
 h_nu_reco_true = ROOT.TH2F("h_nu_reco_true",
-                               ";#nu_{E} [GeV];#nu_{E_{reco}}",
-                               50, 0, 1,
-                               50, 0, 1)
+                           ";E_{#nu} [GeV];E_{corr} [GeV]",
+                           50, 0, 3,
+                           50, 0, 3)
 
-for i in range(n_bins):
+h_reco_spectrum_corr = ROOT.TH1F("h_reco_spectrum_corr", "Reco. energy [GeV]", len(bins) - 1, bins)
+h_true_spectrum_corr = ROOT.TH1F("h_true_spectrum_corr", "True energy [GeV]", len(bins) - 1, bins)
+
+h_shower_proton = ROOT.TH1F("h_shower_proton",";Shower angle [#circ]; N. Entries / 4#circ",45,0,180)
+h_shower_electron = ROOT.TH1F(
+    "h_shower_electron", ";Shower angle [#circ]; N. Entries / 4#circ", 45, 0, 180)
+
+h_shower_proton_dedx = ROOT.TH1F(
+    "h_shower_proton_dedx", ";Shower dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 10)
+h_shower_electron_dedx = ROOT.TH1F(
+    "h_shower_electron_dedx", ";Shower dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 10)
+
+h_shower = ROOT.TH1F("h_shower", ";Angle [#circ]; N. Entries / 4#circ", 45, 0, 180)
+h_shower_dedx = ROOT.TH1F("h_shower_dedx", ";Shower dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 10)
+
+h_track_proton = ROOT.TH1F(
+    "h_track_proton", ";Track angle [#circ]; N. Entries / 4#circ", 45, 0, 180)
+h_track_electron = ROOT.TH1F(
+    "h_track_electron", ";Track angle [#circ]; N. Entries / 4#circ", 45, 0, 180)
+
+h_track_proton_dedx = ROOT.TH1F(
+    "h_track_proton_dedx", ";Track dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 6)
+h_track_electron_dedx = ROOT.TH1F(
+    "h_track_electron_dedx", ";Track dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 6)
+
+h_track = ROOT.TH1F(
+    "h_track", ";Track angle [#circ]; N. Entries / 4#circ", 45, 0, 180)
+h_track_dedx = ROOT.TH1F(
+    "h_track_dedx", ";Track dE/dx [MeV/cm]; N. Entries / 0.25 MeV/cm", 40, 0, 6)
+
+h_angle = ROOT.TH1F("h_angle", "", 180, 0, 180)
+h_angle_proton = ROOT.TH1F("h_angle_proton", "", 180, 0, 180)
+
+for i in range(len(bins) - 1):
     h_reco_nu.append(ROOT.TH1F("h_reco_nu%i" % i,
-                                   "%.2f GeV < #nu_{E} < %.2f GeV;Reco. #nu_{E} [GeV];N. Entries / 0.02 GeV"
-                                   % (0.1 * i , 0.1 * (i + 1)),
-                                   60, 0, 1.2))
+                               "%.2f GeV < E_{dep} < %.2f GeV;E_{reco} [GeV];N. Entries / 0.05 GeV"
+                               % (bins[i] , bins[i + 1]),
+                               60, 0, 3))
     h_true_nu.append(ROOT.TH1F("h_true_nu%i" % i,
-                                   "%.2f GeV < #nu_{E} < %.2f GeV;Reco. #nu_{E_{reco}} [GeV];N. Entries / 0.02 GeV"
-                                   % (0.1 * i, 0.1 * (i + 1)),
-                                   60, 0, 1.2))
+                               "%.2f GeV < E_{dep} < %.2f GeV;E_{reco} [GeV];N. Entries / 0.05 GeV"
+                               % (bins[i], bins[i + 1]),
+                               60, 0, 3))
     h_res_nu.append(ROOT.TH1F("h_res_nu%i" % i,
-                                  "%.2f GeV < #nu_{E} < %.2f GeV;(#nu_{E_{reco}} - #nu_{E})/#nu_{E} [GeV]; N. Entries / 0.05"
-                                  % (0.1 * i, 0.1 * (i + 1)),
-                                  50, -0.8, 0.8))
+                              "%.2f GeV < E_{dep} < %.2f GeV;(E_{reco} - E_{dep})/E_{dep} [GeV]; N. Entries / 0.04"
+                              % (bins[i], bins[i + 1]),
+                              40, -0.8, 0.8))
 
 print("Entries", entries)
 
 PROTON_THRESHOLD = 0.040
 ELECTRON_THRESHOLD = 0.020
 
-OFFSET = 0.8
-BIAS = 0.017
+f_fit = ROOT.TFile("plots/f_fit.root")
+pol = f_fit.Get("f_pol2")
+f_fit.Close()
 
-for i in range(int(entries / 1)):
+p_a = pol.GetParameter(0)
+p_b = pol.GetParameter(1)
+p_c = pol.GetParameter(2)
+
+
+for i in range(int(entries / 5)):
     printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
     c.GetEntry(i)
-    
     p = 0
     e = 0
     photons = 0
     pions = 0
     proton_energy = 0
     n_tracks = 0
-    nu_energy = c.nu_E
+    electron_energy = 0
     for i_pdg, energy in enumerate(c.nu_daughters_E):
 
         p_start = [
@@ -97,41 +140,139 @@ for i in range(int(entries / 1)):
                 break
             if energy > ELECTRON_THRESHOLD:
                 e += 1
+                electron_energy += energy
 
         if c.nu_daughters_pdg[i_pdg] == 22:
             photons += 1
 
-        if c.nu_daughters_pdg[i_pdg] == 111:
+        if c.nu_daughters_pdg[i_pdg] == 111 or abs(c.nu_daughters_pdg[i_pdg]) ==  211:
             pions += 1
 
-    eNp = e == 1 and photons == 0 and pions == 0 and p == 1
+    eNp = e == 1 and photons == 0 and pions == 0 and p >= 1
+    nu_energy = c.nu_E #electron_energy + proton_energy
 
     true_neutrino_vertex = [c.true_vx_sce,
                             c.true_vy_sce,
                             c.true_vz_sce]
 
-    if not c.passed or not eNp or not is_fiducial(true_neutrino_vertex):
+    if not c.passed or not eNp or not is_fiducial(true_neutrino_vertex) or not c.category == 2:
         continue
 
+
+    hit_index = 2
+    track_like_shower_id = -1
+    shower_id = choose_shower(c, hit_index)
+
+    no_tracks = False
+    max_pca = 0
+    min_pca = 1
+    for ish, pca in enumerate(c.shower_pca):
+        if pca > max_pca:
+            max_pca = pca
+            if ish != shower_id:
+                track_like_shower_id = ish
+        if pca < min_pca:
+            min_pca = pca
+
+
+    if c.n_tracks == 0 and c.n_showers > 1:
+        no_tracks = True
+
+
     reco_nu_energy = 0
-    bin = int(nu_energy / (1 / n_bins))
+    corr_energy = 0
+    bin = h_true_spectrum_corr.FindBin(nu_energy) - 1
+
+    vec_shower = ROOT.TVector3(
+        c.shower_dir_x[shower_id],
+        c.shower_dir_y[shower_id],
+        c.shower_dir_z[shower_id])
 
     for i_sh in range(c.n_showers):
-        reco_nu_energy += c.shower_energy[i_sh][2]
+        shower_vertex = [c.shower_start_x[i_sh],
+                        c.shower_start_y[i_sh],
+                        c.shower_start_z[i_sh]]
+
+        v_sh = ROOT.TVector3(
+            c.shower_dir_x[i_sh],
+            c.shower_dir_y[i_sh],
+            c.shower_dir_z[i_sh])
+
+        cos = v_sh.Dot(vec_shower) / (v_sh.Mag() * vec_shower.Mag())
+        shower_angle = math.degrees(math.acos(min(cos, 1)))
+
+        h_shower.Fill(shower_angle)
+        h_shower_dedx.Fill(c.shower_dEdx[i_sh][2])
+        if c.matched_showers[i_sh] == 2212:
+            h_shower_proton_dedx.Fill(c.shower_dEdx[i_sh][2])
+            h_shower_proton.Fill(shower_angle)
+        elif abs(c.matched_showers[i_sh]) == 11:
+            h_shower_electron.Fill(shower_angle)
+            h_shower_electron_dedx.Fill(c.shower_dEdx[i_sh][2])
+
+        if (i_sh != shower_id and shower_angle > 15) or (no_tracks and i_sh == track_like_shower_id):
+            length_e = length2energy(c.shower_length[i_sh])
+            reco_nu_energy += length_e
+            corr_energy += length_e
+        else:
+            reco_nu_energy += c.shower_energy[i_sh][hit_index]
+            corr_energy += c.shower_energy[i_sh][hit_index] / 0.78 + 0.02
 
     for i_tr in range(c.n_tracks):
-        reco_nu_energy += length2energy(c.track_len[i_tr])
 
-    if bin < n_bins and reco_nu_energy:
-        h_reco_nu[bin].Fill(reco_nu_energy)
+        v_tr = ROOT.TVector3(
+            c.track_dir_x[i_tr],
+            c.track_dir_y[i_tr],
+            c.track_dir_z[i_tr])
+
+        cos = v_tr.Dot(vec_shower) / (v_tr.Mag() * vec_shower.Mag())
+        track_angle = math.degrees(math.acos(min(cos, 1)))
+        h_track_dedx.Fill(c.track_dEdx[i_tr][2])
+
+        if c.matched_tracks[i_tr] == 2212:
+            h_track_proton.Fill(track_angle)
+            h_track_proton_dedx.Fill(c.track_dEdx[i_tr][2])
+        elif abs(c.matched_tracks[i_tr]) == 11:
+            h_track_electron.Fill(track_angle)
+            h_track_electron_dedx.Fill(c.track_dEdx[i_tr][2])
+
+        h_track.Fill(track_angle)
+
+        # if 20 < track_angle < 175 or c.track_dEdx[i_tr][2] > 2.3 or c.track_dEdx[i_tr][2] < 0.9:
+        length_e = length2energy(c.track_len[i_tr])
+        reco_nu_energy += length_e
+        corr_energy += length_e 
+        # else:
+        #     reco_nu_energy += c.track_energy_hits[i_tr][hit_index] / 0.69
+        #     corr_energy += c.track_energy_hits[i_tr][hit_index] / 0.69
+    if 0 < reco_nu_energy < 3 and 0 < nu_energy < 3 and c.category == 2:
+        p_c2 = p_c - corr_energy
+        delta = p_b * p_b - 4 * p_a * p_c2
+        corr_energy2 = 0
+
+        if delta > 0:
+            corr_energy2 = (- p_b + math.sqrt(delta)) / (2 * p_a)
+        else:
+            corr_energy2 = corr_energy
+
+        corr_energy2 = corr_energy
+
+        if h_reco_spectrum_corr.FindBin(corr_energy2) == h_true_spectrum_corr.FindBin(nu_energy):
+            h_reco_spectrum_corr.Fill(reco_nu_energy)
+
+        h_true_spectrum_corr.Fill(reco_nu_energy)
+        h_reco_nu[bin].Fill(corr_energy2)
         h_true_nu[bin].Fill(nu_energy)
-        h_nu_reco_true.Fill(nu_energy, reco_nu_energy)
-        h_res_nu[bin].Fill((reco_nu_energy / OFFSET + BIAS - nu_energy) / nu_energy)
-        h_res_nu_total.Fill((reco_nu_energy / OFFSET + BIAS - nu_energy) / nu_energy)
+        h_nu_reco_true.Fill(nu_energy, corr_energy2)
+        h_res_nu[bin].Fill((corr_energy2 - nu_energy) / nu_energy)
+        h_res_nu_total.Fill((corr_energy2 - nu_energy) / nu_energy)
 
 
 if __name__ == "__main__":
-
+    c_angle = ROOT.TCanvas("c_angle")
+    e_angle = ROOT.TEfficiency(h_angle_proton, h_angle)
+    e_angle.Draw("ap")
+    c_angle.Update()
     # ****************************************************
     # Reco vs true plot
     # ****************************************************
@@ -147,19 +288,21 @@ if __name__ == "__main__":
     y_errs_high = array("f", [])
 
     for i, bin in enumerate(h_reco_nu):
-        a_nu_reco_true.append(bin.GetMaximumBin() * 0.02 - 0.01)
+        a_nu_reco_true.append(bin.GetXaxis().GetBinCenter(bin.GetMaximumBin()))
         y_errs_low.append(bin.GetStdDev() / 2)
         y_errs_high.append(bin.GetStdDev() / 2)
-        x_value = h_true_nu[i].FindBin(h_true_nu[i].GetMean()) * 0.02 - 0.01
+        x_value = h_true_nu[i].GetMean()#Xaxis().GetBinCenter(h_true_nu[i].GetMaximumBin())
         a_bins.append(x_value)
-        x_err_h = (i + 1) * 0.1 - x_value
-        x_err_l = x_value - i * 0.1
+        bin_index = h_true_spectrum_corr.FindBin(x_value)
+        x_err_h = h_true_spectrum_corr.GetXaxis().GetBinUpEdge(bin_index) - x_value
+        x_err_l = x_value - h_true_spectrum_corr.GetXaxis().GetBinLowEdge(bin_index)
         x_errs_high.append(x_err_h)
         x_errs_low.append(x_err_l)
 
     g_nu_reco_true = ROOT.TGraphAsymmErrors(
-        10, a_bins, a_nu_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
+        len(bins) - 1, a_bins, a_nu_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
+    h_nu_reco_true.SetMinimum(-0.001)
     h_nu_reco_true.Draw("colz")
     h_nu_reco_true.GetYaxis().SetTitleOffset(1.1)
     h_nu_reco_true.GetXaxis().SetTitleOffset(1.1)
@@ -167,15 +310,20 @@ if __name__ == "__main__":
     g_nu_reco_true.SetMarkerStyle(20)
     g_nu_reco_true.Draw("p same")
 
-    f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 1)
-    f_line.SetParNames("m", "q")
-    f_line.SetParameters(1, 0)
+    f_line = ROOT.TF1("f_pol2", "pol1", 0, 1)
+    f_line.SetParNames("a", "b")
+    f_line.SetParameters(0, 0)
+    f_line.SetParLimits(0, -1, 0)
+    f_line.SetParameters(1, 0.84)
     l_p_true_reco = ROOT.TLegend(0.11, 0.913, 0.900, 0.968)
     l_p_true_reco.SetNColumns(2)
     l_p_true_reco.AddEntry(g_nu_reco_true, "Most probable values", "lep")
     g_nu_reco_true.Fit(f_line)
-    l_p_true_reco.AddEntry(f_line, "#nu_{E_{reco}} = %.2f #nu_{E} + %.2f GeV" %
-                        (f_line.GetParameter(0), f_line.GetParameter(1)), "l")
+    # f_fit = ROOT.TFile("plots/f_fit.root", "RECREATE")
+    # f_line.Write()
+    # f_fit.Close()
+    l_p_true_reco.AddEntry(f_line, "E_{corr} = %.2f E_{#nu} + %.2f" %
+                        (f_line.GetParameter(1), f_line.GetParameter(0)), "l")
     l_p_true_reco.Draw()
     c_nu_reco_true.SetLeftMargin(0.12)
     c_nu_reco_true.SetBottomMargin(0.13)
@@ -190,7 +338,7 @@ if __name__ == "__main__":
     c_nu_energy = ROOT.TCanvas("c_nu_energy", "", 1000, 700)
     c_nu_energy.Divide(5, 2)
 
-    for i in range(n_bins):
+    for i in range(len(bins) - 1):
         c_nu_energy.cd(i + 1)
         h_true_nu[i].Draw()
         h_reco_nu[i].Draw("same")
@@ -221,7 +369,7 @@ if __name__ == "__main__":
     a_res_err_h = array("f", [])
     a_res_err_l = array("f", [])
         
-    for i in range(n_bins):
+    for i in range(len(bins) - 1):
         c_nu_res.cd(i + 1)
 
         h_res_nu[i].Draw()
@@ -243,20 +391,20 @@ if __name__ == "__main__":
 
         if i == 9:
             f_gausexp.SetParLimits(2, 6.49288e-02, 8.09288e-02)
-            h_res_nu[i].Fit(f_gausexp,
-                                    "RQ",
-                                    "",
-                                    -0.35,
-                                    0.16)
+            # h_res_nu[i].Fit(f_gausexp,
+            #                         "RQ",
+            #                         "",
+            #                         -0.35,
+            #                         0.16)
         elif i == 8:
             f_gausexp.SetParLimits(2, 6.69288e-02, 8.09288e-02)
-            h_res_nu[i].Fit(f_gausexp,
-                            "RQ",
-                            "",
-                            -1.6 * h_res_nu[i].GetRMS(),
-                                  1.1 * h_res_nu[i].GetRMS())
+            # h_res_nu[i].Fit(f_gausexp,
+            #                 "RQ",
+            #                 "",
+            #                 -1.6 * h_res_nu[i].GetRMS(),
+            #                       1.1 * h_res_nu[i].GetRMS())
         else:
-            print(h_res_nu[i].GetRMS())
+            print("fit")
             # h_res_nu[i].Fit(f_gausexp,
             #                 "RQ",
             #                 "",
@@ -284,7 +432,7 @@ if __name__ == "__main__":
     x_errs_high.pop(0)
     a_res_err_l.pop(0)
     a_res_err_h.pop(0)
-    g_e_res_e = ROOT.TGraphAsymmErrors(9, a_bins, a_res, x_errs_low, x_errs_high, a_res_err_l, a_res_err_h)
+    g_e_res_e = ROOT.TGraphAsymmErrors(len(bins) - 2, a_bins, a_res, x_errs_low, x_errs_high, a_res_err_l, a_res_err_h)
     g_e_res_e.Draw("ap")
     g_e_res_e.GetYaxis().SetTitle("#sigma [%]")
     g_e_res_e.GetXaxis().SetTitle("#nu_{e} [GeV]")
@@ -317,11 +465,11 @@ if __name__ == "__main__":
     f_gausexp.SetParLimits(1, -0.2, 0.2)
     f_gausexp.SetParLimits(2, 0.01, 0.15)
     f_gausexp.SetParLimits(3, 0, 1)
-    h_res_nu_total.Fit(f_gausexp,
-                           "",
-                           "",
-                           -0.2,
-                           0.3)
+    # h_res_nu_total.Fit(f_gausexp,
+    #                        "",
+    #                        "",
+    #                        -0.2,
+    #                        0.3)
     f_gausexp.Draw("same")
     c_res_total.SetBottomMargin(0.13)
     h_res_nu_total.GetXaxis().SetTitleOffset(1.1)
@@ -329,4 +477,69 @@ if __name__ == "__main__":
 
     c_res_total.Update()
     c_res_total.SaveAs("plots/h_nu_res_total.pdf")
+
+
+    c_eff = ROOT.TCanvas("c_eff")
+    e_energy = ROOT.TEfficiency(h_reco_spectrum_corr, h_true_spectrum_corr)
+    e_energy.SetFillStyle(3002)
+    e_energy.SetFillColor(1)
+    e_energy.Draw("a2")
+    e_energy.Draw("p same")
+    c_eff.Update()
+
+    e_energy.GetPaintedGraph().GetXaxis().SetTitle("Reco. energy [GeV]")
+    e_energy.GetPaintedGraph().GetYaxis().SetTitle("Bin purity")
+    e_energy.GetPaintedGraph().GetYaxis().SetRangeUser(0.001, 1)
+    c_eff.Update()
+
+    c_shower = ROOT.TCanvas("c_shower")
+    h_shower_proton.Divide(h_shower)
+    h_shower_electron.Divide(h_shower)
+
+    h_shower_proton.Draw("hist")
+    h_shower_proton.GetYaxis().SetRangeUser(0.001, 1)
+
+    h_shower_electron.SetLineColor(ROOT.kRed + 1)
+    h_shower_electron.Draw("hist same")
+
+    c_shower.Update()
+
+    c_track = ROOT.TCanvas("c_track")
+    h_track_proton.Divide(h_track)
+    h_track_electron.Divide(h_track)
+
+    h_track_proton.Draw("hist")
+    h_track_proton.GetYaxis().SetRangeUser(0.001,1)
+
+    h_track_electron.SetLineColor(ROOT.kRed + 1)
+    h_track_electron.Draw("hist same")
+
+    c_track.Update()
+
+
+    c_track_dedx = ROOT.TCanvas("c_track_dedx")
+    h_track_proton_dedx.Divide(h_track_dedx)
+    h_track_electron_dedx.Divide(h_track_dedx)
+
+    h_track_proton_dedx.Draw("hist")
+    h_track_proton_dedx.GetYaxis().SetRangeUser(0.001, 1)
+
+    h_track_electron_dedx.SetLineColor(ROOT.kRed + 1)
+    h_track_electron_dedx.Draw("hist same")
+
+    c_track_dedx.Update()
+
+    c_shower_dedx = ROOT.TCanvas("c_shower_dedx")
+    h_shower_proton_dedx.Divide(h_shower_dedx)
+    h_shower_electron_dedx.Divide(h_shower_dedx)
+
+    h_shower_proton_dedx.Draw("hist")
+    h_shower_proton_dedx.GetYaxis().SetRangeUser(0.001, 1)
+        
+    h_shower_electron_dedx.SetLineColor(ROOT.kRed + 1)
+    h_shower_electron_dedx.Draw("hist same")
+
+    c_shower_dedx.Update()
+
+
 input()

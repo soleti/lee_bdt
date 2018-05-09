@@ -3,20 +3,22 @@
 import pickle
 import math
 import numpy as np
+from array import array
 from root_numpy import hist2array
 import ROOT
 
 from bdt_common import variables, spectators, bins, total_data_bnb_pot, FC_histo, upper_limit_FC
-from bdt_common import description, total_pot, sigmaCalc, SIGNAL_INTERVAL, fix_binning
+from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
 
 ROOT.gStyle.SetOptStat(0)
 
 
 SYS_ERR = 0.1
 
+DRAW_POT = False
 DRAW_SUBTRACTION = False
 DRAW_EXT = False
-DRAW_LEE = True
+DRAW_LEE = False
 DRAW_DATA = True
 DRAW_COSMIC = False
 DRAW_SYS = False
@@ -42,7 +44,7 @@ total_pot *= POST_SCALING
 
 def set_axis(histogram, y_max = 0):
     histogram.GetYaxis().SetTitleSize(0.06)
-    histogram.GetYaxis().SetTitleOffset(0.8)
+    histogram.GetYaxis().SetTitleOffset(0.75)
     histogram.SetMinimum(0.01)
     if y_max != 0:
         histogram.SetMaximum(y_max)
@@ -95,17 +97,18 @@ def draw_ratio(num, den):
     h_ratio_sys.Divide(den_sys)
 
     h_ratio.GetXaxis().SetLabelFont(42)
-    h_ratio.GetXaxis().SetLabelSize(0.13)
+    h_ratio.GetXaxis().SetLabelSize(0.1)
     h_ratio.GetXaxis().SetTitleSize(0.13)
     h_ratio.GetXaxis().SetTitleOffset(0.91)
-    h_ratio.GetYaxis().SetTitle("Data / MC")
+    h_ratio.GetYaxis().SetTitle("Data/(MC + EXT)")
     h_ratio.GetYaxis().SetNdivisions(509)
     h_ratio.GetYaxis().SetLabelFont(42)
-    h_ratio.GetYaxis().SetLabelSize(0.13)
+    h_ratio.GetYaxis().SetLabelSize(0.1)
     h_ratio.GetYaxis().SetTitleSize(0.13)
     h_ratio.GetYaxis().SetTitleOffset(0.36)
 
     h_ratio.Draw("hist")
+    # h_ratio.Fit("pol1")
     h_ratio.SetMarkerSize(0)
     h_ratio_2 = h_ratio.Clone()
     h_ratio_2.SetFillStyle(3002)
@@ -158,9 +161,10 @@ for name, var in VARIABLES:
 for i, h in enumerate(histograms_mc):
     for d, histo in zip(description, h.GetHists()):
         if histo.Integral():
+
             n_events = histo.Integral() * POST_SCALING
-            if "CC0" in d: 
-                n_events *= 1.05
+            # if "#pi" in d:
+            #     n_events = 14.5
             legends[i].AddEntry(
                 histo,
                 "{}: {:.1f} events".format(d, n_events), "f")
@@ -174,7 +178,6 @@ for i, h in enumerate(histograms_mc):
         histograms_lee[i].SetLineColor(ROOT.kBlack)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 2)
         histograms_lee[i].SetFillStyle(3002)
-        print(histograms_lee[i].Integral())
         if i != RECO_ENERGY:
             legends[i].AddEntry(histograms_lee[i],
                                 "Low-energy excess: {:.0f} events"
@@ -228,7 +231,7 @@ c_energy = ROOT.TCanvas("c_energy")
 OBJECTS.append(c_energy)
 signal_spectrum = histograms_mc[RECO_ENERGY].GetHists()[0].Clone()
 signal_spectrum_nuecc = histograms_mc[RECO_ENERGY].GetHists()[1].Clone()
-spectrum_stack = ROOT.THStack("spectrum_stack", ";Reco. energy [GeV]; N. Entries / 0.05 GeV")
+spectrum_stack = ROOT.THStack("spectrum_stack", ";E_{corr} [GeV]; N. Entries / 0.05 GeV")
 
 signal_spectrum.Scale(POST_SCALING)
 signal_spectrum_nuecc.Scale(POST_SCALING)
@@ -250,7 +253,7 @@ spectrum_stack.Draw("hist")
 legend_spectrum.Draw()
 
 pt = ROOT.TPaveText(0.098, 0.905, 0.576, 0.989, "ndc")
-pt.AddText("MicroBooNE Preliminary - 4.9e19 POT")
+pt.AddText("MicroBooNE Preliminary %.1e POT" % total_pot)
 f_spectrum = ROOT.TFile("plots/f_spectrum.root", "RECREATE")
 signal_spectrum.Write()
 f_spectrum.Close()
@@ -263,7 +266,18 @@ OBJECTS.append(spectrum_stack)
 OBJECTS.append(pt)
 c_energy.Update()
 
+sigma = array("f", [])
+sigma5 = array("f", [])
+sigma20 = array("f", [])
+sigma_err = array("f", [])
+sigma5_err = array("f", [])
+sigma20_err = array("f", [])
+pots_err = array("f", [])
+pots = array("f", [])
+step = 100
+
 for i in range(len(VARIABLES)):
+# for i in range(RECO_ENERGY, RECO_ENERGY+1):
     if histograms_mc[i].GetHists()[0].Integral() > -10:
 
         c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
@@ -291,6 +305,8 @@ for i in range(len(VARIABLES)):
         h_mc_err_nobinning = h_mc_err.Clone()
         h_mc_err_nobinning.SetName("h_mc_err_nobin%i" % i)
 
+        h_sig = histograms_mc[i].GetHists()[0].Clone()
+
         for j in range(histograms_mc[i].GetNhists()):
             histograms_mc[i].GetHists()[j].Scale(POST_SCALING)
 
@@ -302,17 +318,15 @@ for i in range(len(VARIABLES)):
             h_mc_err.Add(histograms_mc[i].GetHists()[j])
 
         h_bkg = h_mc_err_nobinning.Clone()
-        h_bkg.Add(histograms_mc[i].GetHists()[0], -1)
-        h_bkg.Add(histograms_mc[i].GetHists()[1], -1)
-        h_sig = histograms_bnb[i].Clone()
-        h_sig.Add(h_bkg, -1)
+        h_bkg.Add(h_sig, -1)
+        # h_bkg.Add(histograms_mc[i].GetHists()[1], -1)
+
         # if i == RECO_ENERGY:
         #     print("FC upper limit 5", upper_limit_FC(h_bkg.Integral()) + h_bkg.Integral(), histograms_bnb[i].Integral())
         #     print("FC upper limit 3", upper_limit_FC(h_bkg.Integral(), 0.9973) + h_bkg.Integral(), histograms_bnb[i].Integral())
 
         #     print("sigma no nue", sigmaCalc(h_sig, h_bkg))
             # print("sigma nue", sigmaCalc(histograms_bnb[i], h_mc_err_nobinning))
-
 
         h_mc_err_sys = h_mc_err.Clone()
         h_mc_err_sys.SetName("h_mc_err_sys%i" % i)
@@ -323,33 +337,51 @@ for i in range(len(VARIABLES)):
 
         if i == RECO_ENERGY:
             reco_err = h_mc_err
-            print("Spectrum integral", signal_spectrum_integral)
-            print("Background integral", h_mc_err_nobinning.Integral()-signal_spectrum_integral)
-
-            spectrum_integral = signal_spectrum.Integral(
-                SIGNAL_INTERVAL[0] + 1, SIGNAL_INTERVAL[1] + 1)
-            background_integral = h_mc_err_nobinning.Integral(
-                SIGNAL_INTERVAL[0] + 1, SIGNAL_INTERVAL[1] + 1) - spectrum_integral
-            print("Spectrum integral %.1f-%.1f GeV" %
-                  (bins[SIGNAL_INTERVAL[0]], bins[SIGNAL_INTERVAL[1]]), spectrum_integral)
-            print("Background integral %.1f-%.1f GeV" %
-                  (bins[SIGNAL_INTERVAL[0]], bins[SIGNAL_INTERVAL[1]]), background_integral)
-
+            print(h_sig.Integral(), h_bkg.Integral()+h_sig.Integral())
+            print("Purity", h_sig.Integral()/(h_bkg.Integral() + h_sig.Integral()))
         if DRAW_LEE:
             histograms_lee[i].Scale(POST_SCALING)
             if i == RECO_ENERGY:
-                print("Sigma stat", sigmaCalc(
-                    histograms_lee[i], h_mc_err_nobinning))
-                fix_binning(histograms_lee[i])
+                sig_err = []
+                bkg_err = []
+                sig = hist2array(histograms_lee[i])
+                bkg = hist2array(h_mc_err_nobinning)
 
+
+                for i_bin in range(1,histograms_lee[i].GetNbinsX()+1):
+                    sig_err.append(histograms_lee[i].GetBinError(i_bin))
+                    bkg_err.append(h_mc_err_nobinning.GetBinError(i_bin))
+                
+                sig_err = np.array(sig_err)
+                bkg_err = np.array(bkg_err)
+                if DRAW_POT:
+                    print("Significance: ", sigma_calc_matrix(sig, bkg))
+
+                    for i_pot in range(step):
+                        pot = total_pot + (1.32e21 - total_pot)/step * i_pot
+                        scale = pot/total_pot
+                        pots_err.append(0)
+                        significance = sigma_calc_matrix(sig, bkg, scale)
+                        significance20 = sigma_calc_matrix(sig, bkg, scale, 0.2)
+                        significance5 = sigma_calc_matrix(sig, bkg, scale, 0.05)
+                        sigma.append(significance[0])
+                        sigma_err.append(significance[1])
+                        sigma20.append(significance20[0])
+                        sigma20_err.append(significance[1])
+                        sigma5.append(significance5[0])
+                        sigma5_err.append(significance5[1])
+                        pots.append(pot)
+
+
+                fix_binning(histograms_lee[i])
 
             histograms_mc[i].Add(histograms_lee[i])
 
         if DRAW_DATA:
-            draw_top()
-            # c.SetTopMargin(0.2274194)
-        else:
+            # draw_top()
             c.SetTopMargin(0.2274194)
+        # else:
+        #     c.SetTopMargin(0.2274194)
 
         histograms_mc[i].Draw("hist")
 
@@ -379,12 +411,14 @@ for i in range(len(VARIABLES)):
             h_mc_err_sys.Draw("e1 same")
 
         if DRAW_DATA:
+            p_chi2 = ROOT.TPaveText(0.679, 0.634, 0.872, 0.745, "NDC")
+            p_chi2.AddText("#chi^{2} / n.d.f. = %.2f" %
+                           histograms_bnb[i].Chi2Test(h_mc_err_nobinning, "UW CHI2/NDF"))
+
             if i == RECO_ENERGY:
+                ratio = histograms_bnb[i].Integral() / (h_mc_err_nobinning.Integral())
                 fix_binning(histograms_bnb[i])
 
-            p_chi2 = ROOT.TPaveText(0.65, 0.62, 0.86, 0.73, "NDC")
-            p_chi2.AddText("#chi^{2} / ndf = %.2f" %
-                           histograms_bnb[i].Chi2Test(h_mc_err, "UW CHI2/NDF"))
             if i == RECO_ENERGY:
                 reco_chi2 = p_chi2
             histograms_bnb[i].Draw("ep same")
@@ -399,12 +433,11 @@ for i in range(len(VARIABLES)):
         legends[i].Draw("same")
         c.cd()
 
-        if DRAW_DATA:
+        if DRAW_DATA and h_mc_err_sys.Integral() > 0:
             if i == RECO_ENERGY:
-                ratio = histograms_bnb[i].Integral() / h_mc_err_sys.Integral()
-                print("Data/MC ratio: ", ratio)
+                print("Data/(MC+EXT) ratio: ", ratio)
                       
-            draw_ratio(histograms_bnb[i], h_mc_err)
+            # draw_ratio(histograms_bnb[i], h_mc_err)
 
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
@@ -417,15 +450,13 @@ for i in range(len(VARIABLES)):
 # *******************************
 
 h_true_e = ROOT.THStack(
-    "h_true_e", ";Reco. energy [GeV]; N. Entries / 0.05 GeV")
+    "h_true_e", ";E_{corr} [GeV]; N. Entries / 0.05 GeV")
 
 h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, 0, len(bins) - 1)
 
 for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
         
     h_clone = histograms_mc[RECO_ENERGY].GetHists()[j].Clone()
-    if j == 0:
-        h_clone.Scale(1.06)
     h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, 0, len(bins) - 1)
 
     for i in range(1, h_clone.GetNbinsX() + 1):
@@ -466,11 +497,11 @@ h_true_e.SetMinimum(0.01)
 if DRAW_DATA:
     h_fixed_data.Draw("ep same")
     reco_chi2.Draw()
-    p_datamc = ROOT.TPaveText(0.6132, 0.5747, 0.8596, 0.6863, "NDC")
+    p_datamc = ROOT.TPaveText(0.587, 0.583, 0.872, 0.695, "NDC")
     p_datamc.SetFillStyle(0)
     p_datamc.SetShadowColor(0)
     p_datamc.SetBorderSize(0)
-    p_datamc.AddText("Data / MC = %.2f" % ratio)
+    p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
     p_datamc.Draw()
 legends[RECO_ENERGY].Draw()
 c_fixed.SetTopMargin(0.2274194)
@@ -479,13 +510,141 @@ for i, i_bin in enumerate(bins):
     ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
                    "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
 ax.SetLabelFont(42)
-ax.SetLabelSize(0.05)
+ax.SetLabelSize(0.04)
 ax.Draw()
 c_fixed.Update()
 c_fixed.SaveAs("plots/h_fixed_energy.pdf")
 # *******************************
 # END FIXED BIN WIDTH PLOT
 # *******************************
+
+if DRAW_LEE and DRAW_POT:
+    c_pot = ROOT.TCanvas("c_pot")
+    g_pot = ROOT.TGraphErrors(step, pots, sigma, pots_err, sigma_err)
+    g_pot5 = ROOT.TGraphErrors(step, pots, sigma5, pots_err, sigma_err)
+    g_pot20 = ROOT.TGraphErrors(step, pots, sigma20, pots_err, sigma_err)
+
+    g_pot.Draw("AC4")
+    ROOT.TGaxis().SetMaxDigits(2)
+    run1_label = ROOT.TPaveText(0.4484, 0.00442, 0.5257, 0.067, "NDC")
+    run1_label.AddText("6.6e20")
+    run1_label.SetLineWidth(0)
+    run1_label.SetFillStyle(0)
+    run1_label.Draw()
+    run1_label.SetBorderSize(0)
+    run1_label.SetTextFont(62)
+    run1_line = ROOT.TLine(6.6e20, 0, 6.6e20, 8)
+    run1_line.SetLineWidth(2)
+    run1_line.Draw()
+
+    five_line = ROOT.TLine(total_pot, 5, 1.32e21, 5)
+    three_line = ROOT.TLine(total_pot, 3, 1.32e21, 3)
+    five_line.SetLineWidth(2)
+    three_line.SetLineWidth(2)
+    five_line.Draw()
+    three_line.Draw()
+    three_line.SetLineStyle(7)
+    five_line.SetLineStyle(7)
+
+    g_pot.GetXaxis().SetTitle("POT")
+    g_pot.GetYaxis().SetTitle("Significance [#sigma]")
+    g_pot.GetYaxis().SetRangeUser(0, 8)
+    g_pot.GetXaxis().SetRangeUser(total_pot, 1.32e21)
+
+    g_pot.SetLineColor(ROOT.kOrange + 1)
+    g_pot.SetFillColor(ROOT.kOrange + 1)
+    g_pot.SetFillStyle(3002)
+
+    g_pot.SetLineWidth(2)
+    g_pot5.SetLineColor(ROOT.kRed + 1)
+    g_pot5.SetFillColor(ROOT.kRed + 1)
+    g_pot5.SetFillStyle(3002)
+
+    g_pot5.SetLineWidth(2)
+    g_pot5.Draw("C4 SAME")
+    g_pot20.SetLineColor(ROOT.kGreen + 1)
+    g_pot20.SetFillColor(ROOT.kGreen + 1)
+    g_pot20.SetFillStyle(3002)
+
+    g_pot20.SetLineWidth(2)
+    g_pot20.Draw("C4 SAME")
+    l_pot = ROOT.TLegend(0.55, 0.69, 0.86, 0.86)
+    l_pot.AddEntry(g_pot, "Stat. only", "lf")
+    l_pot.AddEntry(g_pot5, "Stat. only + 5% sys.", "lf")
+    l_pot.AddEntry(g_pot20, "Stat. only + 20% sys", "lf")
+
+    l_pot.Draw()
+    c_pot.Update()
+    c_pot.SaveAs("plots/pots.pdf")
+
+
+DRAW_NORMALIZED = False
+if DRAW_NORMALIZED:
+
+    for i in range(len(VARIABLES)):
+
+        c_norm = ROOT.TCanvas("c%i_norm" % i, "", 900, 44, 700, 645)
+
+
+        h_signal = histograms_mc[i].GetHists()[0].Clone()
+        if h_signal.Integral() <= 0: 
+            continue
+        h_signal.SetLineColor(ROOT.TColor.GetColor("#1e7a2e"))
+        h_signal.SetLineWidth(3)
+        h_signal.SetFillStyle(0)
+        h_signal.Scale(1 / h_signal.Integral())
+
+
+        h_neutrino_bkg = histograms_mc[i].GetHists()[1].Clone()
+        h_neutrino_bkg.Add(histograms_mc[i].GetHists()[2])
+        h_neutrino_bkg.Add(histograms_mc[i].GetHists()[3])
+        h_neutrino_bkg.Add(histograms_mc[i].GetHists()[4])
+        if h_neutrino_bkg.Integral() > 0:
+            h_neutrino_bkg.Scale(1 / h_neutrino_bkg.Integral())
+        h_neutrino_bkg.SetFillStyle(0)
+        h_neutrino_bkg.SetLineWidth(3)
+        h_neutrino_bkg.SetLineColor(ROOT.kBlue + 1)
+
+        h_cosmic_bkg = histograms_mc[i].GetHists()[5].Clone()
+        h_cosmic_bkg.Add(histograms_mc[i].GetHists()[6])
+        h_cosmic_bkg.Add(histograms_mc[i].GetHists()[7])
+        if h_cosmic_bkg.Integral() > 0:
+            h_cosmic_bkg.Scale(1 / h_cosmic_bkg.Integral())
+        h_cosmic_bkg.SetFillStyle(0)
+        h_cosmic_bkg.SetLineWidth(3)
+        h_cosmic_bkg.SetLineColor(ROOT.kRed + 1)
+        h_signal.SetMaximum(max([h_signal.GetMaximum(), h_neutrino_bkg.GetMaximum(), h_cosmic_bkg.GetMaximum()]) * 1.2)
+
+        l_norm = ROOT.TLegend(0.59, 0.75, 0.86, 0.85)
+        l_norm.AddEntry(h_signal, "#nu_{e} CC0#pi-Np", "f")
+        l_norm.AddEntry(h_neutrino_bkg, "Neutrino background", "f")
+        l_norm.AddEntry(h_cosmic_bkg, "Cosmic background", "f")
+
+        h_signal.Draw("hist")
+        h_neutrino_bkg.Draw("hist same")
+        h_cosmic_bkg.Draw("hist same")
+        l_norm.Draw()
+
+        pt = ROOT.TPaveText(0.136, 0.906, 0.501, 0.953, "ndc")
+        pt.AddText("MicroBooNE Preliminary")
+        pt.SetFillColor(0)
+        pt.SetBorderSize(0)
+        pt.SetShadowColor(0)
+        pt.Draw()
+
+        c_norm.SetLeftMargin(0.14)
+        c_norm.SetRightMargin(0.06)
+        c_norm.Update()
+        c_norm.SaveAs("plots/integral/%s_norm.pdf" % histograms_bnb[i].GetName())
+
+        OBJECTS.append(pt)
+        OBJECTS.append(l_norm)
+        OBJECTS.append(c_norm)
+        OBJECTS.append(h_signal)
+        OBJECTS.append(h_neutrino_bkg)
+        OBJECTS.append(h_cosmic_bkg)
+
+
 
 if DRAW_COSMIC:
     legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")

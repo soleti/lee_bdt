@@ -15,7 +15,7 @@ ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
 PROTON_MASS = 0.938
 
-nue_cosmic = glob("mc_nue_ubxsec/*.root")
+nue_cosmic = glob("mc_nue_cali/*.root")
 c = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -57,7 +57,7 @@ ELECTRON_THRESHOLD = 0.020
 OFFSET = 0.96
 single_tracks_events = 0
 more_tracks = 0
-for i in range(int(entries / 1)):
+for i in range(int(entries / 10)):
     printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
     c.GetEntry(i)
     
@@ -155,7 +155,9 @@ if __name__ == "__main__":
         y_errs_low.append(bin.GetStdDev() / 2)
         y_errs_high.append(bin.GetStdDev() / 2)
 
-        x_value = h_true_proton[i].FindBin(h_true_proton[i].GetMean()) * 0.02 - 0.01
+        # x_value = h_true_proton[i].FindBin(h_true_proton[i].GetMean()) * 0.02 - 0.01
+        x_value = h_true_proton[i].GetMaximumBin() * 0.02 - 0.01
+
         a_bins.append(x_value)
         x_err_h = (i + 1) * 0.1 - x_value
         x_err_l = x_value - i * 0.1
@@ -166,6 +168,7 @@ if __name__ == "__main__":
         6, a_bins, a_proton_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
     h_proton_reco_true.Draw("colz")
+    h_proton_reco_true.SetMinimum(-0.001)
     h_proton_reco_true.GetYaxis().SetTitleOffset(1.1)
     g_proton_reco_true.SetMarkerStyle(20)
     g_proton_reco_true.Draw("p same")
@@ -175,11 +178,12 @@ if __name__ == "__main__":
     f_line.SetParameters(1, 0)
     l_p_true_reco = ROOT.TLegend(0.11, 0.913, 0.900, 0.968)
     l_p_true_reco.SetNColumns(2)
-    l_p_true_reco.AddEntry(g_proton_reco_true, "Most probable values", "lep")
-    g_proton_reco_true.Fit(f_line)
+    l_p_true_reco.AddEntry(g_proton_reco_true, "Most probable value", "lep")
+    g_proton_reco_true.Fit(f_line, "R", "0", 0, 0.5)
     l_p_true_reco.AddEntry(f_line, "E_{k}^{reco} = %.2f E_{k}^{true} + %.2f GeV" %
-                        (f_line.GetParameter(0), f_line.GetParameter(1)), "l")
+                        (0.99, 0), "l")
     l_p_true_reco.Draw()
+    f_line.Draw("same")
     c_proton_reco_true.SetLeftMargin(0.12)
     c_proton_reco_true.SetBottomMargin(0.13)
 

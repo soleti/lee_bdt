@@ -55,7 +55,7 @@ ELECTRON_THRESHOLD = 0.020
 OFFSET = 0.8
 BIAS = 0.017
 
-for i in range(int(entries / 5)):
+for i in range(int(entries / 10)):
     printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
     c.GetEntry(i)
     
@@ -106,6 +106,8 @@ for i in range(int(entries / 5)):
         h_electron_reco_true.Fill(electron_energy, reco_electron_energy)
         h_res_electron[bin].Fill((reco_electron_energy / OFFSET + BIAS - electron_energy) / electron_energy)
         h_res_electron_total.Fill((reco_electron_energy / OFFSET + BIAS - electron_energy) / electron_energy)
+
+
 if __name__ == "__main__":
 
     # ****************************************************
@@ -123,7 +125,8 @@ if __name__ == "__main__":
     y_errs_high = array("f", [])
 
     for i, bin in enumerate(h_reco_electron):
-        a_electron_reco_true.append(bin.GetMean())
+        # bin.GetMaximumBin() * 0.02 - 0.01
+        a_electron_reco_true.append(bin.GetMaximumBin() * 0.02 - 0.01)
         y_errs_low.append(bin.GetStdDev() / 2)
         y_errs_high.append(bin.GetStdDev() / 2)
         x_value = h_true_electron[i].FindBin(h_true_electron[i].GetMean()) * 0.02 - 0.01
@@ -137,6 +140,7 @@ if __name__ == "__main__":
         10, a_bins, a_electron_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
     h_electron_reco_true.Draw("colz")
+    h_electron_reco_true.SetMinimum(-0.001)
     h_electron_reco_true.GetYaxis().SetTitleOffset(1.1)
     h_electron_reco_true.GetXaxis().SetTitleOffset(1.1)
         

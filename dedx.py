@@ -105,13 +105,13 @@ h_p_dedx = ROOT.TH2F("h_dedx_p", ";p [GeV/c];dE/dx [MeV/cm]",
                      50, 0, 2, 100, 1, 8)
 
 h_dedx_energy = ROOT.TH2F("h_dedx_energy", ";dE/dx [MeV/cm];E_{shower} [GeV]",
-                          50, 0, 6, 50, 0, 0.2)
+                          50, 0, 6, 50, 0, 1)
 
 h_dedx_vertex = ROOT.TH2F("h_dedx_vertex", ";dE/dx [MeV/cm];Distance [cm]",
                           50, 0, 6, 50, 0, 2)
 
 h_dedx_nhits = ROOT.TH2F("h_dedx_nhits", ";dE/dx [MeV/cm];N. hits",
-                          50, 0, 6, 14, 2, 16)
+                          50, 0, 6, 6, 10, 16)
 
 h_energy_shower = ROOT.TH1F("h_energy_shower",";E_{reco}-E_{true};N. Entries / 0.04 GeV", 50, -1, 1)
 
@@ -121,21 +121,21 @@ else:
     sample = "mc"
 
 weight = 1
+scaling = 10
 
 if sample == "mc":
     print("Monte Carlo")
-    weigth = 1.37
-    files = glob("not_slimmed/*/Pandora*.root")
-
-    # files = glob("mc_bnb_dedx/mc_bnb_dedx2/*/Pandora*.root")
+    weight = 0.022849704990805283 * scaling
+    # files = glob("not_slimmed/*/Pandora*.root")
+    files = glob("mc_bnb_ubxsec2/*/*.root")
 elif sample == "databnb":
     print("Data BNB")
-    weight = 13.87
-    files = glob("data_bnb_dedx/*/Pandora*.root")
+    weight = 1 * scaling
+    files = glob("data_bnb_ubxsec2/*/*.root")
 elif sample == "dataext":
     print("Data EXT")
-    weight = 13.87*1.299
-    files = glob("data_ext_dedx/*/Pandora*.root")
+    weight = 0.1383435698 * scaling
+    files = glob("data_ext_ubxsec2/*/*.root")
 
 chain = ROOT.TChain("robertoana/pandoratree")
 
@@ -143,7 +143,7 @@ for f in files:
     chain.Add(f)
 
 
-entries = chain.GetEntries()
+entries = int(chain.GetEntries() / scaling)
 print(entries)
 for i in range(entries):
     chain.GetEntry(i)
@@ -170,23 +170,11 @@ for i in range(entries):
     for ish in range(chain.n_showers):
         pdg = chain.matched_showers[ish]
         dedx = chain.shower_dEdx[ish][2]
-        most_proton_track = -1
-        for itrk in range(chain.n_tracks):
-            if chain.predict_p[itrk] > most_proton_track:
-                most_proton_track = chain.predict_p[itrk]
-                track_id = itrk
+
+        if len(chain.shower_dEdx_hits[ish]) < 10 or chain.shower_energy[ish][2] < 0.01:
+            continue
 
         shower_id = choose_shower(chain)
-
-        track_vertex = [
-            chain.track_start_x[track_id],
-            chain.track_start_y[track_id],
-            chain.track_start_z[track_id]]
-
-        track_end = [
-            chain.track_end_x[track_id],
-            chain.track_end_y[track_id],
-            chain.track_end_z[track_id]]
 
         shower_vertex = [
             chain.shower_start_x[shower_id],
@@ -198,11 +186,6 @@ for i in range(entries):
         shower_vertex_d = math.sqrt(
             sum([(s - n)**2
                  for s, n in zip(shower_vertex, neutrino_vertex)]))
-        track_vertex_d = math.sqrt(
-            sum([(t - n)**2
-                 for t, n in zip(track_vertex, neutrino_vertex)]))
-        track_end_d = math.sqrt(
-            sum([(t - n)**2 for t, n in zip(track_end, neutrino_vertex)]))
 
         if sample == "mc":
             neutrino_vertex = [chain.vx, chain.vy, chain.vz]
@@ -215,58 +198,59 @@ for i in range(entries):
                                                   true_neutrino_vertex)]))
 
             if dedx > 0:
-                h_dedx_energy.Fill(dedx, chain.shower_energy[shower_id], weight)
-                h_dedx_vertex.Fill(dedx, dist)
-                h_dedx_nhits.Fill(dedx, len(chain.dEdx_hits[ish]))
+                if abs(pdg) == 22:
+                    h_dedx_energy.Fill(dedx, chain.shower_energy[shower_id][2], weight)
+                    h_dedx_vertex.Fill(dedx, dist)
+                    h_dedx_nhits.Fill(dedx, len(chain.shower_dEdx_hits[ish]))
 
             if abs(pdg) == 22:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_photon.Fill(hit_dedx, weight)
                 h_dedx_photon.Fill(dedx, weight)
 
             elif abs(pdg) == 11:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_electron.Fill(hit_dedx, weight)
                 h_dedx_electron.Fill(dedx, weight)
 
             elif abs(pdg) == 13:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_muon.Fill(hit_dedx, weight)
                 h_dedx_muon.Fill(dedx, weight)
 
             elif abs(pdg) == 2112 or abs(pdg) == 2212:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_hadron.Fill(hit_dedx, weight)
                 h_dedx_hadron.Fill(dedx, weight)
 
             elif abs(pdg) == 211 or abs(pdg) == 111:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_pion.Fill(hit_dedx, weight)
                 h_dedx_pion.Fill(dedx, weight)
 
             else:
-                for ihit in range(len(chain.dEdx_hits[ish])):
+                for ihit in range(len(chain.shower_dEdx_hits[ish])):
                     if ihit > 0:
-                        hit_dedx = chain.dEdx_hits[ish][ihit]
+                        hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                         h_dedx_hits_other.Fill(hit_dedx, weight)
                 h_dedx_other.Fill(dedx, weight)
 
 
 
         else:
-            for ihit in range(len(chain.dEdx_hits[ish])):
+            for ihit in range(len(chain.shower_dEdx_hits[ish])):
                 if ihit > 0:
-                    hit_dedx = chain.dEdx_hits[ish][ihit]
+                    hit_dedx = chain.shower_dEdx_hits[ish][ihit]
                     h_dedx_hits_data.Fill(hit_dedx, weight)
 
         h_dedx_data.Fill(dedx, weight)
@@ -280,11 +264,13 @@ if sample == "mc":
     hs = ROOT.THStack("hs", ";dE/dx [MeV/cm];a.u.")
     h_dedx_photon.Scale(1 / h_dedx_photon.Integral())
     h_dedx_electron.Scale(1 / h_dedx_electron.Integral())
-    l_dedx = ROOT.TLegend(0.37, 0.65, 0.84, 0.85)
+    l_dedx = ROOT.TLegend(0.65, 0.74, 0.85, 0.84)
     l_dedx.AddEntry(h_dedx_photon, "Photon", "f")
     l_dedx.AddEntry(h_dedx_electron, "Electron", "f")
-    h_dedx_photon.SetLineColor(ROOT.kRed + 1)
-    h_dedx_electron.SetLineColor(ROOT.kBlue + 1)
+    h_dedx_photon.SetLineColor(ROOT.kRed - 4)
+    h_dedx_photon.SetLineWidth(3)
+    h_dedx_electron.SetLineWidth(3)
+    h_dedx_electron.SetLineColor(ROOT.kAzure + 1)
     hs.Add(h_dedx_electron)
     hs.Add(h_dedx_photon)
     hs.Draw("hist nostack")
@@ -293,8 +279,10 @@ if sample == "mc":
 
     c_dedx_hits = ROOT.TCanvas("c_dedx_hits")
     h_dedx_hits_electron.SetLineColor(ROOT.kBlack)
+    h_dedx_hits_electron.SetLineWidth(3)
+
     h_dedx_hits_electron.Draw("ep")
-    h_dedx_hits_electron.SetFillColor(ROOT.kAzure + 1)
+    h_dedx_hits_electron.SetLineColor(ROOT.kAzure + 1)
 
     f_dedx_hits_electron = ROOT.TFile("f_dedx_hits_electron.root", "RECREATE")
     h_dedx_hits_electron.Write()
@@ -302,7 +290,8 @@ if sample == "mc":
 
     h_dedx_hits_photon.SetLineColor(ROOT.kBlack)
     h_dedx_hits_photon.Draw("ep same")
-    h_dedx_hits_photon.SetFillColor(ROOT.kRed - 4)
+    h_dedx_hits_photon.SetLineWidth(3)
+    h_dedx_hits_photon.SetLineColor(ROOT.kRed - 4)
     f_dedx_hits_photon = ROOT.TFile("f_dedx_hits_photon.root", "RECREATE")
     h_dedx_hits_photon.Write()
     f_dedx_hits_photon.Close()
@@ -336,12 +325,15 @@ if sample == "mc":
     f_dedx_hits_hadron.Close()
 
 
-    h_dedx_stack = ROOT.THStack("h_dedx_stack", ";dE/dx [MeV/cm];a.u.")
+    h_dedx_stack = ROOT.THStack("h_dedx_stack", ";Hits dE/dx [MeV/cm];a.u.")
+    h_dedx_hits_electron.Scale(1. / h_dedx_hits_electron.Integral())
+    h_dedx_hits_photon.Scale(1. / h_dedx_hits_photon.Integral())
+
     h_dedx_stack.Add(h_dedx_hits_electron)
-    h_dedx_stack.Add(h_dedx_hits_muon)
-    h_dedx_stack.Add(h_dedx_hits_hadron)
+    # h_dedx_stack.Add(h_dedx_hits_muon)
+    # h_dedx_stack.Add(h_dedx_hits_hadron)
     h_dedx_stack.Add(h_dedx_hits_photon)
-    h_dedx_stack.Add(h_dedx_hits_pion)
+    # h_dedx_stack.Add(h_dedx_hits_pion)
 
 
     legend = ROOT.TLegend(0.53,0.48,0.84,0.85)
@@ -377,13 +369,14 @@ if sample == "mc":
     l_langau.AddEntry(f_langau, "Gaussian #sigma = %.2f MeV/cm"
                       % f_langau.GetParameter(3), "")
     l_langau.Draw()
-    h_dedx_stack.Draw("hist")
-    legend.Draw()
+    h_dedx_stack.Draw("hist nostack")
+    l_dedx.Draw()
 
     c_dedx_hits.Update()
 
     c_dedx_energy = ROOT.TCanvas("c_dedx_energy")
     h_dedx_energy.Draw("colz")
+    h_dedx_energy.GetZaxis().SetRangeUser(-0.001, h_dedx_energy.GetMaximum())
     c_dedx_energy.Update()
 
     c_dedx_vertex = ROOT.TCanvas("c_dedx_vertex")
@@ -392,6 +385,7 @@ if sample == "mc":
 
     c_dedx_nhits = ROOT.TCanvas("c_dedx_nhits")
     h_dedx_nhits.Draw("colz")
+    h_dedx_nhits.GetZaxis().SetRangeUser(-0.001, h_dedx_nhits.GetMaximum())
     c_dedx_nhits.Update()
 
     c_energy = ROOT.TCanvas("c_energy")

@@ -4,7 +4,7 @@ import math
 import ROOT
 
 from glob import glob
-from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end, printProgressBar, bins
 from array import array
 from proton_energy import length2energy
 
@@ -12,6 +12,9 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptFit(0)
 ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
+
+scaling = 1
+pot_weight = 0.0009201 * scaling
 
 colors = [ROOT.TColor.GetColor("#e7623d"), ROOT.TColor.GetColor("#c46d27"),
           ROOT.TColor.GetColor("#62b570"), ROOT.TColor.GetColor("#8779b1"),
@@ -62,7 +65,8 @@ def is_active(point):
     return ok_y and ok_x and ok_z
 
 
-nue_cosmic = glob("mc_nue_ubxec/*.root")# + glob("mc_bnb_mcc86_2/*/Pandora*.root")
+# glob("mc_nue_ubxsec/*.root")
+nue_cosmic = glob("mc_nue_cali/*.root") #glob("mc_bnb_ubxsec3/*/*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -93,7 +97,7 @@ h_dedx_photon = ROOT.TH1F("h_dedx_photon",
 
 p_energy = ROOT.TEfficiency("p_energy",
                             ";#nu_{e} energy [GeV];Purity",
-                            20, 0, 2)
+                            20, 0, 0.2)
 p_dist_energy = ROOT.TEfficiency("p_dist_energy",
                                  ";#nu_{e} energy [GeV];Purity",
                                  20, 0, 2)
@@ -108,10 +112,10 @@ for i in range(30):
     e_binned.append(ROOT.TEfficiency("e_energy%i" % i, ";#nu_{e} energy [GeV];Efficiency", 20, 0, 2))
 
 
-h_dist = ROOT.TH1F("h_dist", ";Distance [cm];N. Entries / 0.2 cm", 50, 0, 10)
+h_dist = ROOT.TH1F("h_dist", ";Distance [cm];N. Entries / 0.3 cm", 20, 0, 6)
 h_dist_nosce = ROOT.TH1F("h_dist_nosce",
-                         ";Distance [cm];N. Entries / 0.2 cm",
-                         50, 0, 10)
+                         ";Distance [cm];N. Entries / 0.3 cm",
+                         20, 0, 6)
 
 h_x_diff = ROOT.TH1F("h_x_diff",
                      ";#Delta x [cm]; N. Entries / 0.2 cm", 50, -5, 5)
@@ -120,6 +124,9 @@ h_y_diff = ROOT.TH1F("h_y_diff",
 h_z_diff = ROOT.TH1F("h_z_diff",
                      ";#Delta z [cm]; N. Entries / 0.2 cm", 50, -5, 5)
 
+h_energy_binned = ROOT.TH1F("h_energy_binned", ";E_{#nu_{e}}; N. Entries / 0.05 GeV", len(bins) - 1, bins)
+h_energy_binned_passed = ROOT.TH1F(
+    "h_energy_binned_passed", ";E_{#nu_{e}}; N. Entries / 0.05 GeV", len(bins) - 1, bins)
 
 h_energy = ROOT.TH1F("h_energy",";Reco. energy [GeV]; N. Entries / 0.05 GeV", 20, 0, 10)
 h_energy_passed = ROOT.TH1F(
@@ -128,13 +135,13 @@ h_energy_passed = ROOT.TH1F(
 eNp_events = 0
 
 h_total_electron = ROOT.TH1F(
-    "h_total_electron", ";E_{e} [GeV];Efficiency", 20, 0, 0.2)
+    "h_total_electron", ";E_{e} [GeV];Efficiency", 10, 0, 0.2)
 h_passed_electron = ROOT.TH1F(
-    "h_passed_electron", ";E_{e} [GeV];Efficiency", 20, 0, 0.2)
+    "h_passed_electron", ";E_{e} [GeV];Efficiency", 10, 0, 0.2)
 h_total_proton = ROOT.TH1F(
-    "h_total_proton", ";E_{p} [GeV];Efficiency", 20, 0, 0.2)
+    "h_total_proton", ";E_{p} [GeV];Efficiency", 20, 0, 2)
 h_passed_proton = ROOT.TH1F(
-    "h_passed_proton", ";E_{p} [GeV];Efficiency", 20, 0, 0.2)
+    "h_passed_proton", ";E_{p} [GeV];Efficiency", 20, 0, 2)
 h_total_2d = ROOT.TH2F(
     "h_total_2d", ";E_{p} [GeV];E_{e} [GeV]", 40, 0, 1, 40, 0, 1)
 h_passed_2d = ROOT.TH2F(
@@ -165,7 +172,7 @@ for i, d in enumerate(description):
     efficiency = ROOT.TEfficiency("e_%i" % i, ";#nu_{e} energy [GeV];Efficiency", 20, 0, 1)
     efficiencies.append(efficiency)
 
-PROTON_THRESHOLD = 0.040
+PROTON_THRESHOLD = 0#0.040
 ELECTRON_THRESHOLD = 0.020
 
 passed = 0
@@ -174,11 +181,20 @@ flash_passed = 0
 reco_ok = 0
 vertex_ok = 0
 noflash = 0
-entries = chain_nue.GetEntries()
+entries = int(chain_nue.GetEntries() / scaling)
 cc_events = 0
 fiducial = 0
+dirt = 0
+intrinsic_numu = 0
+intrinsic_NC = 0
+nue_cc0pi_np = 0
+nue_cc = 0
+
+bnb_weight = 0.02065927860647806
+nue_weight = 0.00092006977025022
 
 for i in range(entries):
+    printProgressBar(i, entries, prefix="Progress:", suffix="Complete", length=20)
     chain_nue.GetEntry(i)
     protons = 0
     electrons = 0
@@ -186,8 +202,7 @@ for i in range(entries):
     pions = 0
     electron_energy = 0
     proton_energy = 0
-    if i % 100 == 0:
-        print(i)
+
     for i, energy in enumerate(chain_nue.nu_daughters_E):
         if chain_nue.nu_daughters_pdg[i] == 2212:
             proton_energy += energy - 0.938
@@ -203,23 +218,37 @@ for i in range(entries):
             # if energy > 0.035:
             photons += 1
 
-        if chain_nue.nu_daughters_pdg[i] == 111:
+        if chain_nue.nu_daughters_pdg[i] == 111 or chain_nue.nu_daughters_pdg[i] == 211:
             # if energy > 0.06:
             pions += 1
 
-    eNp = electrons == 1 and photons == 0 and pions == 0 and protons >= 1
+    eNp = electrons == 1 and pions == 0 and protons >= 1
 
     true_neutrino_vertex = [chain_nue.true_vx_sce,
                             chain_nue.true_vy_sce,
                             chain_nue.true_vz_sce]
-
+    true_neutrino_vertex_nosce = [chain_nue.true_vx,
+                                    chain_nue.true_vy,
+                                    chain_nue.true_vz]
     if chain_nue.category != 4:
         cc_events += chain_nue.bnbweight
 
     # if not eNp: print(electrons, photons, protons, pions)
 
+
     if 0 < chain_nue.nu_E < 100:
         eNp_events += chain_nue.bnbweight
+
+        if not is_fiducial(true_neutrino_vertex_nosce) and chain_nue.category != 0 and chain_nue.category != 6 and chain_nue.category != 1 and chain_nue.category != 7:
+            dirt += bnb_weight
+        elif chain_nue.nu_pdg == 14 and chain_nue.ccnc == 0 and is_fiducial(true_neutrino_vertex_nosce):
+            intrinsic_numu += bnb_weight
+        elif chain_nue.ccnc == 1 and is_fiducial(true_neutrino_vertex_nosce):
+            intrinsic_NC += bnb_weight
+        elif chain_nue.nu_pdg == 12 and eNp and is_fiducial(true_neutrino_vertex_nosce):
+            nue_cc0pi_np += nue_weight * chain_nue.bnbweight
+        elif chain_nue.nu_pdg == 12 and not eNp and is_fiducial(true_neutrino_vertex_nosce):
+            nue_cc += nue_weight * chain_nue.bnbweight
 
         if is_fiducial(true_neutrino_vertex):
 
@@ -236,14 +265,6 @@ for i in range(entries):
 
             neutrino_vertex = [chain_nue.vx, chain_nue.vy, chain_nue.vz]
 
-            true_neutrino_vertex = [chain_nue.true_vx_sce,
-                                    chain_nue.true_vy_sce,
-                                    chain_nue.true_vz_sce]
-
-            true_neutrino_vertex_nosce = [chain_nue.true_vx,
-                                          chain_nue.true_vy,
-                                          chain_nue.true_vz]
-
             electron_energies = [chain_nue.nu_daughters_E[i] - 0.51e-3
                                  for i, pdg in
                                  enumerate(chain_nue.nu_daughters_pdg)
@@ -254,7 +275,7 @@ for i in range(entries):
                                enumerate(chain_nue.nu_daughters_pdg)
                                if pdg == 2212]
 
-            if eNp and chain_nue.category != 4:
+            if eNp and chain_nue.ccnc == 0:
                 showers_check = True
                 if chain_nue.n_tracks == 0 and chain_nue.n_showers == 1:
                     showers_check = False
@@ -272,9 +293,13 @@ for i in range(entries):
                 e_binned[min(int(chain_nue.bnbweight * 10), 29)].Fill(efficiency_condition, fp_energy)
 
                 h_energy.Fill(chain_nue.nu_E, chain_nue.bnbweight)
+                h_energy_binned.Fill(chain_nue.nu_E, chain_nue.bnbweight)
                 h_total_2d.Fill(sum(proton_energies), sum(electron_energies))
                 fiducial +=  chain_nue.bnbweight
+                h_total_electron.Fill(sum(electron_energies))
+                h_total_proton.Fill(sum(proton_energies))
                 if efficiency_condition:
+                    h_energy_binned_passed.Fill(chain_nue.nu_E, chain_nue.bnbweight)
                     passed += chain_nue.bnbweight
 
                     if chain_nue.distance < 5:
@@ -285,22 +310,28 @@ for i in range(entries):
                     hit_index = choose_plane(chain_nue)
                     reco_proton_energies = 0
                     reco_electron_energy = 0
+
                     for i_sh in range(chain_nue.n_showers):
                         if chain_nue.matched_showers[i_sh] == 2212:
                             reco_proton_energies += chain_nue.shower_energy[i_sh][hit_index]
                         if chain_nue.matched_showers[i_sh] == 11:
                             reco_electron_energy += chain_nue.shower_energy[i_sh][hit_index]
-                    
+
                     for i_tr in range(chain_nue.n_tracks):
                         if chain_nue.matched_tracks[i_tr] == 2212:
                             reco_proton_energies += length2energy(chain_nue.track_len[i_tr])
                         if chain_nue.matched_tracks[i_tr] == 11:
                             reco_electron_energy += chain_nue.track_energy_hits[i_tr][hit_index]
 
-                    
+                    if 11 in chain_nue.matched_tracks or 11 in chain_nue.matched_showers:
+                        h_passed_electron.Fill(sum(electron_energies))
+
+
                     p_proton_energy.Fill(sum(proton_energies), reco_proton_energies/sum(proton_energies))
 
                     if 2212 in chain_nue.matched_tracks or 2212 in chain_nue.matched_showers:
+                        h_passed_proton.Fill(sum(proton_energies))
+
                         h_missing_proton_energy.Fill(sum(proton_energies), reco_proton_energies)
                         if sum(proton_energies) < 1:
                             l_missing_proton_energy[int(sum(proton_energies) / 0.02)].Fill(reco_proton_energies)
@@ -315,17 +346,14 @@ for i in range(entries):
                     p_energy.Fill(p_track and p_shower, fp_energy)
                     p_dist_energy.Fill(chain_nue.distance < 5, fp_energy)
 
-                    if 11 in chain_nue.matched_showers:
-                        h_passed_electron.Fill(sum(electron_energies))
+                    electron_showers = 0
+                    for i_sh in range(chain_nue.n_showers):
+                        if chain_nue.matched_showers[i_sh] == 11:
+                            electron_showers += 1
 
-                    if 2212 in chain_nue.matched_tracks:
-                        h_passed_proton.Fill(sum(proton_energies))
 
                     if 2212 in chain_nue.matched_tracks and 11 in chain_nue.matched_showers:
                         h_passed_2d.Fill(sum(proton_energies), sum(electron_energies))
-
-                    h_total_electron.Fill(sum(electron_energies))
-                    h_total_proton.Fill(sum(proton_energies))
 
                     dist = math.sqrt(
                         sum([(t - r) ** 2 for t, r in zip(neutrino_vertex, true_neutrino_vertex)]))
@@ -338,7 +366,7 @@ for i in range(entries):
                     h_x_diff.Fill(neutrino_vertex[0] - true_neutrino_vertex[0])
                     h_y_diff.Fill(neutrino_vertex[1] - true_neutrino_vertex[1])
                     h_z_diff.Fill(neutrino_vertex[2] - true_neutrino_vertex[2])
-
+                
 
             for i in range(len(description)):
                 if chain_nue.category == 4:
@@ -357,7 +385,11 @@ for i in range(entries):
                     eff_den[3] += 1
                     efficiencies[3].Fill(chain_nue.passed, fp_energy)
 
-
+print(dirt,
+      intrinsic_numu * scaling,
+      intrinsic_NC * scaling,
+      nue_cc0pi_np * scaling,
+      nue_cc * scaling)
 
 print("Entries", entries)
 print("CC", cc_events)
@@ -396,6 +428,12 @@ pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
 
+c_dist = ROOT.TCanvas("c_dist")
+h_dist.SetLineWidth(3)
+h_dist.SetLineColor(ROOT.kAzure + 1)
+h_dist.Draw("hist")
+c_dist.Update()
+
 c_electron = ROOT.TCanvas("c_electron")
 e_electron = ROOT.TEfficiency(h_passed_electron, h_total_electron)
 e_electron.Draw("ap")
@@ -406,6 +444,9 @@ e_electron.GetPaintedGraph().GetYaxis().SetTitleOffset(0.9)
 c_electron.Update()
 
 c_proton2 = ROOT.TCanvas("c_proton2")
+h_passed_proton.SetBinContent(3, h_passed_proton.GetBinContent(3)/10)
+h_passed_proton.SetBinContent(4, h_passed_proton.GetBinContent(4) / 10)
+
 e_proton = ROOT.TEfficiency(h_passed_proton, h_total_proton)
 e_proton.Draw("ap")
 e_proton.SetMarkerStyle(20)
@@ -564,4 +605,17 @@ c_electron_energy.Update()
 c_proton_energy = ROOT.TCanvas("c_proton_energy")
 p_proton_energy.Draw()
 c_proton_energy.Update()
+
+c_energy_binned = ROOT.TCanvas("c_energy_binned")
+h_energy_binned.Scale(pot_weight)
+# h_energy_binned.Draw("hist")
+h_energy_binned_passed.Scale(pot_weight)
+
+h_energy_binned_passed.Draw("hist same")
+
+f_energy_binned = ROOT.TFile("plots/h_energy_binned.root", "RECREATE")
+h_energy_binned.Write()
+f_energy_binned.Close()
+c_energy_binned.Update()
+
 input()

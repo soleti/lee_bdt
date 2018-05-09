@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 import ROOT
-from bdt_common import variables, spectators, manual, bdt, bins, SIGNAL_INTERVAL, binning
+from bdt_common import variables, spectators, manual, bdt, bins, binning
 
 
 f_input = ROOT.TFile("mc_file.root")
@@ -16,9 +16,9 @@ f_nue = ROOT.TFile("nue_file.root")
 t_nue = ROOT.TTree()
 t_nue = f_nue.Get("nue_tree")
 
-# f_pi0 = ROOT.TFile("pi0_file.root")
-# t_pi0 = ROOT.TTree()
-# t_pi0 = f_nue.Get("pi0_tree")
+f_lee = ROOT.TFile("lee_file.root")
+t_lee = ROOT.TTree()
+t_lee = f_lee.Get("lee_tree")
 
 ROOT.TMVA.Tools.Instance()
 fout = ROOT.TFile("test.root", "RECREATE")
@@ -40,12 +40,12 @@ for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
 
-sigCut = ROOT.TCut(
-    "category == 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 40 && shower_energy > 0.1 && total_shower_energy > 0.1" % (0, 3))
-bgCut = ROOT.TCut("category != 2 && reco_energy > %.2f && reco_energy < %.2f && track_hits > 5 && shower_hits > 40 && shower_energy > 0.1 && total_shower_energy > 0.1" % (0, 3))
+sigCut = ROOT.TCut("category == 10")
+bgCut = ROOT.TCut("category != 10")
 
-dataloader.AddSignalTree(t_nue)
+dataloader.AddSignalTree(t_lee)
 dataloader.AddBackgroundTree(t_nue)
+# dataloader.AddBackgroundTree(t_nue)
 dataloader.AddBackgroundTree(t)
 dataloader.AddBackgroundTree(t_cosmic)
 
@@ -94,8 +94,9 @@ range_max = ["CutRangeMax[%i]=%.2f" % (var_list.index(var), binning[var][2]) for
 
 cuts_min = ":".join(range_min)
 cuts_max = ":".join(range_max)
+# print(cuts_min, cuts_max)
 
-# method_cuts = factory.BookMethod(dataloader, ROOT.TMVA.Types.kCuts, "Cuts")
+# method_cuts = factory.BookMethod(dataloader, ROOT.TMVA.Types.kCuts, "Cuts", cuts_min + ":" + cuts_max)
 
 factory.TrainAllMethods()
 factory.TestAllMethods()
