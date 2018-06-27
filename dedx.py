@@ -1,12 +1,28 @@
-#!/usr/bin/env python
+#!/usr/local/bin/python3
 
 import ROOT
-import landau
 from glob import glob
 from numpy import array
 import sys
 import math
+import statistics
 
+def merge_dedx_hits(dedx_planes, hits):
+
+    if dedx_planes[2] > -99999999999999:
+        return dedx_planes[2]
+
+    for i, value in enumerate(dedx_planes):
+        if value <= 0:
+            del dedx_planes[i]
+            del hits[i]
+
+    if not dedx_planes:
+        return dedx_planes[2]
+
+    hits = [hit*hit*hit for hit in hits]
+
+    return sum(dedx * hit for dedx, hit in zip(dedx_planes, hits)) / sum(hits)
 
 def langau(var, par):
     x = array([var[0]])
@@ -32,9 +48,9 @@ def choose_shower(root_chain):
     most_energetic_shower = 0
     shower_id = 0
     for ish in range(root_chain.n_showers):
-        if root_chain.shower_energy[ish] < 3:
-            if root_chain.shower_energy[ish] > most_energetic_shower:
-                most_energetic_shower = root_chain.shower_energy[ish]
+        if root_chain.shower_energy[ish][2] < 3:
+            if root_chain.shower_energy[ish][2] > most_energetic_shower:
+                most_energetic_shower = root_chain.shower_energy[ish][2]
                 shower_id = ish
     return shower_id
 
@@ -125,17 +141,17 @@ scaling = 10
 
 if sample == "mc":
     print("Monte Carlo")
-    weight = 0.022849704990805283 * scaling
+    weight = 0.057717363590464345 * scaling
     # files = glob("not_slimmed/*/Pandora*.root")
-    files = glob("mc_bnb_ubxsec2/*/*.root")
+    files = glob("mc_nue_new/*.root")
 elif sample == "databnb":
     print("Data BNB")
     weight = 1 * scaling
-    files = glob("data_bnb_ubxsec2/*/*.root")
+    files = glob("data_bnb_new/*/*.root")
 elif sample == "dataext":
     print("Data EXT")
-    weight = 0.1383435698 * scaling
-    files = glob("data_ext_ubxsec2/*/*.root")
+    weight = 0.1341262321 * scaling
+    files = glob("data_ext_new/*/*.root")
 
 chain = ROOT.TChain("robertoana/pandoratree")
 
@@ -169,9 +185,10 @@ for i in range(entries):
     neutrino_vertex = [chain.vx, chain.vy, chain.vz]
     for ish in range(chain.n_showers):
         pdg = chain.matched_showers[ish]
-        dedx = chain.shower_dEdx[ish][2]
+        dedx = statistics.median(list(chain.shower_dEdx_hits[ish])) 
 
-        if len(chain.shower_dEdx_hits[ish]) < 10 or chain.shower_energy[ish][2] < 0.01:
+
+        if len(chain.shower_dEdx_hits[ish]) < 5 or chain.shower_energy[ish][2] < 0.01:
             continue
 
         shower_id = choose_shower(chain)
@@ -406,4 +423,4 @@ else:
     c_dedx_hits_data.Update()
 
 
-raw_input()
+input()

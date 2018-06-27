@@ -5,7 +5,7 @@ import ROOT
 from root_numpy import hist2array
 from scipy.stats import poisson
 
-ELECTRON_MASS = 0.51e-3
+ELECTRON_MASS = 0.51e-3 
 PROTON_MASS = 0.938
 PROTON_THRESHOLD = 0.040
 ELECTRON_THRESHOLD = 0.020
@@ -15,17 +15,24 @@ bdt, manual = False, False
 total_data_bnb_pot_mcc83 = 4.903e+19
 total_data_bnb_pot_mcc86 = 4.841e+19
 total_data_bnb_pot_nogoodruns = 4.793e+19
-total_data_bnb_pot = 4.356e+19
+total_data_bnb_goodruns_remap = 4.407e+19
+
 total_data_bnb_pot_goodruns = 4.356e+19
 total_data_bnb_pot_numu = 1.627e20
+total_data_bnb_pot = total_data_bnb_goodruns_remap
 
 # bdt_cut = 0.1470
 
-bdt_cut = 0.1131
+bdt_cut = -0
 rectangular_cut = 0.03
 
 bins = array("f", [0, 0.200, 0.300, 0.375, 0.475, 0.550,
                    0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 3.000])
+bins = array("f", [0, 0.200, 0.300, 0.375, 0.475, 0.550,
+                   0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 3.000])
+
+bins2 = array("f", [0, 0.200, 0.300, 0.375, 0.475, 0.550,
+                   0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 1.700])
 
 # bins = array("f", [0, 0.2, 0.6, 1, 1.700, 3.000])
 
@@ -85,6 +92,11 @@ def choose_shower(root_chain, plane):
                 most_energetic_shower = root_chain.shower_energy[ish][plane]
                 shower_id = ish
     return shower_id
+
+
+def distance(p1, p2):
+    return math.sqrt(
+        sum([(t - n)**2 for t, n in zip(p1, p2)]))
 
 def gauss_exp(var, par):
     """
@@ -164,7 +176,7 @@ def upper_limit_FC(bkg, cf=0.9999994):
         UL += po.pmf(i) * ul
     return UL
 
-colors = [ROOT.TColor.GetColor("#efac3a"), ROOT.TColor.GetColor("#e7623d"),
+colors = [ROOT.TColor.GetColor("#000000"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#62b570"), ROOT.TColor.GetColor("#8779b1"),
           ROOT.TColor.GetColor("#609ec6"), ROOT.TColor.GetColor("#c46d27"),
           ROOT.TColor.GetColor("#ffffff"), ROOT.TColor.GetColor("#e7623d"),
@@ -187,7 +199,7 @@ def pre_cuts(chain):
     # track_end = [chain.track_end_x, chain.track_end_y, chain.track_end_z]
     # shower_start = [chain.shower_start_x, chain.shower_start_y, chain.shower_start_z]
     # fiducial = is_fiducial(track_start) and is_fiducial(track_end) and is_fiducial(shower_start)
-    numu = 13 <= chain.numu_score < 17 or manual
+    numu = -13 <= chain.numu_score < 170 or manual
     track_pca = chain.track_pca > 0.9
     n_showers = chain.n_showers == 2
     # aa = 0.3 < chain.total_shower_energy/0.78 + 0.02 + chain.total_track_energy_length < 0.375
@@ -196,9 +208,13 @@ def pre_cuts(chain):
     # reco_energy = 0.55 < chain.reco_energy < 0.675
     hits = chain.track_hits > 5 and chain.shower_hits_y > 5 and chain.total_hits_y > 0 and chain.total_hits_u > 0 and chain.total_hits_v > 0
     shower_angle = chain.track_shower_angle > -0.98 
+    pre_bdt = 1 < chain.dedx < 3 and chain.shower_distance < 5 and chain.shower_track_d < 5 and chain.track_distance < 5 and chain.shower_distance < 5
     # reco_energy = 0.55 < chain.reco_energy < 0.675
     # dqdx_length = not (chain.track_dedx < 50000 and chain.track_length > 25)
-    return numu and reco_energy and hits and shower_track_energy
+
+    corrected_energy = 0.200 < ((chain.total_shower_energy_cali + 1.36881e-02) /
+                                7.69908e-01) + chain.total_track_energy_length < 0.8
+    return hits and numu and reco_energy and shower_track_energy# and chain.track_shower_angle > -0.95# and (not 100 < chain.track_start_z < 150)
 
 
 def is_fiducial(point):
@@ -252,7 +268,7 @@ def fill_histos_data(tree_name, bdt, manual):
     histo_dict = dict(zip(variables_dict.keys(), histograms))
 
     h_bdt = ROOT.TH1F("h_bdt_%s" % tree_name,
-                      "BDT response; N. Entries / 0.05", 40, -1, 1)
+                      "BDT response; N. Entries / 0.05", 20, -1, 1)
     passed_events = 0
 
     for i in range(t_data.GetEntries()):
@@ -275,15 +291,24 @@ def fill_histos_data(tree_name, bdt, manual):
                 apply_manual = True
 
             if apply_bdt and apply_manual:
+                # print(t_data.run, t_data.subrun, t_data.event, t_data.total_shower_energy / 0.78 +
+                #       0.02 + t_data.total_track_energy_length)
                 # if t_data.n_objects >= 5 and t_data.category == 6:
-                print(int(t_data.run), int(t_data.subrun), int(t_data.event))
                 passed_events += t_data.event_weight
                 for name, var in variables:
                     histo_dict[name].Fill(var[0], t_data.event_weight)
                 for name, var in spectators:
                     if name == "reco_energy":
-                        histo_dict[name].Fill(t_data.total_shower_energy / 0.78 + 0.02 + t_data.total_track_energy_length, t_data.event_weight)
-                    # histo_dict[name][category].Fill(chain.reco_energy, chain.event_weight)
+                        corrected_energy_cali = ((t_data.total_shower_energy_cali * 0.987 + 1.36881e-02) /
+                                                  7.69908e-01) + t_data.total_track_energy_length
+                        corrected_energy = ((t_data.total_shower_energy + 1.23986e-02) /
+                                            7.87131e-01) + t_data.total_track_energy_length
+
+                        corrected_energy_hits = ((t_data.total_shower_energy_cali * 0.987 + 1.36881e-02) /
+                                                 7.69908e-01) + (t_data.total_track_energy + 3.57033e-02) / 7.70870e-01
+                                    
+                        histo_dict[name].Fill(corrected_energy_cali, t_data.event_weight)
+                        # histo_dict[name][category].Fill(chain.reco_energy, chain.event_weight)
                     else:
                         histo_dict[name].Fill(var[0], t_data.event_weight)
 
@@ -308,18 +333,18 @@ def find_interaction(dictionary, interaction):
 
 def manual_cuts(chain):
     track_shower_angle = -0.9 < chain.track_shower_angle 
-    shower_distance = chain.shower_distance < 10
+    shower_distance = chain.shower_distance < 5
     shower_open_angle = 1 < chain.shower_open_angle < 19
-    dedx = 1 < chain.dedx < 3.2
-    total_hits_y = chain.total_hits > 50
-    shower_energy = chain.total_shower_energy > 0.05
+    dedx = 1 < chain.dedx_merged < 3.2
+    total_hits_y = chain.total_hits_y > 100
+    shower_energy = chain.total_shower_energy_cali > 0.06
     track_length = chain.track_length < 80
     track_distance = chain.track_distance < 5
     track_res = chain.track_res_std < 2
     shower_angle = not (5 < chain.shower_angle < 45)
-    dqdx = chain.dqdx_bdt_max > 0.1 #and chain.dqdx_bdt > 0.1
-    corrected_energy = 0.55 < chain.total_shower_energy / \
-        0.78 + 0.02 + chain.total_track_energy_length < 0.675
+    dqdx = chain.dqdx_bdt_max > 0.1# and (chain.dqdx_bdt > 0.1 or chain.dqdx_bdt < -0.2)
+    corrected_energy =  0.300 < (chain.total_shower_energy_cali + 0.02)/ \
+        0.78 + chain.total_track_energy_length < 0.425
 
     numu_exclude = chain.numu_score != 17 and chain.numu_score != 2
 
@@ -332,8 +357,11 @@ def manual_cuts(chain):
         track_distance = chain.track_distance < 2
 
 
-    collabmeeting_cuts = [dedx, total_hits_y, numu_exclude, shower_energy, ratio, dqdx, track_res, dedx_bdt,
-                          track_distance, shower_distance, track_shower_angle, shower_open_angle, track_length]
+    collabmeeting_cuts = [dedx, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, dqdx, track_res, dedx_bdt,
+                          track_distance, shower_distance, shower_open_angle, track_length]
+
+    # collabmeeting_cuts = [total_hits_y, numu_exclude, shower_energy, ratio, dqdx, track_res, dedx_bdt,
+    #                       track_shower_angle, shower_open_angle, track_length]
 
     # collabmeeting_cuts = [dedx_bdt, track_res, ratio, shower_distance, numu_exclude, shower_open_angle,
     #                     track_length, track_distance, dqdx, total_hits_y,
@@ -343,6 +371,7 @@ def manual_cuts(chain):
     inverted_cuts = [dedx_inverted, shower_open_angle, total_hits_y, track_length, track_distance,
                      track_shower_angle, shower_energy, dqdx]
 
+                     
     dedx_harder = 1.5 < chain.dedx < 2.6
     bdt_harder = chain.dqdx_bdt > 0.1
     energy_harder = chain.shower_energy > 0.1
@@ -402,15 +431,26 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
 
 total_pot = total_data_bnb_pot
 
-description = ["#nu_{e} CC0#pi-Np",
+description2 = ["Cosmic in-time",
+               "Cosmic",
+               "#nu_{e} CC0#pi-Np",
+               "Beam Intrinsic #nu_{#mu}",
+               "Beam Intrinsic NC",
+               "Outside fid. vol.",
+               "Data",
+               "Cosmic contaminated",
                "#nu_{e} CC",
+               "Low-energy excess"]
+
+description = ["Data beam-off",
                "Beam Intrinsic #nu_{#mu}",
                "Beam Intrinsic NC",
                "Outside fid. vol.",
                "Cosmic contaminated",
                "Cosmic",
-               "Cosmic in-time",
-               "Data",
+               "Data beam-on",
+               "#nu_{e} CC",
+               "#nu_{e} CC0#pi-Np",
                "Low-energy excess"]
 
 interactions = {
@@ -490,6 +530,8 @@ pi0_mass = array("f", [0])
 
 shower_angle = array("f", [0])
 track_angle = array("f", [0])
+shower_pdg = array("f", [0])
+track_pdg = array("f", [0])
 
 track_length = array("f", [0])
 track_theta = array("f", [0])
@@ -507,6 +549,8 @@ track_id = array("f", [0])
 shower_start_x = array("f", [0])
 track_start_x = array("f", [0])
 shower_distance = array("f", [0])
+shower_true_distance = array("f", [0])
+
 proton_score = array("f", [0])
 track_distance = array("f", [0])
 track_start_y = array("f", [0])
@@ -531,10 +575,16 @@ interaction_type = array("f", [0])
 is_signal = array("f", [0])
 shower_open_angle = array("f", [0])
 dedx = array("f", [0])
+dedx_cali = array("f", [0])
+dedx_u = array("f", [0])
+dedx_v = array("f", [0])
+
 numu_score = array("f", [0])
 shower_pca = array("f", [0])
 track_pca = array("f", [0])
 total_shower_energy = array("f", [0])
+total_shower_energy_cali = array("f", [0])
+
 total_shower_energy_y = array("f", [0])
 
 total_track_energy = array("f", [0])
@@ -548,7 +598,7 @@ track_dedx = array("f", [0])
 track_energy_length = array("f", [0])
 total_track_energy_length = array("f", [0])
 n_objects = array("f", [0])
-dedx_y = array("f", [0])
+dedx_merged = array("f", [0])
 total_hits = array("f", [0])
 total_hits_u = array("f", [0])
 total_hits_v = array("f", [0])
@@ -558,9 +608,12 @@ shower_length = array("f", [0])
 nu_E = array("f", [0])
 E_dep = array("f", [0])
 track_pidchipr = array("f", [0])
+track_pidchi = array("f", [0])
 track_pida = array("f", [0])
 track_res_mean = array("f", [0])
 track_res_std = array("f", [0])
+shower_res_mean = array("f", [0])
+shower_res_std = array("f", [0])
 true_nu_is_fidvol = array("f", [0])
 dqdx_bdt = array("f", [0])
 dqdx_pion = array("f", [0])
@@ -571,16 +624,18 @@ dedx_bdt = array("f", [0])
 shower_track_d = array("f", [0])
 
 spectators = [
+    # ("track_pdg", track_pdg),
+    # ("shower_pdg", shower_pdg),
     ("dedx_bdt", dedx_bdt),
     ("true_nu_is_fidvol", true_nu_is_fidvol),
     ("total_hits_u", total_hits_u),
     ("total_hits_v", total_hits_v),
-    # ("track_pidchipr", track_pidchipr),
-    # ("track_pida", track_pida),
+    ("track_pidchipr", track_pidchipr),
+    ("track_pidchi", track_pidchi),
 
+    # ("track_pida", track_pida),
     ("nu_E", nu_E),
     ("E_dep", nu_E),
-
     ("category", category),
     ("event_weight", event_weight),
     ("event", event),
@@ -590,7 +645,7 @@ spectators = [
     ("is_signal", is_signal),
     ("reco_energy", reco_energy),
     ("total_track_energy", total_track_energy),
-    ("total_shower_energy_y", total_shower_energy_y),
+    # ("total_shower_energy_y", total_shower_energy_y),
     ("total_hits_y", total_hits_y),
     ("track_energy_length", track_energy_length),
     ("n_tracks", n_tracks),
@@ -605,113 +660,122 @@ spectators = [
     ("shower_start_y", shower_start_y),
     ("shower_phi", shower_phi),
     ("track_phi", track_phi),
-    ("shower_hits", shower_hits),
-    ("hits_ratio", hits_ratio),
-    
+    ("shower_hits", shower_hits),    
     ("shower_hits_y", shower_hits_y),
     ("track_hits", track_hits),
     ("shower_energy_y", shower_energy_y),
-
-    ("n_showers", n_showers),
     ("track_dedx", track_dedx),
-    ("proton_score", proton_score),
+    # ("proton_score", proton_score),
     ("shower_start_x", shower_start_x),
     # ("shower_length", shower_length),
-
-
     ("no_tracks", no_tracks),
-    ("dedx_y", dedx_y),
+    ("dedx_merged", dedx_merged),
     ("n_objects", n_objects),
     ("pt", pt),
     ("shower_theta", shower_theta),
     ("track_theta", track_theta),
+    ("track_pca", track_pca),
+    ("shower_pca", shower_pca),
     ("track_res_mean", track_res_mean),
     ("track_res_std", track_res_std),
+    ("shower_res_mean", shower_res_mean),
+    ("shower_res_std", shower_res_std),
     ("total_hits", total_hits),
     ("total_shower_energy", total_shower_energy),
+    ("total_shower_energy_cali", total_shower_energy_cali),
+
     ("total_track_energy_length", total_track_energy_length),    
     ("shower_energy", shower_energy),
-    ("dqdx_bdt", dqdx_bdt),
-    ("dqdx_pion", dqdx_pion),
+    # ("dqdx_pion", dqdx_pion),
+    # ("shower_true_distance", shower_true_distance),
+    ("numu_score", numu_score),
+    ("dedx_cali", dedx_cali),
+    ("dedx_u", dedx_u),
+    ("dedx_v", dedx_v),
+    # ("track_angle", track_angle),
 
-    ("dqdx_bdt_max", dqdx_bdt_max),
-
-    ("shower_open_angle", shower_open_angle),
-    ("track_distance", track_distance),
-    ("shower_distance", shower_distance),
-    ("track_shower_angle", track_shower_angle),
-    ("shower_angle", shower_angle),
-    ("track_angle", track_angle),
-    ("shower_track_d", shower_track_d),
-
-    ("numu_score", numu_score)
 ]
 
 variables = [ 
+    ("n_showers", n_showers),
+    ("shower_track_d", shower_track_d),
+    ("shower_open_angle", shower_open_angle),
+    ("track_distance", track_distance),
+    ("shower_distance", shower_distance),
     ("dedx", dedx),
     ("track_length", track_length),
-    ("track_pca", track_pca),
-    ("shower_pca", shower_pca),
-
+    ("track_shower_angle", track_shower_angle),
+    ("dqdx_bdt", dqdx_bdt),
+    ("dqdx_bdt_max", dqdx_bdt_max),
+    ("hits_ratio", hits_ratio),
+    ("shower_angle", shower_angle),
 ]
 
 binning = {
+    "track_pdg": [100, 0, 100],
+    "shower_pdg": [100, 0, 100],
+
     "dqdx_bdt": [20, -0.5, 0.5],
     "dqdx_pion": [50, -1, 1],
-
     "dqdx_bdt_max": [50, -1, 1],
-
     "dedx_bdt": [50, -1, 1],
-
-    "shower_angle": [45, 0, 180],
-    "track_angle": [45, 0, 180],
-
-    "pi0_mass": [40, 0, 0.4],
+    "shower_angle": [20, 0, 180],
+    "track_angle": [20, 0, 180],
+    "pi0_mass": [20, 0, 0.4],
     "shower_track_d": [30, 0, 15],
     "true_nu_is_fidvol": [2, 0, 2],
     "total_hits_u": [1,0,1],
     "total_hits_v": [1,0,1],
-    "track_pidchipr": [40, 0, 40],
-    "track_pida": [40, 0, 25],
-    "track_res_mean": [40, -1, 1],
-    "track_res_std": [40, 0, 3],
+    "track_pidchipr": [20, 0, 40],
+    "track_pidchi": [20, 0, 40],
+
+    "track_pida": [20, 0, 25],
+    "track_res_mean": [20, -2, 2],
+    "track_res_std": [20, 0, 5],    
+    "shower_res_mean": [20, -2, 2],
+    "shower_res_std": [20, 0, 5],
     "no_tracks": [2, 0, 2],
     "n_objects": [8, 2, 10],
     "n_tracks": [5, 1, 6],
     "n_showers": [5, 1, 6],
-    "track_theta": [36, 0, 180],
-    "track_phi": [36, -180, 180],
+    "track_theta": [18, 0, 180],
+    "track_phi": [18, -180, 180],
     "shower_theta": [18, 0, 180],
     "shower_phi": [18, -180, 180],
-    "shower_distance": [15, 0, 15],
-    "track_distance": [15, 0, 15],
-    "track_shower_angle": [50, -1, 1],
-    "track_start_y": [30, y_start, y_end],
-    "track_start_z": [30, z_start, z_end],
-    "track_start_x": [30, x_start, x_end],
-    "track_end_y": [30, y_start, y_end],
-    "track_end_z": [30, z_start, z_end],
-    "track_end_x": [30, x_start, x_end],
-    "shower_start_y": [30, y_start, y_end],
-    "shower_start_z": [30, z_start, z_end],
-    "shower_start_x": [30, x_start, x_end],
-    "shower_end_y": [30, y_start, y_end],
-    "shower_end_z": [30, z_start, z_end],
-    "shower_end_x": [30, x_start, x_end],
-    "track_length": [50, 0, 150],
-    "shower_length": [50, 0, 150],
+    "shower_distance": [20, 0, 15],
+    "shower_true_distance": [20, 0, 15],
+    "track_distance": [20, 0, 15],
+    "track_shower_angle": [20, -1, 1],
+    "track_start_y": [20, y_start, y_end],
+    "track_start_z": [20, z_start, z_end],
+    "track_start_x": [20, x_start, x_end],
+    "track_end_y": [20, y_start, y_end],
+    "track_end_z": [20, z_start, z_end],
+    "track_end_x": [20, x_start, x_end],
+    "shower_start_y": [20, y_start, y_end],
+    "shower_start_z": [20, z_start, z_end],
+    "shower_start_x": [20, x_start, x_end],
+    "shower_end_y": [20, y_start, y_end],
+    "shower_end_z": [20, z_start, z_end],
+    "shower_end_x": [20, x_start, x_end],
+    "track_length": [20, 0, 300],
+    "shower_length": [20, 0, 150],
     "proton_score": [10, 0, 1],
-    "shower_energy": [50, 0, 0.3],
-    "shower_energy_y": [50, 0, 0.3],
-    "total_hits": [50, 0, 300],
-    "total_hits_u": [50, 0, 1000],
-    "total_hits_v": [50, 0, 1000],
-    "total_hits_y": [50, 0, 1000],
+    "shower_energy": [20, 0, 0.5],
+    "shower_energy_y": [20, 0, 0.5],
+    "total_hits": [30, 0, 300],
+    "total_hits_u": [20, 0, 1000],
+    "total_hits_v": [20, 0, 1000],
+    "total_hits_y": [20, 0, 1000],
     "pt": [20, 0, 1],
     "reco_energy": [40, 0, 2],
     "shower_open_angle": [46, 0, 46],
-    "dedx": [15, 0, 6],
-    "dedx_y": [30, 0, 6],
+    "dedx": [20, 0, 5],
+    "dedx_cali": [20, 0, 5],
+    "dedx_u": [20, 0, 5],
+    "dedx_v": [20, 0, 5],
+
+    "dedx_merged": [20, 0, 5],
     "numu_score": [20, 0, 20],
     "category": [11, 0, 11],
     "event_weight": [20, 0, 100],
@@ -720,23 +784,25 @@ binning = {
     "subrun": [20, 0, 1000],
     "interaction_type": [100, 1000, 1100],
     "is_signal": [2, 0, 1],
-    "shower_pca": [50, 0.8, 1],
-    "track_pca": [50, 0.99, 1],
-    "total_shower_energy": [50, 0, 0.3],
-    "total_shower_energy_y": [50, 0, 0.3],
-    "total_track_energy": [40, 0, 1],
-    "shower_hits": [50, 0, 200],
-    "hits_ratio": [50, 0, 1],
+    "shower_pca": [20, 0.9, 1],
+    "track_pca": [20, 0.99, 1],
+    "total_shower_energy": [20, 0, 0.5],
+    "total_shower_energy_cali": [20, 0, 0.5],
 
-    "shower_hits_y": [50, 0, 500],
+    "total_shower_energy_y": [20, 0, 0.5],
+    "total_track_energy": [20, 0, 1],
+    "shower_hits": [20, 0, 200],
+    "hits_ratio": [20, 0, 1],
+
+    "shower_hits_y": [20, 0, 500],
     "nu_E": [40, 0, 4],
     "E_dep": [30, 0, 3],
 
-    "track_hits": [50, 0, 400],
-    "track_energy": [50, 0, 1],
+    "track_hits": [20, 0, 400],
+    "track_energy": [20, 0, 1],
     "track_dedx": [40, 0, 700],
-    "track_energy_length": [50, 0, 2],
-    "total_track_energy_length": [30, 0, 1]
+    "track_energy_length": [20, 0, 1],
+    "total_track_energy_length": [20, 0, 2]
 }
 
 if manual:
@@ -748,7 +814,10 @@ if manual:
 
 
 labels = {
-    "dqdx_bdt": ";dQ/dx BDT;",
+    "track_pdg": "track pdg",
+    "shower_pdg": "shower pdg",
+
+    "dqdx_bdt": ";Proton BDT;N. Entries / %.2f" % bin_size("dqdx_bdt"),
     "dqdx_pion": ";dQ/dx BDT;",
     
     "dqdx_bdt_max": ";dQ/dx BDT;",
@@ -765,10 +834,14 @@ labels = {
     "total_hits_u": ";total hits u;",
     "total_hits_v": "; total hits u;",
     "no_tracks": ";No tracks",
-    "track_pidchipr": ";Track PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchipr"),
+    "track_pidchipr": ";Track proton PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchipr"),
+    "track_pidchi": ";Track min. PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchi"),
+
     "track_pida": ";Track PIDa; N. Entries / %.1f" % bin_size("track_pida"),
     "track_res_mean": ";Track res. #mu [cm]; N. Entries / %.2f" % bin_size("track_res_mean"),
     "track_res_std": ";Track res. #sigma [cm]; N. Entries / %.2f" % bin_size("track_res_std"),
+    "shower_res_mean": ";Shower res. #mu [cm]; N. Entries / %.2f" % bin_size("shower_res_mean"),
+    "shower_res_std": ";Shower res. #sigma [cm]; N. Entries / %.2f" % bin_size("shower_res_std"),
     "nu_E": ";True E #nu;N. Entries / %.1f" % bin_size("nu_E"),
     "E_dep": ";True E #nu;N. Entries / %.1f" % bin_size("nu_E"),
 
@@ -779,9 +852,11 @@ labels = {
     "track_phi": ";Track #phi [#circ];N. Entries / %.1f#circ" % bin_size("track_phi"),
     "shower_theta": ";Shower #theta [#circ];N. Entries / %.1f#circ" % bin_size("shower_theta"),
     "shower_phi": ";Shower #phi [#circ];N. Entries / %.1f#circ" % bin_size("shower_phi"),
-    "shower_distance": ";Shower distance [cm];N. Entries / %.1f cm" % bin_size("shower_distance"),
-    "track_distance": ";Track distance [cm];N. Entries / %.1f cm" % bin_size("track_distance"),
-    "track_shower_angle": ";cos#theta [#circ];N. Entries / %.2f" % bin_size("track_shower_angle"),
+    "shower_distance": ";Track distance [cm];N. Entries / %.1f cm" % bin_size("shower_distance"),
+    "shower_true_distance": ";Shower-true #nu distance [cm];N. Entries / %.1f cm" % bin_size("shower_true_distance"),
+
+    "track_distance": ";Shower distance [cm];N. Entries / %.1f cm" % bin_size("track_distance"),
+    "track_shower_angle": ";cos#alpha [#circ];N. Entries / %.2f" % bin_size("track_shower_angle"),
     "track_start_y": ";Track start y [cm];N. Entries / %.1f cm" % bin_size("track_start_y"),
     "track_start_z": ";Track start z [cm];N. Entries / %.1f cm" % bin_size("track_start_z"),
     "track_start_x": ";Track start x [cm];;N. Entries / %.1f cm" % bin_size("track_start_x"),
@@ -800,10 +875,13 @@ labels = {
     "shower_energy": ";Shower energy [GeV]; N. Entries / %.2f GeV" % bin_size("shower_energy"),
     "shower_energy_y": ";Shower energy (Y plane) [GeV]; N. Entries / %.2f GeV" % bin_size("shower_energy_y"),
     "pt": ";p_{t} [GeV/c];N. Entries / %.2f GeV/c" % bin_size("pt"),
-    "reco_energy": ";E_{corr} [GeV]; N. Entries / 0.05 GeV",
+    "reco_energy": ";E_{deposited} [GeV]; N. Entries / 0.05 GeV",
     "shower_open_angle": ";Shower open angle [#circ]; N. Entries / %.1f#circ" % bin_size("shower_open_angle"),
-    "dedx": ";Shower dE/dx [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx"),
-    "dedx_y": ";Shower dE/dx (Y plane) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx_y"),
+    "dedx": ";Shower dE/dx (not calibrated) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx"),
+    "dedx_cali": ";Shower dE/dx [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx_cali"),
+    "dedx_u": ";Shower dE/dx (U plane) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx_u"),
+    "dedx_v": ";Shower dE/dx (V plane) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx_v"),
+    "dedx_merged": ";Shower dE/dx (merged hits) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("dedx_merged"),
     "numu_score": ";#nu_{#mu} selection score; N. Entries / %i" % bin_size("numu_score"),
     "category": ";category",
     "event_weight": ";event_weight",
@@ -814,8 +892,9 @@ labels = {
     "is_signal": ";is_signal",
     "shower_pca": ";Shower PCA;N. Entries / %.3f" % bin_size("shower_pca"),
     "track_pca": ";Track PCA;N. Entries / %.3f" % bin_size("track_pca"),
-    "total_shower_energy": ";Total shower E [GeV]; N. Entries / %.2f GeV" % bin_size("total_shower_energy"),
-    "total_shower_energy_y": ";Total shower E (Y plane) [GeV]; N. Entries / %.2f GeV" % bin_size("total_shower_energy_y"),
+    "total_shower_energy": ";Total shower E (not calibrated) [GeV]; N. Entries / %.2f GeV" % bin_size("total_shower_energy"),
+    "total_shower_energy_cali": ";Total shower E [GeV]; N. Entries / %.2f GeV" % bin_size("total_shower_energy_cali"),
+
     "total_track_energy": ";Total track E [GeV]; N. Entries / %.2f GeV" % bin_size("total_track_energy"),
     "shower_hits": ";Shower hits; N. Entries / %i" % bin_size("shower_hits"),
     "hits_ratio": ";Shower hits/total hits; N. Entries / %i" % bin_size("hits_ratio"),

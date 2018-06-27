@@ -3,7 +3,7 @@
 import ROOT
 from array import array
 
-ARGON_DENSITY = 1.379
+ARGON_DENSITY = 1.4
 
 
 def length2energy(length):

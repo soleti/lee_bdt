@@ -18,7 +18,8 @@ h_bdt_lee = f_bdt_lee.Get("h_bdt_lee")
 
 # h_bdt_data.Scale(h_bdt_mc.Integral()/h_bdt_data.Integral())
 
-h_bdt_mc.GetHists()[5].SetFillStyle(3001)
+h_bdt_mc.GetHists()[4].SetFillStyle(3001)
+h_bdt_mc.GetHists()[0].SetFillStyle(3004)
 
 legend = ROOT.TLegend(0.09455587, 0.7850208, 0.8923496, 0.9791956, "", "brNDC")
 legend.SetTextSize(16)
@@ -33,6 +34,7 @@ for j in range(h_bdt_mc.GetNhists()):
                         "f")
 
 h_mc_err = h_bdt_mc.GetHists()[0].Clone()
+h_mc_err.Clear()
 h_mc_err.SetName("h_bdt_mc_err")
 
 for i in range(1, h_bdt_mc.GetNhists()):
@@ -54,24 +56,36 @@ legend.SetNColumns(2)
 # pad_top.SetTopMargin(0.2411347)
 # pad_top.Draw()
 # pad_top.cd()
-h_bdt_mc.Add(h_bdt_lee)
-h_bdt_lee.Draw("hist")
-# h_bdt_mc.Draw("hist")
-# h_mc_err.Draw("e2 same")
+# h_bdt_mc.Add(h_bdt_lee)
+# h_bdt_lee.Draw("hist")
+h_bdt_mc.Draw("hist")
+h_bdt_mc.SetMinimum(0.1)
+h_bdt_mc.SetMaximum(100)
+h_bdt_mc.GetYaxis().SetTitleOffset(0.9)
+h_bdt_mc.GetXaxis().SetRangeUser(-0.5, 0.5)
+
+h_mc_err.Draw("e2 same")
+h_mc_err_clone = h_mc_err.Clone()
+h_mc_err_clone.SetLineColor(1)
+h_mc_err_clone.SetFillStyle(0)
+
+h_mc_err_clone.Draw("hist same")
 
 h_bdt_data.SetMarkerStyle(20)
 h_bdt_data.SetLineColor(1)
 # h_bdt_mc.GetYaxis().SetTitleOffset(0.8)
 # h_bdt_mc.GetYaxis().SetTitleSize(0.06)
 
-# h_bdt_data.Draw("ep same")
+h_bdt_data.Draw("ep same")
+legend.AddEntry(h_mc_err, "Stat. error", "lf")
 legend.Draw()
 
 line_bdt = ROOT.TLine(bdt_cut, 0, bdt_cut, h_mc_err.GetMaximum() * 1.6)
 line_bdt.SetLineWidth(2)
 line_bdt.SetLineStyle(2)
 # line_bdt.Draw()
-
+c_bdt.SetTopMargin(0.22)
+c_bdt.SetLogy()
 # pad_top.SetLogy()
 c_bdt.cd()
 # pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)

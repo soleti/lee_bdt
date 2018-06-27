@@ -16,18 +16,6 @@ import statistics
 PROTON_THRESHOLD = 0.040
 ELECTRON_THRESHOLD = 0.020
 
-h_angle_proton = TH1F("h_angle_proton",
-                      ";Angle from main shower [#circ];N. Entries / 5#circ",
-                      36, 0, 180)
-h_angle_nonproton = TH1F("h_angle_nonproton",
-                         ";Angle from main shower [#circ];N. Entries / 5#circ",
-                         36, 0, 180)
-
-h_pca_proton = TH1F(
-    "h_pca_proton", ";PCA;N. Entries / 5#circ", 50, 0.9, 1)
-h_pca_nonproton = TH1F(
-    "h_pca_nonproton", ";PCA;N. Entries / 5#circ", 50, 0.9, 1)
-
 TMVA.Tools.Instance()
 reader_dqdx = TMVA.Reader(":".join([
     "!V",
@@ -123,6 +111,14 @@ def min_dqdx(root_chain):
 
     return min_score
 
+def merged_shower_cali(chain, shower_id):
+    plane_nhits = [chain.shower_nhits[shower_id][i] for i in range(3)]
+    plane_cali = [chain.shower_dQdx_cali[shower_id][i] for i in range(3)]
+
+    num = sum((n * c for n, c in zip(plane_nhits, plane_cali)))
+    den = sum(plane_nhits)
+
+    return num/den
 
 def dqdx_length_pion(v_dqdx, v_length):
 
@@ -134,6 +130,32 @@ def dqdx_length_pion(v_dqdx, v_length):
 
     BDT_response = reader_dqdx_pion.EvaluateMVA("dqdx pion BDT")
     return BDT_response
+
+def merge_dedx_planes(dedx_planes, pitches):
+
+    for i, value in enumerate(dedx_planes):
+        if value <= 0:
+            del dedx_planes[i]
+            del pitches[i]
+
+    if not dedx_planes:
+        return dedx_planes[2]
+
+    p_invs = [1./p for p in pitches]
+    return sum(dedx * p_inv for dedx, p_inv in zip(dedx_planes, p_invs)) / sum(p_invs)
+
+
+def merge_dedx_hits(dedx_planes, hits):
+
+    for i, value in enumerate(dedx_planes):
+        if value <= 0:
+            del dedx_planes[i]
+            del hits[i]
+
+    if not dedx_planes:
+        return dedx_planes[2]
+
+    return sum(dedx * hit for dedx, hit in zip(dedx_planes, hits)) / sum(hits)
 
 def dqdx_length(v_dqdx, v_length):
     
@@ -212,17 +234,21 @@ def is_active(point):
 
 
 def choose_track(root_chain):
-    if root_chain.n_tracks:
-        return -1
+    max_score = 0
+    chosen_track = 0
 
-    track_id = 0
-    least_proton_track = 1
+    for i_tr in range(root_chain.n_tracks):
+        track_dqdx = root_chain.track_dQdx[i_tr][2]
+        if root_chain.category == 0 or root_chain.category == 6:
+            track_dqdx *= 1.2
 
-    for itrk in range(root_chain.n_tracks):
-        if root_chain.predict_p[itrk] < least_proton_track:
-            least_proton_track = root_chain.predict_p[itrk]
-            track_id = itrk
-    return track_id
+        track_length = root_chain.track_len[i_tr]
+        score = dqdx_length(track_dqdx, track_length)
+        if score > max_score:
+            max_score = score
+            chosen_track = i_tr
+
+    return chosen_track
 
 
 def choose_plane(root_chain):
@@ -269,11 +295,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
     track_like_shower_id = -1
     if root_chain.n_tracks == 0 and root_chain.n_showers > 1:
-        max_pca = 0
-        for ish, pca in enumerate(root_chain.shower_pca):
-            if pca > max_pca and ish != shower_id:
-                max_pca = pca
-                track_like_shower_id = ish
+        shower_res_std_list = list(root_chain.shower_res_std)
+        shower_res_std_list.pop(shower_id)
+        track_like_shower_id = shower_res_std_list.index(min(shower_res_std_list))
+
         no_tracks = True
 
     for itrk in range(root_chain.n_tracks):
@@ -288,14 +313,15 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             root_chain.shower_dir_z[track_like_shower_id])
     else:
         v_track = TVector3(
-            root_chain.track_dir_x[longest_track_id],
-            root_chain.track_dir_y[longest_track_id],
-            root_chain.track_dir_z[longest_track_id])
+            root_chain.track_dir_x[track_id],
+            root_chain.track_dir_y[track_id],
+            root_chain.track_dir_z[track_id])
 
     vec_shower = TVector3(
         root_chain.shower_dir_x[shower_id],
         root_chain.shower_dir_y[shower_id],
         root_chain.shower_dir_z[shower_id])
+
     costheta_shower_track = v_track.Dot(
         vec_shower) / (v_track.Mag() * vec_shower.Mag())
 
@@ -350,8 +376,6 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
     variables["is_signal"][0] = signal
     variables["true_nu_is_fidvol"][0] = int(is_fiducial(true_vertex))
-    # total_shower_energy = sum([root_chain.shower_energy[i_sh][hit_index] for i_sh in range(root_chain.n_showers)])
-    total_shower_energy_y = sum([root_chain.shower_energy[i_sh][2] for i_sh in range(root_chain.n_showers)])
 
     total_shower_nhits = sum([root_chain.shower_nhits[i_sh][hit_index] for i_sh in range(root_chain.n_showers)])
     total_shower_nhits_y = sum([root_chain.shower_nhits[i_sh][2] for i_sh in range(root_chain.n_showers)])
@@ -370,12 +394,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         total_track_energy_y = root_chain.shower_energy[track_like_shower_id][2]
         total_track_nhits = root_chain.shower_nhits[track_like_shower_id][2]
         total_shower_nhits_y -= root_chain.shower_nhits[track_like_shower_id][2]
-        # total_shower_energy -= total_track_energy
-        total_shower_energy_y -= total_track_energy_y
         total_shower_nhits -= total_track_nhits
         # total_track_energy_length = length2energy(root_chain.shower_length[track_like_shower_id])
         variables["track_energy"][0] = total_track_energy
-        variables["proton_score"][0] = 1
+        # variables["proton_score"][0] = 1
         variables["track_pca"][0] = max(0, root_chain.shower_pca[track_like_shower_id])
         variables["n_tracks"][0] = 1
         variables["n_showers"][0] = root_chain.n_showers - 1
@@ -384,21 +406,21 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         variables["track_energy_length"][0] = length2energy(root_chain.shower_length[track_like_shower_id])
         variables["track_res_mean"][0] = -999
         variables["track_res_std"][0] = -999
-        # variables["track_pida"][0] = -999
-        # variables["track_pidchipr"][0] = -999
+        variables["track_pidchi"][0] = -999
+        variables["track_pidchipr"][0] = -999
         variables["dqdx_bdt"][0] = 1
         variables["dqdx_bdt_max"][0] = 1
-        variables["dqdx_pion"][0] = 1
+        # variables["dqdx_pion"][0] = 1
+        # variables["track_pdg"][0] = root_chain.matched_showers[track_like_shower_id]
 
         dqdx_length(
             root_chain.shower_dQdx[track_like_shower_id][2],
             root_chain.shower_length[track_like_shower_id])
-
     else:
-        variables["track_res_mean"][0] = max(-999, root_chain.track_res_mean[longest_track_id])
-        variables["track_res_std"][0] = max(-999, root_chain.track_res_std[longest_track_id])
-        # variables["track_pida"][0] = max(-999, root_chain.track_pida[longest_track_id])
-        # variables["track_pidchipr"][0] = max(-999, root_chain.track_pidchipr[longest_track_id])
+        variables["track_res_mean"][0] = max(-999, root_chain.track_res_mean[track_id])
+        variables["track_res_std"][0] = max(-999, root_chain.track_res_std[track_id])
+        variables["track_pidchi"][0] = max(-999, root_chain.track_pidchi[track_id])
+        variables["track_pidchipr"][0] = max(-999, root_chain.track_pidchipr[track_id])
         variables["track_length"][0] = root_chain.track_len[longest_track_id]
         variables["track_phi"][0] = math.degrees(root_chain.track_phi[track_id])
         variables["track_theta"][0] = math.degrees(root_chain.track_theta[track_id])
@@ -412,7 +434,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         total_track_nhits = sum(
             [root_chain.track_nhits[i_tr][2] for i_tr in range(root_chain.n_tracks)])
         variables["track_energy"][0] = root_chain.track_energy_hits[track_id][2]
-        variables["proton_score"][0] = max(0, root_chain.predict_p[track_id])
+        # variables["proton_score"][0] = max(0, root_chain.predict_p[track_id])
         variables["track_pca"][0] = max(0, root_chain.track_pca[track_id])
         variables["n_tracks"][0] = root_chain.n_tracks
         variables["n_showers"][0] = root_chain.n_showers
@@ -424,16 +446,18 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
         variables["track_energy_length"][0] = length2energy(root_chain.track_len[track_id])
         variables["dqdx_bdt"][0] = min_dqdx(root_chain)
-        variables["dqdx_pion"][0] = min_dqdx_pion(root_chain)
+        # variables["dqdx_pion"][0] = min_dqdx_pion(root_chain)
+        # variables["track_pdg"][0] = root_chain.matched_tracks[track_id]
 
         variables["dqdx_bdt_max"][0] = max_dqdx(root_chain)
 
-    
+    # variables["shower_pdg"][0] = root_chain.matched_showers[shower_id]
+    variables["shower_res_mean"][0] = max(-99999, root_chain.shower_res_mean[shower_id])
+    variables["shower_res_std"][0] = max(-99999, root_chain.shower_res_std[shower_id])
+
     variables["dedx_bdt"][0] =  dedx_hits(
         root_chain.shower_dEdx[shower_id][2],
         root_chain.shower_nhits[shower_id][2])
-
-   
     
     variables["nu_E"][0] = max(-1, root_chain.nu_E)
     # variables["shower_length"][0] = root_chain.shower_length[shower_id]
@@ -442,7 +466,6 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["track_end_z"][0] = track_end[2]
     variables["track_distance"][0] = shower_vertex_d
     variables["shower_distance"][0] = track_vertex_d
-
     variables["shower_start_x"][0] = root_chain.shower_start_x[shower_id]
     # variables["shower_end_x"][0] = root_chain.shower_end_x[shower_id]
     variables["shower_start_y"][0] = root_chain.shower_start_y[shower_id]
@@ -460,7 +483,6 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         dedx_y = statistics.median(total_dedx_hits)
 
     variables["shower_track_d"][0] = distance(shower_vertex, track_vertex)
-    variables["total_shower_energy_y"][0] = total_shower_energy_y
     variables["total_track_energy"][0] = total_track_energy
     # variables["total_track_energy_length"][0] = total_track_energy_length
     variables["track_hits"][0] = total_track_nhits
@@ -481,7 +503,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     v_shower = sum([root_chain.shower_nhits[i_sh][1] for i_sh in range(root_chain.n_showers)])
     v_trackh = sum([root_chain.track_nhits[i_sh][1] for i_sh in range(root_chain.n_tracks)])
 
-    variables["total_hits"][0] = math.ceil((y_shower + y_track) / 2)
+    variables["total_hits"][0] = u_shower + u_track + v_shower + v_trackh + y_shower + y_track
 
     variables["total_hits_u"][0] = u_shower + u_track
     variables["total_hits_v"][0] = v_shower + v_trackh
@@ -496,10 +518,14 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     else:
         variables["category"][0] = root_chain.category
 
-
     variables["event_weight"][0] = weight
-    if variables["category"][0] == 2:
-        variables["event_weight"][0] = weight * 1.325
+
+    if option == "nue":
+        if root_chain.cosmic_fraction > 0.5 and root_chain.category == 7:
+            variables["category"][0] = 2
+
+    # if variables["category"][0] == 2:
+    #     variables["event_weight"][0] = weight * 1.325
 
     variables["pt"][0] = pt_plot(root_chain, 2)
     variables["track_shower_angle"][0] = costheta_shower_track
@@ -513,8 +539,12 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["shower_angle"][0] = -1
 
     total_shower_energy = 0
+    total_shower_energy_cali = 0
+
     total_track_energy_length = 0
     max_pca = 0
+
+
     for i_sh in range(root_chain.n_showers):
         shower_v = [root_chain.shower_start_x[i_sh],
                          root_chain.shower_start_y[i_sh],
@@ -534,16 +564,19 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
         if root_chain.shower_pca[i_sh] > max_pca:
             max_pca = root_chain.shower_pca[i_sh]
-        
-        if i_sh != shower_id and shower_angle > 15:
+
+        if i_sh != shower_id and (70 < shower_angle < 160 or root_chain.shower_pca[i_sh] > 0.985) or root_chain.shower_res_std[i_sh] < 0.2:
             length_e = length2energy(root_chain.shower_length[i_sh])
             variables["reco_energy"][0] += length_e
             total_track_energy_length += length_e
-            variables["n_tracks"][0] += 1
-            variables["n_showers"][0] -= 1
+            # variables["n_tracks"][0] += 1
+            # variables["n_showers"][0] -= 1
         else:
             variables["reco_energy"][0] += root_chain.shower_energy[i_sh][hit_index]
             total_shower_energy += root_chain.shower_energy[i_sh][hit_index]
+            total_shower_energy_cali += root_chain.shower_energy[i_sh][hit_index] * \
+                root_chain.shower_energy_cali[shower_id][2]
+
 
     for i_tr in range(root_chain.n_tracks):
 
@@ -553,33 +586,40 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             root_chain.track_dir_z[i_tr])
 
         cos = v_tr.Dot(v_track) / (v_tr.Mag() * v_track.Mag())
-        track_angle = math.degrees(math.acos(min(cos, 1)))
 
         if root_chain.track_pca[i_tr] < max_pca:
             variables["reco_energy"][0] += root_chain.track_energy_hits[i_tr][hit_index]
             total_shower_energy += root_chain.track_energy_hits[i_tr][hit_index]
-            variables["n_tracks"][0] -= 1
-            variables["n_showers"][0] += 1
+            total_shower_energy_cali += root_chain.track_energy_hits[i_tr][hit_index]
+
+            # variables["n_tracks"][0] -= 1
+            # variables["n_showers"][0] += 1
         else:
             length_e = length2energy(root_chain.track_len[i_tr])
             variables["reco_energy"][0] += length_e
             total_track_energy_length += length_e
 
-        if root_chain.n_tracks == 2:
-            if i_tr != longest_track_id:
-                variables["track_angle"][0] = track_angle
-        else:
-            variables["track_angle"][0] = -1
-
     variables["total_shower_energy"][0] = total_shower_energy
-    variables["total_track_energy_length"][0] = total_track_energy_length
+    variables["total_shower_energy_cali"][0] = total_shower_energy_cali
 
+    variables["total_track_energy_length"][0] = total_track_energy_length
     variables["numu_score"][0] = root_chain.numu_cuts
 
     # dE/dx for the collection plane only
-    dedx = root_chain.shower_dEdx[shower_id][hit_index]
-    variables["dedx"][0] = max(0, dedx)
-    variables["dedx_y"][0] = dedx_y
+
+    dedx_merged = statistics.median(list(root_chain.shower_dEdx_hits[shower_id])) * merged_shower_cali(root_chain, shower_id)
+
+    dedx_cali = root_chain.shower_dEdx[shower_id][2] * root_chain.shower_dQdx_cali[shower_id][2]
+    dedx = root_chain.shower_dEdx[shower_id][2]
+    dedx_u = root_chain.shower_dEdx[shower_id][0] * root_chain.shower_dQdx_cali[shower_id][0]
+    dedx_v = root_chain.shower_dEdx[shower_id][1] * root_chain.shower_dQdx_cali[shower_id][1]
+
+    variables["shower_energy"][0] = root_chain.shower_energy[shower_id][2] * root_chain.shower_energy_cali[shower_id][2]
+    variables["dedx_cali"][0] = max(-1, dedx_cali)
+    variables["dedx"][0] = max(-1, dedx)
+    variables["dedx_u"][0] = max(-1, dedx_u)
+    variables["dedx_v"][0] = max(-1, dedx_v)
+    variables["dedx_merged"][0] = max(-1, dedx_merged)
 
 
 def pt_plot(root_chain, plane):
@@ -677,6 +717,11 @@ def fill_tree(chain, weight, tree, option=""):
             if chain.n_tracks == 0 and chain.n_showers == 1:
                 showers_2_tracks_0 = False
 
+            is_data = option == "bnb_data" or option == "ext_data"
+
+            perfect_reconstruction = True 
+            if (2212 not in chain.matched_tracks or 11 not in chain.matched_showers or 2212 in chain.matched_showers or 11 in chain.matched_tracks) and not is_data:
+                perfect_reconstruction = False 
 
             if option_check and is_fiducial(neutrino_vertex) and track_fidvol and shower_fidvol and showers_2_tracks_0:
                 total_events += event_weight
@@ -694,16 +739,16 @@ def fill_tree(chain, weight, tree, option=""):
 
 begin_time = time.time()
 # To be obtained with Zarko's POT tool
-# data_ext_scaling_factor = 0.1383435698
-data_ext_scaling_factor = 0.1341741721  # 0.153054124
+data_ext_scaling_factor = 0.1382116186  # Sample with remapped PMTs
+
 samples = ["cosmic_mc", "nue", "bnb", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("cosmic_intime_mcc86/*/a*.root"),
-              glob("mc_nue_cali/a*.root"),
-              glob("mc_bnb_cali/*/a*.root"),
-              glob("data_bnb_cali/*/*.root"),
-              glob("data_ext_cali/*/*.root"),
-              glob("lee/*.root")]
+              glob("mc_nue_crhit/*.root"),
+              glob("mc_bnb_larg4/*.root"),
+              glob("data_bnb_new/*/*.root"),
+              glob("data_ext_new/*/*.root"),
+              glob("lee/*a.root")]
 
 chains = []
 chains_pot = []
@@ -728,21 +773,21 @@ pots_dict = dict(zip(samples, pots))
 chains_dict = dict(zip(samples, chains))
 chains_pot_dict = dict(zip(samples, chains_pot))
 variables = dict(variables + spectators)
-pots_dict["nue"] = 1
-pots_dict["bnb"] = 1
+# pots_dict["nue"] = 1
+# pots_dict["bnb"] = 3.91300146e19
+pots_dict["lee"] = 1
 
-weights = [1,#data_ext_scaling_factor * total_pot / total_data_bnb_pot * ext_mc_scaling *
-           #chains_dict["ext_data"].GetEntries() / chains_dict["cosmic_mc"].GetEntries(),
-           total_pot / pots_dict["nue"],
-           total_pot / pots_dict["bnb"],
+weights = [1,
+           total_pot / pots_dict["nue"] * 1.028, # Position of the detector is slightly wrong
+           total_pot / pots_dict["bnb"] * 1.028,
            1,
            data_ext_scaling_factor,
            total_pot / pots_dict["lee"]]
 print(weights)
-files = ["cosmic_mc_file.root", "nue_file.root",
-         "mc_file.root", "bnb_file.root", "bnbext_file.root", "lee_file.root"]
-tree_names = ["cosmic_mc_tree", "nue_tree",
-              "mc_tree", "bnb_tree", "bnbext_tree", "lee_tree"]
+files = ["cosmic_mc_file.root", "nue_file.root", "mc_file.root",
+         "bnb_file.root", "bnbext_file.root", "lee_file.root"]
+tree_names = ["cosmic_mc_tree", "nue_tree", "mc_tree",
+              "bnb_tree", "bnbext_tree", "lee_tree"]
 
 trees = []
 
@@ -785,32 +830,10 @@ for i, s in enumerate(samples):
     print("Time to fill %.1f s"  % (time.time() - start_time))
 
 for f, t in zip(files, trees):
-    tfile = TFile(f, "RECREATE")
+    tfile = TFile("root_files/" + f, "RECREATE")
     t.Write()
     tfile.Close()
 
-
-# Files needed for Zarko's POT counting tool
-
 print("Total time %.2f" % (time.time() - begin_time))
 
-# c_angle = TCanvas("c_angle")
 
-# h_ratio = h_angle_proton.Clone()
-# h_den = h_angle_nonproton.Clone()
-# h_den.Add(h_angle_proton)
-# h_ratio.Divide(h_den)
-
-# h_angle_nonproton.Draw("hist")
-# h_angle_proton.Draw("hist same")
-# h_angle_proton.SetLineColor(kRed + 1)
-# h_angle_nonproton.SetLineColor(kBlue + 1)
-
-# c_angle.Update()
-
-# c_pca = TCanvas("c_pca")
-# h_pca_nonproton.Draw("hist")
-# h_pca_proton.Draw("hist same")
-# c_pca.Update()
-
-# input()

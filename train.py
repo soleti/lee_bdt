@@ -40,12 +40,12 @@ for name, var in spectators:
     dataloader.AddSpectator(name, "F")
 
 
-sigCut = ROOT.TCut("category == 10")
-bgCut = ROOT.TCut("category != 10")
+sigCut = ROOT.TCut("shower_track_d < 5 && track_distance < 5 && shower_distance < 5 && dedx > 1 && dedx < 3.4 && shower_energy > 0.03 && total_shower_energy > 0.01 && shower_energy_y > 0.01 && total_track_energy_length > 0 && numu_score < 17 && track_hits > 5 && shower_hits_y > 5 && total_hits_y > 0 && total_hits_u > 0 && total_hits_v > 0 && category == 2")
+bgCut = ROOT.TCut("shower_track_d < 5 && track_distance < 5 && shower_distance < 5 && dedx > 1 && dedx < 3.4 && shower_energy > 0.03 && total_shower_energy > 0.01 && shower_energy_y > 0.01 && total_track_energy_length > 0 && category != 2 && numu_score < 17 && track_hits > 5 && shower_hits_y > 5 && total_hits_y > 0 && total_hits_u > 0 && total_hits_v > 0")
 
-dataloader.AddSignalTree(t_lee)
+# dataloader.AddSignalTree(t_lee)
 dataloader.AddBackgroundTree(t_nue)
-# dataloader.AddBackgroundTree(t_nue)
+dataloader.AddSignalTree(t_nue)
 dataloader.AddBackgroundTree(t)
 dataloader.AddBackgroundTree(t_cosmic)
 

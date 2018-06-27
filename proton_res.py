@@ -32,7 +32,7 @@ h_res_proton_total = ROOT.TH1F("h_res_proton_total",
                                80, -0.5, 0.5)
 
 h_proton_reco_true = ROOT.TH2F("h_proton_reco_true",
-                               ";p_{E_{k}} [GeV];p_{E_{reco}}",
+                               ";E^{p} [GeV];E^{p}_{reco}",
                                50, 0, 0.6,
                                50, 0, 0.6)
 
@@ -57,7 +57,7 @@ ELECTRON_THRESHOLD = 0.020
 OFFSET = 0.96
 single_tracks_events = 0
 more_tracks = 0
-for i in range(int(entries / 10)):
+for i in range(int(entries / 1)):
     printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
     c.GetEntry(i)
     
@@ -117,7 +117,7 @@ for i in range(int(entries / 10)):
     
     for i_tr in range(c.n_tracks):
         if c.matched_tracks[i_tr] == 2212:
-            reco_proton_energy += length2energy(c.track_len[i_tr])
+            reco_proton_energy += c.track_energy_hits[i_tr][2] #length2energy(c.track_len[i_tr])
             n_tracks += 1
     if bin < n_bins and reco_proton_energy:
         h_reco_proton[bin].Fill(reco_proton_energy)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     g_proton_reco_true = ROOT.TGraphAsymmErrors(
         6, a_bins, a_proton_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
-    h_proton_reco_true.Draw("colz")
+    h_proton_reco_true.Draw("col")
     h_proton_reco_true.SetMinimum(-0.001)
     h_proton_reco_true.GetYaxis().SetTitleOffset(1.1)
     g_proton_reco_true.SetMarkerStyle(20)
@@ -175,12 +175,12 @@ if __name__ == "__main__":
 
     f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 1)
     f_line.SetParNames("m", "q")
-    f_line.SetParameters(1, 0)
+    f_line.SetParameters(0.995, 0)
     l_p_true_reco = ROOT.TLegend(0.11, 0.913, 0.900, 0.968)
     l_p_true_reco.SetNColumns(2)
     l_p_true_reco.AddEntry(g_proton_reco_true, "Most probable value", "lep")
-    g_proton_reco_true.Fit(f_line, "R", "0", 0, 0.5)
-    l_p_true_reco.AddEntry(f_line, "E_{k}^{reco} = %.2f E_{k}^{true} + %.2f GeV" %
+    # g_proton_reco_true.Fit(f_line, "R", "0", 0, 0.5)
+    l_p_true_reco.AddEntry(f_line, "E^{p}_{reco} = %.2f E^{p} + %.2f GeV" %
                         (0.99, 0), "l")
     l_p_true_reco.Draw()
     f_line.Draw("same")

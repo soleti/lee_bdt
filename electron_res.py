@@ -14,7 +14,7 @@ ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
 ELECTRON_MASS = 0.00052
 
-nue_cosmic = glob("mc_nue_ubxsec/*.root")
+nue_cosmic = glob("mc_nue_new/*.root")
 c = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:
@@ -31,7 +31,7 @@ h_res_electron_total = ROOT.TH1F("h_res_electron_total",
                                  80, -0.5, 0.5)
 
 h_electron_reco_true = ROOT.TH2F("h_electron_reco_true",
-                               ";e_{E} [GeV];e_{E_{reco}}",
+                                 ";E^{e} [GeV];E^{e}_{reco} [GeV]",
                                50, 0, 1,
                                50, 0, 1)
 
@@ -55,7 +55,7 @@ ELECTRON_THRESHOLD = 0.020
 OFFSET = 0.8
 BIAS = 0.017
 
-for i in range(int(entries / 10)):
+for i in range(int(entries / 1)):
     printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
     c.GetEntry(i)
     
@@ -98,7 +98,7 @@ for i in range(int(entries / 10)):
 
     for i_sh in range(c.n_showers):
         if c.matched_showers[i_sh] == 11:
-            reco_electron_energy += c.shower_energy[i_sh][2]
+            reco_electron_energy += c.shower_energy[i_sh][2] * c.shower_energy_cali[i_sh][2]
 
     if bin < n_bins and reco_electron_energy:
         h_reco_electron[bin].Fill(reco_electron_energy)
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     g_electron_reco_true = ROOT.TGraphAsymmErrors(
         10, a_bins, a_electron_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
-    h_electron_reco_true.Draw("colz")
+    h_electron_reco_true.Draw("col")
     h_electron_reco_true.SetMinimum(-0.001)
     h_electron_reco_true.GetYaxis().SetTitleOffset(1.1)
     h_electron_reco_true.GetXaxis().SetTitleOffset(1.1)
@@ -149,13 +149,14 @@ if __name__ == "__main__":
 
     f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 1)
     f_line.SetParNames("m", "q")
-    f_line.SetParameters(1, 0)
+    f_line.SetParameters(0.784, -0.017)
     l_p_true_reco = ROOT.TLegend(0.11, 0.913, 0.900, 0.968)
     l_p_true_reco.SetNColumns(2)
     l_p_true_reco.AddEntry(g_electron_reco_true, "Most probable values", "lep")
     g_electron_reco_true.Fit(f_line)
-    l_p_true_reco.AddEntry(f_line, "E_{k}^{reco} = %.2f E_{k}^{true} + %.2f GeV" %
-                        (f_line.GetParameter(0), f_line.GetParameter(1)), "l")
+    l_p_true_reco.AddEntry(f_line, "E_{reco}^{e} = %.2f E^{e} - %.2f GeV" % (f_line.GetParameter(0), -f_line.GetParameter(1)), "l")
+    f_line.SetLineColor(ROOT.kRed + 1)
+    f_line.Draw("same")
     l_p_true_reco.Draw()
     c_electron_reco_true.SetLeftMargin(0.12)
     c_electron_reco_true.SetBottomMargin(0.13)

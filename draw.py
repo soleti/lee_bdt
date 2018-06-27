@@ -7,7 +7,7 @@ from array import array
 from root_numpy import hist2array
 import ROOT
 
-from bdt_common import variables, spectators, bins, total_data_bnb_pot, FC_histo, upper_limit_FC
+from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, FC_histo, upper_limit_FC
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
 
 ROOT.gStyle.SetOptStat(0)
@@ -31,7 +31,7 @@ histograms_bnbext = []
 histograms_mc = []
 histograms_lee = []
 
-histograms = [histograms_bnb, histograms_bnbext, histograms_mc, histograms_lee]
+histograms = [histograms_bnb, histograms_mc, histograms_lee]
 
 
 if DRAW_DATA:
@@ -50,10 +50,6 @@ def set_axis(histogram, y_max = 0):
         histogram.SetMaximum(y_max)
     else:
         histogram.SetMaximum(histogram.GetMaximum() * 1.3)
-
-
-
-
 
 def draw_top():
     pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
@@ -100,12 +96,12 @@ def draw_ratio(num, den):
     h_ratio.GetXaxis().SetLabelSize(0.1)
     h_ratio.GetXaxis().SetTitleSize(0.13)
     h_ratio.GetXaxis().SetTitleOffset(0.91)
-    h_ratio.GetYaxis().SetTitle("Data/(MC + EXT)")
+    h_ratio.GetYaxis().SetTitle("Ratio")
     h_ratio.GetYaxis().SetNdivisions(509)
     h_ratio.GetYaxis().SetLabelFont(42)
     h_ratio.GetYaxis().SetLabelSize(0.1)
-    h_ratio.GetYaxis().SetTitleSize(0.13)
-    h_ratio.GetYaxis().SetTitleOffset(0.36)
+    h_ratio.GetYaxis().SetTitleSize(0.14)
+    h_ratio.GetYaxis().SetTitleOffset(0.3)
 
     h_ratio.Draw("hist")
     # h_ratio.Fit("pol1")
@@ -130,7 +126,7 @@ def draw_ratio(num, den):
 
 legends = []
 l_errs = []
-samples = ["bnb", "bnbext", "mc", "lee"]
+samples = ["bnb", "mc", "lee"]
 
 for name, var in VARIABLES:
 
@@ -140,7 +136,7 @@ for name, var in VARIABLES:
         OBJECTS.append(f)
         histos.append(h)
 
-    legend = ROOT.TLegend(0.1, 0.7747, 0.891117, 0.97926, "", "brNDC")
+    legend = ROOT.TLegend(0.085, 0.7747, 0.891117, 0.97926, "", "brNDC")
     legend.SetTextSize(16)
     legend.SetTextFont(63)
     legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot)
@@ -159,6 +155,13 @@ for name, var in VARIABLES:
     legends.append(legend)
 
 for i, h in enumerate(histograms_mc):
+
+    if DRAW_DATA:
+        legends[i].AddEntry(histograms_bnb[i],
+                            "Data beam-on: {:.0f} events"
+                            .format(histograms_bnb[i].Integral()
+                                    * POST_SCALING), "lep")
+
     for d, histo in zip(description, h.GetHists()):
         if histo.Integral():
 
@@ -169,11 +172,6 @@ for i, h in enumerate(histograms_mc):
                 histo,
                 "{}: {:.1f} events".format(d, n_events), "f")
 
-    if DRAW_DATA:
-        legends[i].AddEntry(histograms_bnb[i],
-                            "Data BNB: {:.0f} events"
-                            .format(histograms_bnb[i].Integral()
-                                    * POST_SCALING), "lep")
     if DRAW_LEE:
         histograms_lee[i].SetLineColor(ROOT.kBlack)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 2)
@@ -186,7 +184,8 @@ for i, h in enumerate(histograms_mc):
 
 
 for h in histograms_mc:
-    h.GetHists()[5].SetFillStyle(3001)
+    h.GetHists()[4].SetFillColor(ROOT.TColor.GetColor("#fca4d0"))
+    h.GetHists()[0].SetFillStyle(3004)
 
 
 if DRAW_SUBTRACTION:
@@ -227,44 +226,43 @@ if DRAW_LEE:
                                   .format(histograms_lee[RECO_ENERGY].Integral() * POST_SCALING),
                                   "f")
 
-c_energy = ROOT.TCanvas("c_energy")
-OBJECTS.append(c_energy)
-signal_spectrum = histograms_mc[RECO_ENERGY].GetHists()[0].Clone()
-signal_spectrum_nuecc = histograms_mc[RECO_ENERGY].GetHists()[1].Clone()
-spectrum_stack = ROOT.THStack("spectrum_stack", ";E_{corr} [GeV]; N. Entries / 0.05 GeV")
+# c_energy = ROOT.TCanvas("c_energy")
+# OBJECTS.append(c_energy)
+# signal_spectrum = histograms_mc[RECO_ENERGY].GetHists()[0].Clone()
+# signal_spectrum_nuecc = histograms_mc[RECO_ENERGY].GetHists()[1].Clone()
+# spectrum_stack = ROOT.THStack("spectrum_stack", ";E_{deposited} [GeV]; N. Entries / 0.05 GeV")
 
-signal_spectrum.Scale(POST_SCALING)
-signal_spectrum_nuecc.Scale(POST_SCALING)
-legend_spectrum = ROOT.TLegend(0.6733, 0.92, 0.913, 0.9747, "", "brNDC")
+# signal_spectrum.Scale(POST_SCALING)
+# signal_spectrum_nuecc.Scale(POST_SCALING)
+# legend_spectrum = ROOT.TLegend(0.6733, 0.92, 0.913, 0.9747, "", "brNDC")
 
+# # signal_spectrum.Add(signal_spectrum_nuecc)
+# legend_spectrum.AddEntry(
+#     signal_spectrum, "Beam intrinsic #nu_{e}: %.1f" % signal_spectrum.Integral(), "f")
+# signal_spectrum_integral = signal_spectrum.Integral()
+# fix_binning(signal_spectrum)
+# fix_binning(signal_spectrum_nuecc)
 
-# signal_spectrum.Add(signal_spectrum_nuecc)
-legend_spectrum.AddEntry(
-    signal_spectrum, "Beam intrinsic #nu_{e}: %.1f" % signal_spectrum.Integral(), "f")
-signal_spectrum_integral = signal_spectrum.Integral()
-fix_binning(signal_spectrum)
-fix_binning(signal_spectrum_nuecc)
+# spectrum_stack.Add(signal_spectrum_nuecc)
+# spectrum_stack.Add(signal_spectrum)
 
-spectrum_stack.Add(signal_spectrum_nuecc)
-spectrum_stack.Add(signal_spectrum)
+# spectrum_stack.Draw("hist")
+# #signal_spectrum.Draw("hist")
+# legend_spectrum.Draw()
 
-spectrum_stack.Draw("hist")
-#signal_spectrum.Draw("hist")
-legend_spectrum.Draw()
-
-pt = ROOT.TPaveText(0.098, 0.905, 0.576, 0.989, "ndc")
-pt.AddText("MicroBooNE Preliminary %.1e POT" % total_pot)
-f_spectrum = ROOT.TFile("plots/f_spectrum.root", "RECREATE")
-signal_spectrum.Write()
-f_spectrum.Close()
-pt.SetFillColor(0)
-pt.SetBorderSize(0)
-pt.SetShadowColor(0)
-pt.Draw()
-OBJECTS.append(signal_spectrum)
-OBJECTS.append(spectrum_stack)
-OBJECTS.append(pt)
-c_energy.Update()
+# pt = ROOT.TPaveText(0.098, 0.905, 0.576, 0.989, "ndc")
+# pt.AddText("MicroBooNE Preliminary %.1e POT" % total_pot)
+# f_spectrum = ROOT.TFile("plots/f_spectrum.root", "RECREATE")
+# signal_spectrum.Write()
+# f_spectrum.Close()
+# pt.SetFillColor(0)
+# pt.SetBorderSize(0)
+# pt.SetShadowColor(0)
+# pt.Draw()
+# OBJECTS.append(signal_spectrum)
+# OBJECTS.append(spectrum_stack)
+# OBJECTS.append(pt)
+# c_energy.Update()
 
 sigma = array("f", [])
 sigma5 = array("f", [])
@@ -305,9 +303,10 @@ for i in range(len(VARIABLES)):
         h_mc_err_nobinning = h_mc_err.Clone()
         h_mc_err_nobinning.SetName("h_mc_err_nobin%i" % i)
 
-        h_sig = histograms_mc[i].GetHists()[0].Clone()
+        h_sig = histograms_mc[i].GetHists()[-1].Clone()
 
         for j in range(histograms_mc[i].GetNhists()):
+            
             histograms_mc[i].GetHists()[j].Scale(POST_SCALING)
 
             h_mc_err_nobinning.Add(histograms_mc[i].GetHists()[j])
@@ -378,10 +377,15 @@ for i in range(len(VARIABLES)):
             histograms_mc[i].Add(histograms_lee[i])
 
         if DRAW_DATA:
-            # draw_top()
+            draw_top()
+            # c.SetTopMargin(0.2274194)
+        else:
             c.SetTopMargin(0.2274194)
-        # else:
-        #     c.SetTopMargin(0.2274194)
+            
+        if DRAW_SUBTRACTION:
+            histograms_bnb[i].Add(histograms_mc[i].GetHists()[0], -1)
+            h_mc_err.Add(histograms_mc[i].GetHists()[0], -1)
+            histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
 
         histograms_mc[i].Draw("hist")
 
@@ -401,9 +405,92 @@ for i in range(len(VARIABLES)):
         h_mc_err.SetFillColor(1)
         h_mc_err_sys.SetFillStyle(3002)
         h_mc_err_sys.SetFillColor(1)
-    
 
+        max_hist = histograms_bnb[i].GetMaximum() * 1.35
+    
+        if VARIABLES[i][0] == "dedx":
+            l1 = ROOT.TLine(1, 0, 1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l2 = ROOT.TLine(3.2, 0, 3.2, max_hist)
+            l2.SetLineStyle(2)
+            l2.SetLineWidth(3)
+            l1.Draw()
+            l2.Draw()
+            OBJECTS.append(l1)
+            OBJECTS.append(l2)
+
+        if VARIABLES[i][0] == "track_distance":
+            l1 = ROOT.TLine(5, 0, 5, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_distance":
+            l1 = ROOT.TLine(5, 0, 5, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_open_angle":
+            l1 = ROOT.TLine(1, 0, 1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l2 = ROOT.TLine(20, 0, 20, max_hist)
+            l2.SetLineStyle(2)
+            l2.SetLineWidth(3)
+            l1.Draw()
+            l2.Draw()
+            OBJECTS.append(l1)
+            OBJECTS.append(l2)
+
+        if VARIABLES[i][0] == "track_shower_angle":
+            l1 = ROOT.TLine(-0.9, 0, -0.9, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "total_hits_y":
+            l1 = ROOT.TLine(50, 0, 50, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_energy":
+            l1 = ROOT.TLine(0.050, 0, 0.050, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "track_length":
+            l1 = ROOT.TLine(80, 0, 80, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+
+        if VARIABLES[i][0] == "dqdx_bdt":
+            l1 = ROOT.TLine(0.1, 0, 0.1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+        
         h_mc_err.Draw("e2 same")
+
+        h_mc_err_clone = h_mc_err.Clone()
+        h_mc_err_clone.SetLineWidth(2)
+        h_mc_err_clone.SetFillStyle(0)
+        h_mc_err_clone.Draw("hist same")
+        OBJECTS.append(h_mc_err_clone)
+        legends[i].AddEntry(h_mc_err, "Stat. error", "lf")
+
         if DRAW_SYS:
             l_errs[i].AddEntry(h_mc_err, "Stat. uncertainties", "lf")
             l_errs[i].AddEntry(h_mc_err_sys, "Stat. #oplus 10% sys. uncertainties", "le")
@@ -421,6 +508,7 @@ for i in range(len(VARIABLES)):
 
             if i == RECO_ENERGY:
                 reco_chi2 = p_chi2
+
             histograms_bnb[i].Draw("ep same")
             p_chi2.Draw("same")
             p_chi2.SetFillStyle(0)
@@ -437,7 +525,7 @@ for i in range(len(VARIABLES)):
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
                       
-            # draw_ratio(histograms_bnb[i], h_mc_err)
+            draw_ratio(histograms_bnb[i], h_mc_err)
 
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
@@ -450,22 +538,23 @@ for i in range(len(VARIABLES)):
 # *******************************
 
 h_true_e = ROOT.THStack(
-    "h_true_e", ";E_{corr} [GeV]; N. Entries / 0.05 GeV")
+    "h_true_e", ";E_{deposited} [GeV]; N. Entries / 0.05 GeV")
 
-h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, 0, len(bins) - 1)
+h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, bins2)
 
 for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
         
     h_clone = histograms_mc[RECO_ENERGY].GetHists()[j].Clone()
-    h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, 0, len(bins) - 1)
+    h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, bins2)
 
     for i in range(1, h_clone.GetNbinsX() + 1):
         h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
         h_fixed.SetBinError(i, h_clone.GetBinError(i))
-        h_fixed.GetXaxis().SetBinLabel(i, "")
         h_mc_fixed.SetBinContent(i, h_mc_fixed.GetBinContent(i) + h_clone.GetBinContent(i))
-
-    h_fixed.SetLineColor(ROOT.kBlack)
+        
+    if j!=0:
+        h_fixed.SetLineWidth(0)
+    h_fixed.SetLineColor(1)
     h_fixed.SetFillColor(h_clone.GetFillColor())
     h_fixed.SetFillStyle(h_clone.GetFillStyle())
 
@@ -476,7 +565,7 @@ for i in range(1, h_mc_fixed.GetNbinsX() + 1):
 
 
 h_clone_data = histograms_bnb[RECO_ENERGY].Clone()
-h_fixed_data = ROOT.TH1F("h_fixed_data", "", len(bins) - 1, 0, len(bins) - 1)
+h_fixed_data = ROOT.TH1F("h_fixed_data", "", len(bins) - 1, bins2)
 
 for i in range(1, h_clone_data.GetNbinsX() + 1):
     h_fixed_data.SetBinContent(i, h_clone_data.GetBinContent(i))
@@ -488,30 +577,64 @@ h_fixed_data.SetMarkerStyle(20)
 c_fixed = ROOT.TCanvas("c_true")
 h_true_e.Draw("hist")
 h_true_e.GetYaxis().SetTitleOffset(0.95)
+h_mc_fixed.SetLineWidth(2)
+h_mc_fixed.SetLineColor(1)
 h_mc_fixed.Draw("e2 same")
+h_mc_fixed_clone = h_mc_fixed.Clone()
+h_mc_fixed_clone.Draw("hist same")
+
 h_mc_fixed.SetFillColor(ROOT.kBlack)
 h_mc_fixed.SetFillStyle(3002)
-h_true_e.SetMaximum(h_fixed_data.GetMaximum() * 1.3)
-h_true_e.SetMinimum(0.01)
+h_true_e.SetMaximum(max(h_true_e.GetMaximum(), h_fixed_data.GetMaximum()) * 1.3)
+h_true_e.SetMinimum(0.001)
 
 if DRAW_DATA:
     h_fixed_data.Draw("ep same")
-    reco_chi2.Draw()
-    p_datamc = ROOT.TPaveText(0.587, 0.583, 0.872, 0.695, "NDC")
+    # reco_chi2.Draw()
+    p_datamc = ROOT.TPaveText(0.563, 0.58947, 0.882, 0.703, "NDC")
     p_datamc.SetFillStyle(0)
     p_datamc.SetShadowColor(0)
     p_datamc.SetBorderSize(0)
     p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
-    p_datamc.Draw()
+    # p_datamc.Draw()
 legends[RECO_ENERGY].Draw()
-c_fixed.SetTopMargin(0.2274194)
-ax = ROOT.TGaxis(0, 0, len(bins) - 1, 0, 0, len(bins) - 1, 515, "")
-for i, i_bin in enumerate(bins):
-    ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
-                   "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
-ax.SetLabelFont(42)
-ax.SetLabelSize(0.04)
-ax.Draw()
+c_fixed.SetTopMargin(0.245)
+c_fixed.SetBottomMargin(0.105)
+
+p_15 = ROOT.TPaveText(0.7679, 0.06, 0.843, 0.105, "NDC")
+p_15.AddText("1.5")
+p_15.SetFillStyle(0)
+p_15.SetShadowColor(0)
+p_15.SetBorderSize(0)
+p_15.SetTextFont(42)
+p_15.Draw()
+
+p_white = ROOT.TPaveText(0.832, 0.065, 0.871, 0.10, "NDC")
+p_white.AddText("  ")
+p_white.SetFillColor(ROOT.kWhite)
+p_white.SetShadowColor(0)
+p_white.SetBorderSize(0)
+p_white.SetTextFont(42)
+p_white.SetTextSize(14)
+p_white.Draw()
+
+
+p_3 = ROOT.TPaveText(0.861, 0.06, 0.936, 0.105, "NDC")
+p_3.AddText("3")
+p_3.SetFillStyle(0)
+p_3.SetShadowColor(0)
+p_3.SetBorderSize(0)
+p_3.SetTextFont(42)
+p_3.Draw()
+# h_true_e.GetXaxis().ChangeLabel(2,  -1, -1, -1, -1, -1, "aaaaa")
+# ax = ROOT.TGaxis(0, 0, 1.7, 0, 0, 1.7, 515, "")
+# for i, i_bin in enumerate(bins):
+#     ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
+#                    "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
+# ax.SetLabelFont(42)
+# ax.SetLabelSize(0.04)
+# ax.Draw()
+# pt3.Draw()
 c_fixed.Update()
 c_fixed.SaveAs("plots/h_fixed_energy.pdf")
 # *******************************
@@ -582,7 +705,6 @@ DRAW_NORMALIZED = False
 if DRAW_NORMALIZED:
 
     for i in range(len(VARIABLES)):
-
         c_norm = ROOT.TCanvas("c%i_norm" % i, "", 900, 44, 700, 645)
 
 
@@ -613,17 +735,99 @@ if DRAW_NORMALIZED:
         h_cosmic_bkg.SetFillStyle(0)
         h_cosmic_bkg.SetLineWidth(3)
         h_cosmic_bkg.SetLineColor(ROOT.kRed + 1)
-        h_signal.SetMaximum(max([h_signal.GetMaximum(), h_neutrino_bkg.GetMaximum(), h_cosmic_bkg.GetMaximum()]) * 1.2)
+        max_hist = max(h_signal.GetMaximum(), h_neutrino_bkg.GetMaximum(), h_cosmic_bkg.GetMaximum()) * 1.2
 
-        l_norm = ROOT.TLegend(0.59, 0.75, 0.86, 0.85)
+        h_signal.SetMaximum(max_hist)
+        h_signal.SetMinimum(0.00001)
+
+        l_norm = ROOT.TLegend(0.59, 0.73, 0.86, 0.82)
         l_norm.AddEntry(h_signal, "#nu_{e} CC0#pi-Np", "f")
         l_norm.AddEntry(h_neutrino_bkg, "Neutrino background", "f")
         l_norm.AddEntry(h_cosmic_bkg, "Cosmic background", "f")
-
         h_signal.Draw("hist")
         h_neutrino_bkg.Draw("hist same")
         h_cosmic_bkg.Draw("hist same")
         l_norm.Draw()
+
+    # track_distance = chain.track_distance < 5
+    # track_res = chain.track_res_std < 2
+    # shower_angle = not (5 < chain.shower_angle < 45)
+    # dqdx = chain.dqdx_bdt_max > 0.1  # and chain.dqdx_bdt > 0.1
+    # corrected_energy = 0.55 < chain.total_shower_energy / \
+
+        if VARIABLES[i][0] == "dedx":
+            l1 = ROOT.TLine(1, 0, 1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l2 = ROOT.TLine(3.2, 0, 3.2, max_hist)
+            l2.SetLineStyle(2)
+            l2.SetLineWidth(3)
+            l1.Draw()
+            l2.Draw()
+            OBJECTS.append(l1)
+            OBJECTS.append(l2)
+
+        if VARIABLES[i][0] == "track_distance":
+            l1 = ROOT.TLine(5, 0, 5, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_distance":
+            l1 = ROOT.TLine(5, 0, 5, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_open_angle":
+            l1 = ROOT.TLine(1, 0, 1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l2 = ROOT.TLine(20, 0, 20, max_hist)
+            l2.SetLineStyle(2)
+            l2.SetLineWidth(3)
+            l1.Draw()
+            l2.Draw()
+            OBJECTS.append(l1)
+            OBJECTS.append(l2)
+
+        if VARIABLES[i][0] == "track_shower_angle":
+            l1 = ROOT.TLine(-0.9, 0, -0.9, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "total_hits_y":
+            l1 = ROOT.TLine(50, 0, 50, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "shower_energy":
+            l1 = ROOT.TLine(0.050, 0, 0.050, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+        if VARIABLES[i][0] == "track_length":
+            l1 = ROOT.TLine(80, 0, 80, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
+
+
+        if VARIABLES[i][0] == "dqdx_bdt":
+            l1 = ROOT.TLine(0.1, 0, 0.1, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            OBJECTS.append(l1)
 
         pt = ROOT.TPaveText(0.136, 0.906, 0.501, 0.953, "ndc")
         pt.AddText("MicroBooNE Preliminary")
@@ -632,12 +836,21 @@ if DRAW_NORMALIZED:
         pt.SetShadowColor(0)
         pt.Draw()
 
+        pt2 = ROOT.TPaveText(0.59, 0.83, 0.80, 0.87, "ndc")
+        pt2.AddText("Area normalized")
+        pt2.SetFillColor(0)
+        pt2.SetBorderSize(0)
+        pt2.SetShadowColor(0)
+        pt2.Draw()
+
         c_norm.SetLeftMargin(0.14)
         c_norm.SetRightMargin(0.06)
         c_norm.Update()
         c_norm.SaveAs("plots/integral/%s_norm.pdf" % histograms_bnb[i].GetName())
 
         OBJECTS.append(pt)
+        OBJECTS.append(pt2)
+
         OBJECTS.append(l_norm)
         OBJECTS.append(c_norm)
         OBJECTS.append(h_signal)

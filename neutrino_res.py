@@ -36,7 +36,7 @@ h_res_nu_total = ROOT.TH1F("h_res_nu_total",
                            80, -0.5, 0.5)
 
 h_nu_reco_true = ROOT.TH2F("h_nu_reco_true",
-                           ";E_{#nu} [GeV];E_{corr} [GeV]",
+                           ";E_{#nu} [GeV];E_{deposited} [GeV]",
                            50, 0, 3,
                            50, 0, 3)
 
@@ -303,7 +303,7 @@ if __name__ == "__main__":
         len(bins) - 1, a_bins, a_nu_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
 
     h_nu_reco_true.SetMinimum(-0.001)
-    h_nu_reco_true.Draw("colz")
+    h_nu_reco_true.Draw("col")
     h_nu_reco_true.GetYaxis().SetTitleOffset(1.1)
     h_nu_reco_true.GetXaxis().SetTitleOffset(1.1)
         
@@ -322,7 +322,7 @@ if __name__ == "__main__":
     # f_fit = ROOT.TFile("plots/f_fit.root", "RECREATE")
     # f_line.Write()
     # f_fit.Close()
-    l_p_true_reco.AddEntry(f_line, "E_{corr} = %.2f E_{#nu} + %.2f" %
+    l_p_true_reco.AddEntry(f_line, "E_{deposited} = %.2f E_{#nu} + %.2f" %
                         (f_line.GetParameter(1), f_line.GetParameter(0)), "l")
     l_p_true_reco.Draw()
     c_nu_reco_true.SetLeftMargin(0.12)
