@@ -4,24 +4,24 @@ import ROOT
 from bdt_common import variables, spectators, manual, bdt, bins, binning
 
 
-f_input = ROOT.TFile("mc_file.root")
+f_input = ROOT.TFile("root_files/mc_file.root")
 t = ROOT.TTree()
 t = f_input.Get("mc_tree")
 
-f_cosmic = ROOT.TFile("bnbext_file.root")
+f_cosmic = ROOT.TFile("root_files/bnbext_file.root")
 t_cosmic = ROOT.TTree()
 t_cosmic = f_cosmic.Get("bnbext_tree")
 
-f_nue = ROOT.TFile("nue_file.root")
+f_nue = ROOT.TFile("root_files/nue_file.root")
 t_nue = ROOT.TTree()
 t_nue = f_nue.Get("nue_tree")
 
-f_lee = ROOT.TFile("lee_file.root")
+f_lee = ROOT.TFile("root_files/lee_file.root")
 t_lee = ROOT.TTree()
 t_lee = f_lee.Get("lee_tree")
 
 ROOT.TMVA.Tools.Instance()
-fout = ROOT.TFile("test.root", "RECREATE")
+fout = ROOT.TFile("root_files/test.root", "RECREATE")
 factory = ROOT.TMVA.Factory("TMVAClassification", fout,
                             ":".join([
                                 "!V",

@@ -301,7 +301,7 @@ if sample == "mc":
     h_dedx_hits_electron.Draw("ep")
     h_dedx_hits_electron.SetLineColor(ROOT.kAzure + 1)
 
-    f_dedx_hits_electron = ROOT.TFile("f_dedx_hits_electron.root", "RECREATE")
+    f_dedx_hits_electron = ROOT.TFile("root_files/f_dedx_hits_electron.root", "RECREATE")
     h_dedx_hits_electron.Write()
     f_dedx_hits_electron.Close()
 
@@ -309,35 +309,35 @@ if sample == "mc":
     h_dedx_hits_photon.Draw("ep same")
     h_dedx_hits_photon.SetLineWidth(3)
     h_dedx_hits_photon.SetLineColor(ROOT.kRed - 4)
-    f_dedx_hits_photon = ROOT.TFile("f_dedx_hits_photon.root", "RECREATE")
+    f_dedx_hits_photon = ROOT.TFile("root_files/f_dedx_hits_photon.root", "RECREATE")
     h_dedx_hits_photon.Write()
     f_dedx_hits_photon.Close()
 
     h_dedx_hits_other.SetLineColor(ROOT.kBlack)
     h_dedx_hits_other.Draw("ep same")
     h_dedx_hits_other.SetFillColor(ROOT.kGray)
-    f_dedx_hits_other = ROOT.TFile("f_dedx_hits_other.root", "RECREATE")
+    f_dedx_hits_other = ROOT.TFile("root_files/f_dedx_hits_other.root", "RECREATE")
     h_dedx_hits_other.Write()
     f_dedx_hits_other.Close()
 
     h_dedx_hits_pion.SetLineColor(ROOT.kBlack)
     h_dedx_hits_pion.Draw("ep same")
     h_dedx_hits_pion.SetFillColor(ROOT.kOrange + 1)
-    f_dedx_hits_pion = ROOT.TFile("f_dedx_hits_pion.root", "RECREATE")
+    f_dedx_hits_pion = ROOT.TFile("root_files/f_dedx_hits_pion.root", "RECREATE")
     h_dedx_hits_pion.Write()
     f_dedx_hits_pion.Close()
 
     h_dedx_hits_muon.SetLineColor(ROOT.kBlack)
     h_dedx_hits_muon.Draw("ep same")
     h_dedx_hits_muon.SetFillColor(ROOT.kGreen + 1)
-    f_dedx_hits_muon = ROOT.TFile("f_dedx_hits_muon.root", "RECREATE")
+    f_dedx_hits_muon = ROOT.TFile("root_files/f_dedx_hits_muon.root", "RECREATE")
     h_dedx_hits_muon.Write()
     f_dedx_hits_muon.Close()
 
     h_dedx_hits_hadron.SetLineColor(ROOT.kBlack)
     h_dedx_hits_hadron.Draw("ep same")
     h_dedx_hits_hadron.SetFillColor(ROOT.kBlue - 4)
-    f_dedx_hits_hadron = ROOT.TFile("f_dedx_hits_hadron.root", "RECREATE")
+    f_dedx_hits_hadron = ROOT.TFile("root_files/f_dedx_hits_hadron.root", "RECREATE")
     h_dedx_hits_hadron.Write()
     f_dedx_hits_hadron.Close()
 
@@ -412,10 +412,10 @@ if sample == "mc":
 else:
     c_dedx_hits_data = ROOT.TCanvas("c_dedx_hits_data")
     if sample == "dataext":
-        f_dedx_hits_data = ROOT.TFile("f_dedx_hits_dataext.root", "RECREATE")
+        f_dedx_hits_data = ROOT.TFile("root_files/f_dedx_hits_dataext.root", "RECREATE")
         h_dedx_hits_data.Write()
     elif sample == "databnb":
-        f_dedx_hits_data = ROOT.TFile("f_dedx_hits_databnb.root", "RECREATE")
+        f_dedx_hits_data = ROOT.TFile("root_files/f_dedx_hits_databnb.root", "RECREATE")
         h_dedx_hits_data.Write()
 
     f_dedx_hits_data.Close()

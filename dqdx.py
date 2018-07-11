@@ -8,7 +8,7 @@ from bdt_common import printProgressBar, is_1eNp, PROTON_MASS, is_fiducial
 
 def train_BDT(name, variables, signal_tree, bkg_tree):
     ROOT.TMVA.Tools.Instance()
-    fout = ROOT.TFile("%s.root" % name, "RECREATE")
+    fout = ROOT.TFile("root_files/%s.root" % name, "RECREATE")
     factory = ROOT.TMVA.Factory("TMVAClassification", fout,
                                 ":".join([
                                     "!V",
