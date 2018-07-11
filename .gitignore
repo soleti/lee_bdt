@@ -11,9 +11,11 @@ __pycache__
 a.py
 *.json
 eff_comparison.py
-data_bnb_1e0p/
-data_ext_1e0p/
-mc_bnb_1e0p/
-mc_bnb_1e0p_tune2/
-mc_nue_1e0p/
-mc_nue_1e0p_tune2/
+track_study.py
+bin_purity.py
+dqdx_plot.py
+eff_selected.py
+filter_tree.py
+ineff.py
+reclassification.py
+cutflow.py
