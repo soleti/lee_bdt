@@ -104,7 +104,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             # if category == 2 and not manual:
             #     corr = 1.2
             if option == "bnbext":
-                corrected_energy_cali = ((chain.total_shower_energy_cali * 0.987 + 1.36881e-02) /
+                corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
                                             7.69908e-01) + chain.total_track_energy_length
             else:
                 corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
@@ -348,7 +348,7 @@ for h in stacked_histos:
     h.Write()
     f.Close()
 
-f_data = ROOT.TFile("bnb_file.root")
+f_data = ROOT.TFile("root_files/bnb_file.root")
 t_data = f_data.Get("bnb_tree")
 
 for name, var in variables:

@@ -419,8 +419,8 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     else:
         variables["track_res_mean"][0] = max(-999, root_chain.track_res_mean[track_id])
         variables["track_res_std"][0] = max(-999, root_chain.track_res_std[track_id])
-        variables["track_pidchi"][0] = max(-999, root_chain.track_pidchi[track_id])
-        variables["track_pidchipr"][0] = max(-999, root_chain.track_pidchipr[track_id])
+        variables["track_pidchi"][0] = -999#max(-999, root_chain.track_pidchi[track_id])
+        variables["track_pidchipr"][0] = -999#max(-999, root_chain.track_pidchipr[track_id])
         variables["track_length"][0] = root_chain.track_len[longest_track_id]
         variables["track_phi"][0] = math.degrees(root_chain.track_phi[track_id])
         variables["track_theta"][0] = math.degrees(root_chain.track_theta[track_id])
@@ -575,7 +575,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             variables["reco_energy"][0] += root_chain.shower_energy[i_sh][hit_index]
             total_shower_energy += root_chain.shower_energy[i_sh][hit_index]
             total_shower_energy_cali += root_chain.shower_energy[i_sh][hit_index] * \
-                root_chain.shower_energy_cali[shower_id][2]
+                root_chain.shower_energy_cali[i_sh][hit_index]
 
 
     for i_tr in range(root_chain.n_tracks):
@@ -590,7 +590,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         if root_chain.track_pca[i_tr] < max_pca:
             variables["reco_energy"][0] += root_chain.track_energy_hits[i_tr][hit_index]
             total_shower_energy += root_chain.track_energy_hits[i_tr][hit_index]
-            total_shower_energy_cali += root_chain.track_energy_hits[i_tr][hit_index]
+            total_shower_energy_cali += root_chain.track_energy_hits[i_tr][hit_index] * root_chain.track_energy_cali[i_tr][hit_index]
 
             # variables["n_tracks"][0] -= 1
             # variables["n_showers"][0] += 1
@@ -739,15 +739,15 @@ def fill_tree(chain, weight, tree, option=""):
 
 begin_time = time.time()
 # To be obtained with Zarko's POT tool
-data_ext_scaling_factor = 0.1382116186  # Sample with remapped PMTs
+data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
 samples = ["cosmic_mc", "nue", "bnb", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("cosmic_intime_mcc86/*/a*.root"),
               glob("mc_nue_crhit/*.root"),
-              glob("mc_bnb_larg4/*.root"),
-              glob("data_bnb_new/*/*.root"),
-              glob("data_ext_new/*/*.root"),
+              glob("mc_bnb_newcrhit/*/*.root"),
+              glob("data_bnb_newcrhit/*/*.root"),
+              glob("data_ext_newcrhit/*/*.root"),
               glob("lee/*a.root")]
 
 chains = []

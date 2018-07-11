@@ -2,7 +2,6 @@ from array import array
 import numpy as np
 import math
 import ROOT
-from root_numpy import hist2array
 from scipy.stats import poisson
 
 ELECTRON_MASS = 0.51e-3 
@@ -15,7 +14,7 @@ bdt, manual = False, False
 total_data_bnb_pot_mcc83 = 4.903e+19
 total_data_bnb_pot_mcc86 = 4.841e+19
 total_data_bnb_pot_nogoodruns = 4.793e+19
-total_data_bnb_goodruns_remap = 4.407e+19
+total_data_bnb_goodruns_remap = 4.341e+19
 
 total_data_bnb_pot_goodruns = 4.356e+19
 total_data_bnb_pot_numu = 1.627e20
@@ -199,7 +198,7 @@ def pre_cuts(chain):
     # track_end = [chain.track_end_x, chain.track_end_y, chain.track_end_z]
     # shower_start = [chain.shower_start_x, chain.shower_start_y, chain.shower_start_z]
     # fiducial = is_fiducial(track_start) and is_fiducial(track_end) and is_fiducial(shower_start)
-    numu = -13 <= chain.numu_score < 170 or manual
+    numu = 13 <= chain.numu_score < 17 or manual
     track_pca = chain.track_pca > 0.9
     n_showers = chain.n_showers == 2
     # aa = 0.3 < chain.total_shower_energy/0.78 + 0.02 + chain.total_track_energy_length < 0.375
@@ -225,7 +224,7 @@ def is_fiducial(point):
 
 
 def fill_histos_data(tree_name, bdt, manual):
-    f_data = ROOT.TFile("%s_file.root" % tree_name)
+    f_data = ROOT.TFile("root_files/%s_file.root" % tree_name)
     t_data = f_data.Get("%s_tree" % tree_name)
 
     ROOT.TMVA.Tools.Instance()
@@ -299,12 +298,12 @@ def fill_histos_data(tree_name, bdt, manual):
                     histo_dict[name].Fill(var[0], t_data.event_weight)
                 for name, var in spectators:
                     if name == "reco_energy":
-                        corrected_energy_cali = ((t_data.total_shower_energy_cali * 0.987 + 1.36881e-02) /
+                        corrected_energy_cali = ((t_data.total_shower_energy_cali + 1.36881e-02) /
                                                   7.69908e-01) + t_data.total_track_energy_length
                         corrected_energy = ((t_data.total_shower_energy + 1.23986e-02) /
                                             7.87131e-01) + t_data.total_track_energy_length
 
-                        corrected_energy_hits = ((t_data.total_shower_energy_cali * 0.987 + 1.36881e-02) /
+                        corrected_energy_hits = ((t_data.total_shower_energy_cali + 1.36881e-02) /
                                                  7.69908e-01) + (t_data.total_track_energy + 3.57033e-02) / 7.70870e-01
                                     
                         histo_dict[name].Fill(corrected_energy_cali, t_data.event_weight)
@@ -357,8 +356,8 @@ def manual_cuts(chain):
         track_distance = chain.track_distance < 2
 
 
-    collabmeeting_cuts = [dedx, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, dqdx, track_res, dedx_bdt,
-                          track_distance, shower_distance, shower_open_angle, track_length]
+    collabmeeting_cuts = [dedx, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, track_res,
+                          track_distance, shower_distance, shower_open_angle, track_length, chain.dqdx_bdt > 0.1]
 
     # collabmeeting_cuts = [total_hits_y, numu_exclude, shower_energy, ratio, dqdx, track_res, dedx_bdt,
     #                       track_shower_angle, shower_open_angle, track_length]
