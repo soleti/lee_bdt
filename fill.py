@@ -26,7 +26,7 @@ length = array("f", [0])
 reader_dqdx.AddVariable("dqdx", dqdx)
 reader_dqdx.AddVariable("len", length)
 reader_dqdx.BookMVA("dqdx BDT",
-                "dataset/weights/TMVAClassification_dqdx BDT.weights.xml")
+                    "dataset/weights/TMVAClassification_dqdx BDT.weights.xml")
 
 reader_dedx = TMVA.Reader(":".join([
     "!V",
@@ -49,7 +49,7 @@ length_pion = array("f", [0])
 reader_dqdx_pion.AddVariable("dqdx", dqdx_pion)
 reader_dqdx_pion.AddVariable("len", length_pion)
 reader_dqdx_pion.BookMVA("dqdx pion BDT",
-                    "dataset/weights/TMVAClassification_dqdx pion BDT.weights.xml")
+                         "dataset/weights/TMVAClassification_dqdx pion BDT.weights.xml")
 
 def min_dqdx_pion(root_chain):
     min_score = 1
@@ -92,7 +92,7 @@ def max_dqdx(root_chain):
         score = dqdx_length(track_dqdx, track_length)
         if score > max_score:
             max_score = score
-    
+
     return max_score
 
 
@@ -158,7 +158,7 @@ def merge_dedx_hits(dedx_planes, hits):
     return sum(dedx * hit for dedx, hit in zip(dedx_planes, hits)) / sum(hits)
 
 def dqdx_length(v_dqdx, v_length):
-    
+
     if v_dqdx < 0:
         return -1
 
@@ -180,11 +180,11 @@ def dedx_hits(v_dedx, v_hits):
 def pi0_mass(root_chain):
     if root_chain.n_showers < 2:
         return -1
-    
+
     shower_energies = sorted(
         [e[2] for e in root_chain.shower_energy], reverse=True)
     shower_ids = []
-    
+
     for i_sh in range(root_chain.n_showers):
         if root_chain.shower_energy[i_sh][2] in shower_energies:
             shower_ids.append(i_sh)
@@ -193,7 +193,7 @@ def pi0_mass(root_chain):
         root_chain.shower_dir_x[shower_ids[0]],
         root_chain.shower_dir_y[shower_ids[0]],
         root_chain.shower_dir_z[shower_ids[0]])
-      
+
     v_2 = TVector3(
         root_chain.shower_dir_x[shower_ids[1]],
         root_chain.shower_dir_y[shower_ids[1]],
@@ -214,14 +214,14 @@ def pi0_mass(root_chain):
             root_chain.shower_dir_x[i_sh],
             root_chain.shower_dir_y[i_sh],
             root_chain.shower_dir_z[i_sh])
-        
+
         cos_1 = v_x.Dot(v_1) / (v_x.Mag() * v_1.Mag())
         cos_2 = v_x.Dot(v_2) / (v_x.Mag() * v_2.Mag())
         if math.acos(cos_1) < math.acos(cos_2):
             e1 += root_chain.shower_energy[i_sh][2]
         else:
             e2 += root_chain.shower_energy[i_sh][2]
-            
+
     pi0_mass = math.sqrt(4 * e1 * e2 * (math.sin(angle / 2)**2))
 
     return pi0_mass
@@ -342,7 +342,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
     if no_tracks:
         length = root_chain.shower_length[track_like_shower_id]
-        
+
         shower_end_x = root_chain.shower_start_x[track_like_shower_id] + \
                        length * root_chain.shower_dir_x[track_like_shower_id]
 
@@ -377,8 +377,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["is_signal"][0] = signal
     variables["true_nu_is_fidvol"][0] = int(is_fiducial(true_vertex))
 
-    total_shower_nhits = sum([root_chain.shower_nhits[i_sh][hit_index] for i_sh in range(root_chain.n_showers)])
-    total_shower_nhits_y = sum([root_chain.shower_nhits[i_sh][2] for i_sh in range(root_chain.n_showers)])
+    total_shower_nhits = sum([root_chain.shower_nhits[i_sh][hit_index]
+                              for i_sh in range(root_chain.n_showers)])
+    total_shower_nhits_y = sum([root_chain.shower_nhits[i_sh][2]
+                                for i_sh in range(root_chain.n_showers)])
 
     variables["n_objects"][0] = root_chain.n_tracks + root_chain.n_showers
     variables["no_tracks"][0] = int(no_tracks)
@@ -455,17 +457,17 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["shower_res_mean"][0] = max(-99999, root_chain.shower_res_mean[shower_id])
     variables["shower_res_std"][0] = max(-99999, root_chain.shower_res_std[shower_id])
 
-    variables["dedx_bdt"][0] =  dedx_hits(
+    variables["dedx_bdt"][0] = dedx_hits(
         root_chain.shower_dEdx[shower_id][2],
         root_chain.shower_nhits[shower_id][2])
-    
+
     variables["nu_E"][0] = max(-1, root_chain.nu_E)
     # variables["shower_length"][0] = root_chain.shower_length[shower_id]
     variables["track_end_x"][0] = track_end[0]
     variables["track_end_y"][0] = track_end[1]
     variables["track_end_z"][0] = track_end[2]
-    variables["track_distance"][0] = shower_vertex_d
-    variables["shower_distance"][0] = track_vertex_d
+    variables["track_distance"][0] = track_vertex_d
+    variables["shower_distance"][0] = shower_vertex_d
     variables["shower_start_x"][0] = root_chain.shower_start_x[shower_id]
     # variables["shower_end_x"][0] = root_chain.shower_end_x[shower_id]
     variables["shower_start_y"][0] = root_chain.shower_start_y[shower_id]
@@ -547,8 +549,8 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
     for i_sh in range(root_chain.n_showers):
         shower_v = [root_chain.shower_start_x[i_sh],
-                         root_chain.shower_start_y[i_sh],
-                         root_chain.shower_start_z[i_sh]]
+                    root_chain.shower_start_y[i_sh],
+                    root_chain.shower_start_z[i_sh]]
 
         v_sh = TVector3(
             root_chain.shower_dir_x[i_sh],
@@ -590,7 +592,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         if root_chain.track_pca[i_tr] < max_pca:
             variables["reco_energy"][0] += root_chain.track_energy_hits[i_tr][hit_index]
             total_shower_energy += root_chain.track_energy_hits[i_tr][hit_index]
-            total_shower_energy_cali += root_chain.track_energy_hits[i_tr][hit_index] * root_chain.track_energy_cali[i_tr][hit_index]
+            total_shower_energy_cali += root_chain.track_energy_hits[i_tr][hit_index]# * root_chain.track_energy_cali[i_tr][hit_index]
 
             # variables["n_tracks"][0] -= 1
             # variables["n_showers"][0] += 1
@@ -672,7 +674,7 @@ def fill_tree(chain, weight, tree, option=""):
 
     for ievt in range(total_entries):
         chain.GetEntry(ievt)
-        printProgressBar(ievt, total_entries, prefix="Progress:", suffix="Complete", length = 20)
+        printProgressBar(ievt, total_entries, prefix="Progress:", suffix="Complete", length=20)
 
         if chain.passed:
 
@@ -706,7 +708,7 @@ def fill_tree(chain, weight, tree, option=""):
             if option == "bnb":
                 option_check = abs(chain.nu_pdg) != 12
             if abs(chain.nu_pdg) == 12:
-                event_weight = weight * chain.bnbweight 
+                event_weight = weight * chain.bnbweight
             if "nue" in option:
                 option_check = abs(chain.nu_pdg) == 12
 
@@ -719,9 +721,9 @@ def fill_tree(chain, weight, tree, option=""):
 
             is_data = option == "bnb_data" or option == "ext_data"
 
-            perfect_reconstruction = True 
+            perfect_reconstruction = True
             if (2212 not in chain.matched_tracks or 11 not in chain.matched_showers or 2212 in chain.matched_showers or 11 in chain.matched_tracks) and not is_data:
-                perfect_reconstruction = False 
+                perfect_reconstruction = False
 
             if option_check and is_fiducial(neutrino_vertex) and track_fidvol and shower_fidvol and showers_2_tracks_0:
                 total_events += event_weight
@@ -744,10 +746,10 @@ data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 samples = ["cosmic_mc", "nue", "bnb", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("cosmic_intime_mcc86/*/a*.root"),
-              glob("mc_nue_crhit/*.root"),
-              glob("mc_bnb_newcrhit/*/*.root"),
-              glob("data_bnb_newcrhit/*/*.root"),
-              glob("data_ext_newcrhit/*/*.root"),
+              glob("mc_nue_new/*.root"),
+              glob("mc_bnb_new/*/*.root"),
+              glob("data_bnb_new/*/*.root"),
+              glob("data_ext_new/*/*.root"),
               glob("lee/*a.root")]
 
 chains = []
@@ -835,5 +837,3 @@ for f, t in zip(files, trees):
     tfile.Close()
 
 print("Total time %.2f" % (time.time() - begin_time))
-
-

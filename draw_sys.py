@@ -1,14 +1,8 @@
 #!/usr/local/bin/python3
 
-import pickle
-import math
-import numpy as np
-from array import array
-from root_numpy import hist2array
 import ROOT
 
-from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, FC_histo, upper_limit_FC
-from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
+from bdt_common import variables, spectators, description, total_pot, fix_binning
 
 ROOT.gStyle.SetOptStat(0)
 
@@ -18,16 +12,22 @@ DESCRIPTIONS = ["Standard MC + DIC",
                 "Standard MC + data SCE"]
 OBJECTS = []
 SYS_ERR = 0.1
+
 histograms_bnb = []
 histograms_mc = []
 histograms_mc_dic = []
 histograms_mc_larg4 = []
 histograms_mc_sce = []
 
-histograms_lee = []
 VARIABLES = variables + spectators
 RECO_ENERGY = list(dict(VARIABLES)).index("reco_energy")
-histograms = [histograms_bnb, histograms_mc, histograms_mc_dic, histograms_mc_sce, histograms_mc_larg4]
+
+histograms = [histograms_bnb,
+              histograms_mc,
+              histograms_mc_dic,
+              histograms_mc_sce,
+              histograms_mc_larg4]
+
 
 def draw_histo(histo, color):
     histo.SetFillColor(color)
@@ -44,7 +44,8 @@ def draw_histo(histo, color):
     histo_clone.Draw("hist same")
     OBJECTS.append(histo_clone)
 
-def set_axis(histogram, y_max = 0):
+
+def set_axis(histogram, y_max=0):
     histogram.GetYaxis().SetTitleSize(0.06)
     histogram.GetYaxis().SetTitleOffset(0.75)
     histogram.SetMinimum(0.01)
@@ -52,6 +53,7 @@ def set_axis(histogram, y_max = 0):
         histogram.SetMaximum(y_max)
     else:
         histogram.SetMaximum(histogram.GetMaximum() * 1.3)
+
 
 def draw_top():
     pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
@@ -198,7 +200,7 @@ for i in range(len(VARIABLES)):
 
     h_sums = [h_sum]
 
-    for j, h_sys in enumerate(histograms[2:3]):
+    for j, h_sys in enumerate(histograms[2:]):
         h_sys_sum = h_sys[i].GetStack().Last().Clone()
         h_sys_sum.Add(h_sys[i].GetHists()[0], -1)
         legends[i].AddEntry(h_sys_sum, "%s: %.1f events" %

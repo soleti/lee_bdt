@@ -31,8 +31,12 @@ h_int = {}
 for name in interactions:
     h_int[interactions[name]] = ROOT.TH1F(name, ";E_{corr};N. Entries / 0.05 GeV", len(bins) - 1, bins)
 
-h_angle_energy_bkg = ROOT.TH2F("h_angle_energy_bkg", ";Shower opening angle [#circ];Shower energy [GeV]", 45, 0, 45, 20, 0.05, 0.5)
-h_angle_energy_sig = ROOT.TH2F("h_angle_energy_sig", ";Shower opening angle [#circ];Shower energy [GeV]", 45, 0, 45, 20, 0.05, 0.5)
+h_angle_energy_bkg = ROOT.TH2F("h_angle_energy_bkg",
+                               ";Shower opening angle [#circ];Shower energy [GeV]",
+                               45, 0, 45, 20, 0.05, 0.5)
+h_angle_energy_sig = ROOT.TH2F("h_angle_energy_sig",
+                               ";Shower opening angle [#circ];Shower energy [GeV]",
+                               45, 0, 45, 20, 0.05, 0.5)
 
 def fill_histos(chain, histo_dict, h_bdts, option=""):
     ROOT.TMVA.Tools.Instance()
@@ -64,12 +68,10 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
     h_energy_sig = ROOT.TH1F("h_energy_sig_%s" % option, ";E_{#nu_{e}};N. Entries / 0.05 GeV", len(bins) - 1, bins)
     h_energy_bkg = ROOT.TH1F("h_energy_bkg_%s" % option, ";E_{#nu_{e}};N. Entries / 0.05 GeV", len(bins) - 1, bins)
     h_reco_sig = ROOT.TH1F("h_reco_sig_%s" % option,
-                             ";Reco. energy [GeV];N. Entries / 0.05 GeV", len(bins) - 1, bins)
+                           ";Reco. energy [GeV];N. Entries / 0.05 GeV", len(bins) - 1, bins)
     h_reco_bkg = ROOT.TH1F("h_reco_bkg_%s" % option,
-                             ";Reco. energy [GeV];N. Entries / 0.05 GeV", len(bins) - 1, bins)
+                           ";Reco. energy [GeV];N. Entries / 0.05 GeV", len(bins) - 1, bins)
 
-    nue_file = open("nue_passed.txt", "w")
-    numu_file = open("numu_passed.txt", "w")
 
     passed_events = 0
 
@@ -84,7 +86,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
         if pre_cuts(chain):
             h_bdts[category].Fill(BDT_response, chain.event_weight)
         else:
-            continue 
+            continue
 
         if bdt:
             apply_bdt = BDT_response > bdt_cut
@@ -105,10 +107,10 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             #     corr = 1.2
             if option == "bnbext":
                 corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
-                                            7.69908e-01) + chain.total_track_energy_length
+                                         7.69908e-01) + chain.total_track_energy_length
             else:
                 corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
-                                        7.69908e-01) + chain.total_track_energy_length
+                                         7.69908e-01) + chain.total_track_energy_length
             corrected_energy = ((chain.total_shower_energy + 1.23986e-02) /
                                 7.87131e-01) + chain.total_track_energy_length
 
@@ -130,9 +132,6 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
                 # if abs(chain.shower_pdg) not in h_dedx_pdgs:
                 #     h_dedx_pdgs[abs(chain.shower_pdg)] = ROOT.TH1F("%i" % int(abs(chain.shower_pdg)), ";Shower dE/dx", 30, 0, 6)
                 # h_dedx_pdgs[abs(chain.shower_pdg)].Fill(chain.dedx, chain.event_weight * corr)
-
-            if category == 2 and option == "nue":
-                print(int(chain.run), int(chain.subrun), int(chain.event), file=nue_file)
 
                 if chain.true_nu_is_fidvol:
                     h_energy_sig.Fill(chain.nu_E, chain.event_weight * corr)
@@ -159,7 +158,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             #           int(chain.run), int(chain.subrun), int(chain.event),
             #           int(chain.category),
             #           inv_interactions[int(chain.interaction_type)])
-    
+
     if manual or bdt:
         f_energy_binned_selected = ROOT.TFile("plots/h_energy_%s_after.root" % option, "RECREATE")
         h_energy_sig.Write()
@@ -168,7 +167,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
         h_reco_bkg.Write()
         f_energy_binned_selected.Close()
     else:
-        f_energy_binned_selected = ROOT.TFile( "plots/h_energy_%s.root" % option, "RECREATE")
+        f_energy_binned_selected = ROOT.TFile("plots/h_energy_%s.root" % option, "RECREATE")
         h_energy_sig.Write()
         h_energy_bkg.Write()
         h_reco_sig.Write()
@@ -177,7 +176,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
 
     return passed_events
 
-        
+
 
 print("LEE events", fill_histos_data("lee", bdt, manual))
 print("Data events", fill_histos_data("bnb", bdt, manual))
@@ -222,7 +221,6 @@ for i, n in enumerate(variables_dict.keys()):
     h_stack.Add(histos[2])
     stacked_histos.append(h_stack)
     kinds.append(histos)
-
 
 
 histo_dict = dict(zip(variables_dict.keys(), kinds))
@@ -283,6 +281,21 @@ for j in range(h_interactions.GetNhists()):
 
     h_true_e.Add(h_fixed)
 
+f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
+h_bdt_stack.Write()
+f_bdt.Close()
+
+for i, histos in enumerate(kinds):
+    for j, h in enumerate(histos):
+        h.SetLineColor(1)
+        if j != 0:
+            h.SetLineWidth(0)
+        h.SetFillColor(colors[j])
+
+for h in stacked_histos:
+    f = ROOT.TFile("plots/%s_mc.root" % h.GetName(), "RECREATE")
+    h.Write()
+    f.Close()
 
 # c_interactions = ROOT.TCanvas("c_interactions", "")
 # c_interactions.SetLeftMargin(0.14)
@@ -314,59 +327,41 @@ for j in range(h_interactions.GetNhists()):
 # h_dedx_pdg.Draw("pfc hist")
 # c_dedx.BuildLegend(0.1, 0.8, 0.8, 1, "NDC", "f")
 # c_dedx.Update()
-OBJECTS = []
-for i in range(11):
-    c = ROOT.TCanvas("c_shower_d%i" % i)
-    h_shower_d_pdg = ROOT.THStack(
-        "h_shower_d_pdg", ";Shower distance [cm];N. Entries / 0.5 cm")
-    od2 = collections.OrderedDict(sorted(h_shower_d_pdgs[i].items()))
-    for name, h in od2.items():
-        h.SetLineColor(1)
-        h_shower_d_pdg.Add(h)
+# OBJECTS = []
+# for i in range(11):
+#     c = ROOT.TCanvas("c_shower_d%i" % i)
+#     h_shower_d_pdg = ROOT.THStack(
+#         "h_shower_d_pdg", ";Shower distance [cm];N. Entries / 0.5 cm")
+#     od2 = collections.OrderedDict(sorted(h_shower_d_pdgs[i].items()))
+#     for name, h in od2.items():
+#         h.SetLineColor(1)
+#         h_shower_d_pdg.Add(h)
 
-    h_shower_d_pdg.Draw("pfc hist")
-    c.BuildLegend(0.1, 0.8, 0.8, 1, "NDC", "f")
-    c.Update()
-    OBJECTS.append(h_shower_d_pdg)
-    OBJECTS.append(c)
+#     h_shower_d_pdg.Draw("pfc hist")
+#     c.BuildLegend(0.1, 0.8, 0.8, 1, "NDC", "f")
+#     c.Update()
+#     OBJECTS.append(h_shower_d_pdg)
+#     OBJECTS.append(c)
 
+# f_data = ROOT.TFile("root_files/bnb_file.root")
+# t_data = f_data.Get("bnb_tree")
 
+# for name, var in variables:
+#     t_data.SetBranchAddress(name, var)
 
-f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
-h_bdt_stack.Write()
-f_bdt.Close()
+# for name, var in spectators:
+#     t_data.SetBranchAddress(name, var)
 
-for i, histos in enumerate(kinds):
-    for j, h in enumerate(histos):
-        h.SetLineColor(1)
-        if j != 0:
-            h.SetLineWidth(0)
-        h.SetFillColor(colors[j])
+# ROOT.gStyle.SetOptStat(0)
 
-for h in stacked_histos:
-    f = ROOT.TFile("plots/%s_mc.root" % h.GetName(), "RECREATE")
-    h.Write()
-    f.Close()
+# c_angle = ROOT.TCanvas("c_angle")
+# h_angle_energy_sig.SetMinimum(-0.001)
+# h_angle_energy_sig.Draw("col")
+# c_angle.Update()
 
-f_data = ROOT.TFile("root_files/bnb_file.root")
-t_data = f_data.Get("bnb_tree")
+# c_angle2 = ROOT.TCanvas("c_angle2")
+# h_angle_energy_bkg.SetMinimum(-0.001)
+# h_angle_energy_bkg.Draw("col")
+# c_angle2.Update()
 
-for name, var in variables:
-    t_data.SetBranchAddress(name, var)
-
-for name, var in spectators:
-    t_data.SetBranchAddress(name, var)
-
-ROOT.gStyle.SetOptStat(0)
-
-c_angle = ROOT.TCanvas("c_angle")
-h_angle_energy_sig.SetMinimum(-0.001)
-h_angle_energy_sig.Draw("col")
-c_angle.Update()
-
-c_angle2 = ROOT.TCanvas("c_angle2")
-h_angle_energy_bkg.SetMinimum(-0.001)
-h_angle_energy_bkg.Draw("col")
-c_angle2.Update()
-
-input()
+# input()

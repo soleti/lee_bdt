@@ -4,10 +4,10 @@ import pickle
 import math
 import numpy as np
 from array import array
-from root_numpy import hist2array
+# from root_numpy import hist2array
 import ROOT
 
-from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, FC_histo, upper_limit_FC
+from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
 
 ROOT.gStyle.SetOptStat(0)
@@ -42,7 +42,7 @@ else:
 total_pot *= POST_SCALING
 
 
-def set_axis(histogram, y_max = 0):
+def set_axis(histogram, y_max=0):
     histogram.GetYaxis().SetTitleSize(0.06)
     histogram.GetYaxis().SetTitleOffset(0.75)
     histogram.SetMinimum(0.01)
@@ -201,7 +201,9 @@ if DRAW_SUBTRACTION:
                 h_bnb.SetBinError(i, math.sqrt(err1**2 + err2**2))
 
         leg.AddEntry(
-            h_bnb, "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING), "lep")
+            h_bnb,
+            "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING),
+            "lep")
 
 
 # h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
@@ -290,7 +292,6 @@ for i in range(len(VARIABLES)):
         #     if i == RECO_ENERGY:
         #         fix_binning(histograms_cosmic[i])
         #     histograms_mc[i].Add(histograms_bnbext[i])
-        
         # if not DRAW_EXT:
         #     if i == RECO_ENERGY:
         #         fix_binning(histograms_bnbext[i])
@@ -306,7 +307,7 @@ for i in range(len(VARIABLES)):
         h_sig = histograms_mc[i].GetHists()[-1].Clone()
 
         for j in range(histograms_mc[i].GetNhists()):
-            
+
             histograms_mc[i].GetHists()[j].Scale(POST_SCALING)
 
             h_mc_err_nobinning.Add(histograms_mc[i].GetHists()[j])
@@ -321,8 +322,12 @@ for i in range(len(VARIABLES)):
         # h_bkg.Add(histograms_mc[i].GetHists()[1], -1)
 
         # if i == RECO_ENERGY:
-        #     print("FC upper limit 5", upper_limit_FC(h_bkg.Integral()) + h_bkg.Integral(), histograms_bnb[i].Integral())
-        #     print("FC upper limit 3", upper_limit_FC(h_bkg.Integral(), 0.9973) + h_bkg.Integral(), histograms_bnb[i].Integral())
+        #     print("FC upper limit 5",
+        #           upper_limit_FC(h_bkg.Integral()) + h_bkg.Integral(),
+        #           histograms_bnb[i].Integral())
+        #     print("FC upper limit 3",
+        #           upper_limit_FC(h_bkg.Integral(), 0.9973) + h_bkg.Integral(),
+        #           histograms_bnb[i].Integral())
 
         #     print("sigma no nue", sigmaCalc(h_sig, h_bkg))
             # print("sigma nue", sigmaCalc(histograms_bnb[i], h_mc_err_nobinning))
@@ -341,19 +346,18 @@ for i in range(len(VARIABLES)):
         if DRAW_LEE:
             histograms_lee[i].Scale(POST_SCALING)
             if i == RECO_ENERGY:
-                sig_err = []
-                bkg_err = []
-                sig = hist2array(histograms_lee[i])
-                bkg = hist2array(h_mc_err_nobinning)
-
-
-                for i_bin in range(1,histograms_lee[i].GetNbinsX()+1):
-                    sig_err.append(histograms_lee[i].GetBinError(i_bin))
-                    bkg_err.append(h_mc_err_nobinning.GetBinError(i_bin))
-                
-                sig_err = np.array(sig_err)
-                bkg_err = np.array(bkg_err)
                 if DRAW_POT:
+                    sig_err = []
+                    bkg_err = []
+                    sig = hist2array(histograms_lee[i])
+                    bkg = hist2array(h_mc_err_nobinning)
+
+                    for i_bin in range(1, histograms_lee[i].GetNbinsX()+1):
+                        sig_err.append(histograms_lee[i].GetBinError(i_bin))
+                        bkg_err.append(h_mc_err_nobinning.GetBinError(i_bin))
+
+                    sig_err = np.array(sig_err)
+                    bkg_err = np.array(bkg_err)
                     print("Significance: ", sigma_calc_matrix(sig, bkg))
 
                     for i_pot in range(step):
@@ -381,7 +385,7 @@ for i in range(len(VARIABLES)):
             # c.SetTopMargin(0.2274194)
         else:
             c.SetTopMargin(0.2274194)
-            
+
         if DRAW_SUBTRACTION:
             histograms_bnb[i].Add(histograms_mc[i].GetHists()[0], -1)
             h_mc_err.Add(histograms_mc[i].GetHists()[0], -1)
@@ -407,7 +411,7 @@ for i in range(len(VARIABLES)):
         h_mc_err_sys.SetFillColor(1)
 
         max_hist = histograms_bnb[i].GetMaximum() * 1.35
-    
+
         if VARIABLES[i][0] == "dedx":
             l1 = ROOT.TLine(1, 0, 1, max_hist)
             l1.SetLineStyle(2)
@@ -481,7 +485,7 @@ for i in range(len(VARIABLES)):
             l1.SetLineWidth(3)
             l1.Draw()
             OBJECTS.append(l1)
-        
+
         h_mc_err.Draw("e2 same")
 
         h_mc_err_clone = h_mc_err.Clone()
@@ -524,7 +528,7 @@ for i in range(len(VARIABLES)):
         if DRAW_DATA and h_mc_err_sys.Integral() > 0:
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
-                      
+
             draw_ratio(histograms_bnb[i], h_mc_err)
 
         c.Update()
@@ -543,7 +547,7 @@ h_true_e = ROOT.THStack(
 h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, bins2)
 
 for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
-        
+
     h_clone = histograms_mc[RECO_ENERGY].GetHists()[j].Clone()
     h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, bins2)
 
@@ -551,9 +555,10 @@ for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
         h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
         h_fixed.SetBinError(i, h_clone.GetBinError(i))
         h_mc_fixed.SetBinContent(i, h_mc_fixed.GetBinContent(i) + h_clone.GetBinContent(i))
-        
-    if j!=0:
+
+    if j != 0:
         h_fixed.SetLineWidth(0)
+
     h_fixed.SetLineColor(1)
     h_fixed.SetFillColor(h_clone.GetFillColor())
     h_fixed.SetFillStyle(h_clone.GetFillStyle())
@@ -709,7 +714,7 @@ if DRAW_NORMALIZED:
 
 
         h_signal = histograms_mc[i].GetHists()[0].Clone()
-        if h_signal.Integral() <= 0: 
+        if h_signal.Integral() <= 0:
             continue
         h_signal.SetLineColor(ROOT.TColor.GetColor("#1e7a2e"))
         h_signal.SetLineWidth(3)
@@ -735,7 +740,9 @@ if DRAW_NORMALIZED:
         h_cosmic_bkg.SetFillStyle(0)
         h_cosmic_bkg.SetLineWidth(3)
         h_cosmic_bkg.SetLineColor(ROOT.kRed + 1)
-        max_hist = max(h_signal.GetMaximum(), h_neutrino_bkg.GetMaximum(), h_cosmic_bkg.GetMaximum()) * 1.2
+        max_hist = max(h_signal.GetMaximum(),
+                       h_neutrino_bkg.GetMaximum(),
+                       h_cosmic_bkg.GetMaximum()) * 1.2
 
         h_signal.SetMaximum(max_hist)
         h_signal.SetMinimum(0.00001)
@@ -863,7 +870,8 @@ if DRAW_COSMIC:
     legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
     legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} events".format(
         histograms_bnbext[RECO_ENERGY].Integral() * POST_SCALING), "lep")
-    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1], "CORSIKA in-time Monte Carlo: integral normalized", "f")
+    legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1],
+                           "CORSIKA in-time Monte Carlo: integral normalized", "f")
     legend_cosmic.SetNColumns(2)
 
     for i in range(len(VARIABLES)):
