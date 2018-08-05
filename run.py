@@ -7,7 +7,7 @@ from bdt_common import manual_cuts, bdt, manual, bins, colors, inv_interactions,
 from bdt_common import pre_cuts, rectangular_cut, fix_binning, total_data_bnb_pot, description2
 from array import array
 import collections
-
+import sys
 ROOT.gStyle.SetPalette(ROOT.kLightTemperature)
 print("BDT: ", bdt, "Manual: ", manual)
 
@@ -105,21 +105,16 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             corr = 1
             # if category == 2 and not manual:
             #     corr = 1.2
-            if option == "bnbext":
-                corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
-                                         7.69908e-01) + chain.total_track_energy_length
-            else:
-                corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
-                                         7.69908e-01) + chain.total_track_energy_length
-            corrected_energy = ((chain.total_shower_energy + 1.23986e-02) /
-                                7.87131e-01) + chain.total_track_energy_length
+
+            corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
+                                        7.69908e-01) + chain.total_track_energy_length
 
             corrected_energy_hits = ((chain.total_shower_energy_cali + 1.36881e-02) /
                                      7.69908e-01) + (chain.total_track_energy + 3.57033e-02) / 7.70870e-01
-            if category == 2:
-                h_angle_energy_sig.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
-            elif category == 4:
-                h_angle_energy_bkg.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
+            # if category == 2:
+            #     h_angle_energy_sig.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
+            # elif category == 4:
+            #     h_angle_energy_bkg.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
 
             # if category != 0 and category != 6 and category != 1 and category != 7 and category == 8:
             #     h_int[chain.interaction_type].Fill(corrected_energy, chain.event_weight * corr)
@@ -129,14 +124,14 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             #         "%i %s" % (int(abs(chain.shower_pdg)), description2[category]), ";Shower distance;", 30, 0, 15)
             # h_shower_d_pdgs[category][abs(chain.shower_pdg)].Fill(chain.shower_true_distance, chain.event_weight * corr)
 
-                # if abs(chain.shower_pdg) not in h_dedx_pdgs:
-                #     h_dedx_pdgs[abs(chain.shower_pdg)] = ROOT.TH1F("%i" % int(abs(chain.shower_pdg)), ";Shower dE/dx", 30, 0, 6)
-                # h_dedx_pdgs[abs(chain.shower_pdg)].Fill(chain.dedx, chain.event_weight * corr)
+            # if abs(chain.shower_pdg) not in h_dedx_pdgs:
+            #     h_dedx_pdgs[abs(chain.shower_pdg)] = ROOT.TH1F("%i" % int(abs(chain.shower_pdg)), ";Shower dE/dx", 30, 0, 6)
+            # h_dedx_pdgs[abs(chain.shower_pdg)].Fill(chain.dedx, chain.event_weight * corr)
 
-                if chain.true_nu_is_fidvol:
-                    h_energy_sig.Fill(chain.nu_E, chain.event_weight * corr)
+            if chain.true_nu_is_fidvol:
+                h_energy_sig.Fill(chain.nu_E, chain.event_weight * corr)
 
-                h_reco_sig.Fill(corrected_energy_cali, chain.event_weight * corr)
+            h_reco_sig.Fill(corrected_energy_cali, chain.event_weight * corr)
 
             if (option == "mc" or option == "bnbext" or (option == "nue" and category != 2)):
                 if chain.true_nu_is_fidvol:
@@ -144,14 +139,14 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
                 h_reco_bkg.Fill(corrected_energy_hits, chain.event_weight * corr)
 
             for name, var in variables:
-                histo_dict[name][category].Fill(var[0], chain.event_weight)
+                for v in var:
+                    if v > -999:
+                        histo_dict[name][category].Fill(v, chain.event_weight)
 
             for name, var in spectators:
-
-                if name == "reco_energy":
-                    histo_dict[name][category].Fill(corrected_energy_cali, chain.event_weight)
-                else:
-                    histo_dict[name][category].Fill(var[0], chain.event_weight * corr)
+                for v in var:
+                    if v > -999:
+                        histo_dict[name][category].Fill(v, chain.event_weight)
 
             # if chain.category != 2 and 0 < chain.reco_energy < 2:
             #     print("nu_mu",
@@ -296,72 +291,3 @@ for h in stacked_histos:
     f = ROOT.TFile("plots/%s_mc.root" % h.GetName(), "RECREATE")
     h.Write()
     f.Close()
-
-# c_interactions = ROOT.TCanvas("c_interactions", "")
-# c_interactions.SetLeftMargin(0.14)
-# h_true_e.Draw("pfc hist")
-# l_interactions.Draw("same")
-# ax = ROOT.TGaxis(0, 0, len(bins) - 1, 0, 0, len(bins) - 1, 515, "")
-# for i, i_bin in enumerate(bins):
-#     ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
-#                    "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
-# ax.SetLabelFont(42)
-# ax.SetLabelSize(0.04)
-# ax.Draw()
-# pt = ROOT.TPaveText(0.117, 0.89, 0.801, 0.975, "ndc")
-# pt.AddText("MicroBooNE Preliminary %.1e POT - #nu_{e} CC" % total_data_bnb_pot)
-# pt.SetFillColor(0)
-# pt.SetBorderSize(0)
-# pt.SetShadowColor(0)
-# pt.Draw()
-# c_interactions.SetTopMargin(0.2411347)
-# c_interactions.Update()
-
-# c_dedx = ROOT.TCanvas("c_dedx")
-# h_dedx_pdg = ROOT.THStack("h_dedx_pdg", ";Shower dE/dx [MeV/cm];N. Entries / 0.2 MeV/cm")
-# od = collections.OrderedDict(sorted(h_dedx_pdgs.items()))
-# for name, h in od.items():
-#     h.SetLineColor(1)
-#     h_dedx_pdg.Add(h)
-
-# h_dedx_pdg.Draw("pfc hist")
-# c_dedx.BuildLegend(0.1, 0.8, 0.8, 1, "NDC", "f")
-# c_dedx.Update()
-# OBJECTS = []
-# for i in range(11):
-#     c = ROOT.TCanvas("c_shower_d%i" % i)
-#     h_shower_d_pdg = ROOT.THStack(
-#         "h_shower_d_pdg", ";Shower distance [cm];N. Entries / 0.5 cm")
-#     od2 = collections.OrderedDict(sorted(h_shower_d_pdgs[i].items()))
-#     for name, h in od2.items():
-#         h.SetLineColor(1)
-#         h_shower_d_pdg.Add(h)
-
-#     h_shower_d_pdg.Draw("pfc hist")
-#     c.BuildLegend(0.1, 0.8, 0.8, 1, "NDC", "f")
-#     c.Update()
-#     OBJECTS.append(h_shower_d_pdg)
-#     OBJECTS.append(c)
-
-# f_data = ROOT.TFile("root_files/bnb_file.root")
-# t_data = f_data.Get("bnb_tree")
-
-# for name, var in variables:
-#     t_data.SetBranchAddress(name, var)
-
-# for name, var in spectators:
-#     t_data.SetBranchAddress(name, var)
-
-# ROOT.gStyle.SetOptStat(0)
-
-# c_angle = ROOT.TCanvas("c_angle")
-# h_angle_energy_sig.SetMinimum(-0.001)
-# h_angle_energy_sig.Draw("col")
-# c_angle.Update()
-
-# c_angle2 = ROOT.TCanvas("c_angle2")
-# h_angle_energy_bkg.SetMinimum(-0.001)
-# h_angle_energy_bkg.Draw("col")
-# c_angle2.Update()
-
-# input()

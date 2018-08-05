@@ -12,7 +12,7 @@ def length2energy(length):
     return g_proton_range.Eval(length * ARGON_DENSITY, 0, "S") / 1000
 
 
-with open("proton_range.txt", "r") as table_file:
+with open("config_files/proton_range.txt", "r") as table_file:
     lines = table_file.readlines()
     a_range = array("f", [])
     a_energy = array("f", [])
