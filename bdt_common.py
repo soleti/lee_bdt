@@ -194,7 +194,7 @@ def pre_cuts(chain):
     # track_end = [chain.track_end_x, chain.track_end_y, chain.track_end_z]
     # shower_start = [chain.shower_start_x, chain.shower_start_y, chain.shower_start_z]
     # fiducial = is_fiducial(track_start) and is_fiducial(track_end) and is_fiducial(shower_start)
-    numu = 13 <= chain.numu_score < 17 or manual
+    numu = chain.numu_score < 17 or manual
     n_showers = chain.n_showers == 2
     sh_id = int(chain.shower_id)
     shower_track_energy = chain.total_shower_energy > 0.01 and chain.total_track_energy_length > 0 and chain.shower_energy[sh_id] > 0.01

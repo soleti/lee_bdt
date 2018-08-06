@@ -263,7 +263,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["true_nu_is_fidvol"][0] = int(is_fiducial(true_vertex))
     variables["n_objects"][0] = root_chain.n_tracks + root_chain.n_showers
     variables["no_tracks"][0] = int(no_tracks)
-    variables["nu_E"][0] = max(-1, root_chain.nu_E)
+    variables["nu_E"][0] = max(-999, root_chain.nu_E)
 
     y_shower = sum([root_chain.shower_nhits[i_sh][2] for i_sh in range(root_chain.n_showers)])
     y_track = sum([root_chain.track_nhits[i_sh][2]for i_sh in range(root_chain.n_tracks)])
@@ -408,13 +408,13 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             shower_energy_cali = root_chain.shower_energy[i_sh][2] * root_chain.shower_energy_cali[i_sh][2]
             variables["shower_energy"][i_sh] = shower_energy_cali
             dedx = root_chain.shower_dEdx[i_sh][2]
-            variables["shower_dedx"][i_sh] = max(-1, dedx)
+            variables["shower_dedx"][i_sh] = max(-999, dedx)
             dedx_cali = dedx * root_chain.shower_dQdx_cali[i_sh][2]
-            variables["shower_dedx_cali"][i_sh] = max(-1, dedx_cali)
+            variables["shower_dedx_cali"][i_sh] = max(-999, dedx_cali)
             dedx_u = root_chain.shower_dEdx[shower_id][0] * root_chain.shower_dQdx_cali[shower_id][0]
-            variables["shower_dedx_u"][i_sh] = max(-1, dedx_u)
+            variables["shower_dedx_u"][i_sh] = max(-999, dedx_u)
             dedx_v = root_chain.shower_dEdx[shower_id][1] * root_chain.shower_dQdx_cali[shower_id][1]
-            variables["shower_dedx_v"][i_sh] = max(-1, dedx_v)
+            variables["shower_dedx_v"][i_sh] = max(-999, dedx_v)
             variables["shower_res_mean"][i_sh] = max(-999, root_chain.shower_res_mean[i_sh])
             variables["shower_res_std"][i_sh] = max(-999, root_chain.shower_res_std[i_sh])
             variables["shower_open_angle"][i_sh] = math.degrees(root_chain.shower_open_angle[i_sh])
@@ -517,7 +517,7 @@ def pt_plot(root_chain, plane):
 
 def fill_tree(chain, weight, tree, option=""):
     total_events = 0
-    total_entries = int(chain.GetEntries() / 50)
+    total_entries = int(chain.GetEntries() / 1)
 
     for ievt in range(total_entries):
         chain.GetEntry(ievt)
