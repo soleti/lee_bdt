@@ -8,24 +8,29 @@ from bdt_common import pre_cuts, rectangular_cut, fix_binning, total_data_bnb_po
 from array import array
 import collections
 import sys
-ROOT.gStyle.SetPalette(ROOT.kLightTemperature)
+ROOT.gStyle.SetPalette(ROOT.kColorPrintableOnGrey)
 print("BDT: ", bdt, "Manual: ", manual)
 
 pdgs = {
     "#gamma": 22,
-    "e^{#pm}": 11,
-    "#mu^{#pm}": 13,
-    "p": 2212,
-    "n": 2112,
     "#pi^{0}": 111,
-    "#pi^{#pm}": 211
+    "e^{#pm}": 11,
+    "n": 2112,
+    "#mu^{#pm}": 13,
+    "#pi^{#pm}": 211,
+    "p": 2212,
+    "Other": 99999,
+    "Data off-beam": 2147483648,
 }
 
-h_dedx_pdgs = {}
-h_shower_d_pdgs = [{} for _ in range(11)]
+h_pdgs = {}
+vars = dict(variables + spectators)
 
-# for name in pdgs:
-#     h_dedx_pdgs[pdgs[name]] = ROOT.TH1F(name, ";Shower dE/dx [MeV/cm]; N. Entries / 0.2 MeV/cm", 30, 0, 6)
+for n, b in vars.items():
+    pdg_dict = {}
+    for pdg in pdgs:
+        pdg_dict[pdgs[pdg]] = ROOT.TH1F("h_%s_%s" % (n, pdg), pdg+labels[n], binning[n][0], binning[n][1], binning[n][2])
+    h_pdgs[n] = pdg_dict
 
 h_int = {}
 for name in interactions:
@@ -74,8 +79,8 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
 
 
     passed_events = 0
-
-    for i in range(chain.GetEntries()):
+    entries = int(chain.GetEntries() / 1)
+    for i in range(entries):
         chain.GetEntry(i)
         category = int(chain.category)
 
@@ -111,6 +116,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
 
             corrected_energy_hits = ((chain.total_shower_energy_cali + 1.36881e-02) /
                                      7.69908e-01) + (chain.total_track_energy + 3.57033e-02) / 7.70870e-01
+
             # if category == 2:
             #     h_angle_energy_sig.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
             # elif category == 4:
@@ -138,14 +144,39 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
                     h_energy_bkg.Fill(chain.nu_E, chain.event_weight * corr)
                 h_reco_bkg.Fill(corrected_energy_hits, chain.event_weight * corr)
 
+
+            var_dict = dict(variables + spectators)
             for name, var in variables:
-                for v in var:
+                for i, v in enumerate(var):
                     if v > -999:
+                        # print(var_dict["track_pdg"])
+                        if "track" in name:
+                            pdg_code = int(var_dict["track_pdg"][i])
+                        if "shower" in name:
+                            pdg_code = int(var_dict["shower_pdg"][i])
+
+                        if abs(pdg_code) in h_pdgs[name]:
+                            h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
+                        else:
+                            h_pdgs[name][99999].Fill(v, chain.event_weight)
+
+                        # if "track" in name:
+                        #     h_pdgs[name[variables["track_pdg"][i]]].Fill(v, chain.event_weight)
                         histo_dict[name][category].Fill(v, chain.event_weight)
 
             for name, var in spectators:
-                for v in var:
+                for i, v in enumerate(var):
                     if v > -999:
+                        if "track" in name:
+                            pdg_code = int(var_dict["track_pdg"][i])
+                        if "shower" in name:
+                            pdg_code = int(var_dict["shower_pdg"][i])
+
+                        if abs(pdg_code) in h_pdgs[name]:
+                            h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
+                        else:
+                            h_pdgs[name][99999].Fill(v, chain.event_weight)
+
                         histo_dict[name][category].Fill(v, chain.event_weight)
 
             # if chain.category != 2 and 0 < chain.reco_energy < 2:
@@ -173,7 +204,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
 
 
 
-print("LEE events", fill_histos_data("lee", bdt, manual))
+# print("LEE events", fill_histos_data("lee", bdt, manual))
 print("Data events", fill_histos_data("bnb", bdt, manual))
 
 
@@ -291,3 +322,46 @@ for h in stacked_histos:
     f = ROOT.TFile("plots/%s_mc.root" % h.GetName(), "RECREATE")
     h.Write()
     f.Close()
+
+OBJECTS = []
+for v in h_pdgs:
+    if h_pdgs[v]:
+        h_stack = ROOT.THStack("h_stack_%s" % v, labels[v])
+        OBJECTS.append(h_stack)
+        h_tot_mc = ROOT.TH1F("h_tot_mc_%s" % v,
+                             labels[v],
+                             binning[v][0],
+                             binning[v][1],
+                             binning[v][2])
+        h_tot_mc.SetTitle("Stat. uncertainties")
+        h_tot_mc_clone = h_tot_mc.Clone()
+        h_tot_mc.SetFillStyle(3002)
+        h_tot_mc.SetFillColor(1)
+        for pdg in h_pdgs[v]:
+            h_pdgs[v][pdg].SetLineWidth(0)
+            h_pdgs[v][pdg].SetMarkerStyle(0)
+            h_pdgs[v][pdg].SetMarkerSize(0)
+            h_stack.Add(h_pdgs[v][pdg])
+            h_tot_mc.Add(h_pdgs[v][pdg])
+        c = ROOT.TCanvas("c_%s" % v)
+        h_stack.Draw("hist pfc")
+        f = ROOT.TFile("plots/h_%s_bnb.root" % v)
+        h = f.Get("h_%s" % v)
+        h.SetLineColor(1)
+        h.SetTitle("Data beam-on")
+        h.SetMarkerStyle(20)
+        h_tot_mc.SetLineColor(1)
+        h_tot_mc.SetLineWidth(2)
+        h.Draw("ep same")
+
+        OBJECTS.append(f)
+        OBJECTS.append(h_tot_mc)
+        h_tot_mc.Draw("e2 same")
+        c.BuildLegend()
+        h_tot_mc_clone.SetLineWidth(2)
+        h_tot_mc_clone.SetLineColor(1)
+        h_tot_mc_clone.Draw("hist same")
+        OBJECTS.append(h_tot_mc_clone)
+        c.Update()
+        OBJECTS.append(c)
+input()

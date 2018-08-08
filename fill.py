@@ -306,6 +306,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     total_track_energy_length = 0
 
     for i_tr in range(MAX_N_TRACKS):
+        variables["track_pdg"][i_tr] = -999
         variables["track_phi"][i_tr] = -999
         variables["track_theta"][i_tr] = -999
         variables["track_length"][i_tr] = -999
@@ -320,8 +321,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         variables["track_end_z"][i_tr] = -999
         variables["track_shower_angle"][i_tr] = -999
         variables["track_distance"][i_tr] = -999
-
+        variables["track_pidchipr"][i_tr] = -999
+        variables["track_likelihood"][i_tr] = -999
     for i_sh in range(MAX_N_SHOWERS):
+        variables["shower_pdg"][i_sh] = -999
         variables["shower_start_x"][i_sh] = -999
         variables["shower_start_y"][i_sh] = -999
         variables["shower_start_z"][i_sh] = -999
@@ -361,7 +364,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
         cos = v_sh.Dot(vec_shower) / (v_sh.Mag() * vec_shower.Mag())
         shower_angle = math.degrees(math.acos(min(cos, 1)))
-        shower_pca = root_chain.shower_pca[i_sh]
+        shower_pca = root_chain.shower_pca[i_sh][2]
         converted_showers = 0
         shower_res_std = root_chain.shower_res_std[i_sh]
         shower_open_angle = root_chain.shower_open_angle[i_sh]
@@ -378,15 +381,18 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
         if (i_sh == track_like_shower_id or score > 0) and i_sh != shower_id:
             variables["n_tracks"][0] += 1
+            variables["track_pdg"][root_chain.n_tracks + converted_showers] = root_chain.matched_showers[i_sh]
             variables["track_start_x"][root_chain.n_tracks + converted_showers] = root_chain.shower_start_x[i_sh]
             variables["track_start_y"][root_chain.n_tracks + converted_showers] = root_chain.shower_start_y[i_sh]
             variables["track_start_z"][root_chain.n_tracks + converted_showers] = root_chain.shower_start_z[i_sh]
             variables["track_phi"][root_chain.n_tracks + converted_showers] = math.degrees(root_chain.shower_phi[i_sh])
             variables["track_theta"][root_chain.n_tracks + converted_showers] = math.degrees(root_chain.shower_theta[i_sh])
             variables["track_length"][root_chain.n_tracks + converted_showers] = root_chain.shower_length[i_sh]
-            variables["track_pca"][root_chain.n_tracks + converted_showers] = max(-999, root_chain.shower_pca[i_sh])
+            variables["track_pca"][root_chain.n_tracks + converted_showers] = max(-999, root_chain.shower_pca[i_sh][2])
             variables["track_res_mean"][root_chain.n_tracks + converted_showers] = max(-999, root_chain.shower_res_mean[i_sh])
             variables["track_res_std"][root_chain.n_tracks + converted_showers] = max(-999, root_chain.shower_res_std[i_sh])
+            variables["track_pidchipr"][root_chain.n_tracks + converted_showers] = -999
+            variables["track_likelihood"][root_chain.n_tracks + converted_showers] = -999
             variables["track_end_x"][root_chain.n_tracks + converted_showers] = shower_end[0]
             variables["track_end_y"][root_chain.n_tracks + converted_showers] = shower_end[1]
             variables["track_end_z"][root_chain.n_tracks + converted_showers] = shower_end[2]
@@ -400,13 +406,14 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             variables["track_distance"][root_chain.n_tracks + converted_showers] = track_vertex_d
         else:
             variables["n_showers"][0] += 1
+            variables["shower_pdg"][i_sh] = root_chain.matched_showers[i_sh]
             variables["shower_start_x"][i_sh] = root_chain.shower_start_x[i_sh]
             variables["shower_start_y"][i_sh] = root_chain.shower_start_y[i_sh]
             variables["shower_start_z"][i_sh] = root_chain.shower_start_z[i_sh]
             variables["shower_theta"][i_sh] = math.degrees(root_chain.shower_theta[i_sh])
             variables["shower_phi"][i_sh] = math.degrees(root_chain.shower_phi[i_sh])
             shower_energy_cali = root_chain.shower_energy[i_sh][2] * root_chain.shower_energy_cali[i_sh][2]
-            variables["shower_energy"][i_sh] = shower_energy_cali
+            variables["shower_energy"][i_sh] = max(-999, shower_energy_cali)
             dedx = root_chain.shower_dEdx[i_sh][2]
             variables["shower_dedx"][i_sh] = max(-999, dedx)
             dedx_cali = dedx * root_chain.shower_dQdx_cali[i_sh][2]
@@ -418,7 +425,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             variables["shower_res_mean"][i_sh] = max(-999, root_chain.shower_res_mean[i_sh])
             variables["shower_res_std"][i_sh] = max(-999, root_chain.shower_res_std[i_sh])
             variables["shower_open_angle"][i_sh] = math.degrees(root_chain.shower_open_angle[i_sh])
-            variables["shower_pca"][i_sh] = max(0, root_chain.shower_pca[i_sh])
+            variables["shower_pca"][i_sh] = max(0, root_chain.shower_pca[i_sh][2])
             total_shower_energy += root_chain.shower_energy[i_sh][hit_index]
             total_shower_energy_cali += shower_energy_cali
             total_shower_nhits += root_chain.shower_nhits[i_sh][2]
@@ -440,13 +447,19 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
 
         total_track_nhits += root_chain.track_nhits[i_tr][2]
         variables["n_tracks"][0] += 1
+        variables["track_pdg"][i_tr] = root_chain.matched_tracks[i_tr]
+        variables["track_pidchipr"][i_tr] = root_chain.track_pid_chipr[i_tr]
+        if root_chain.track_bragg_p[i_tr] != 0:
+            variables["track_likelihood"][i_tr] = math.log(root_chain.track_bragg_mip[i_tr]/root_chain.track_bragg_p[i_tr])
+        else:
+            variables["track_likelihood"][i_tr] = -999
         variables["track_phi"][i_tr] = math.degrees(root_chain.track_phi[i_tr])
         variables["track_theta"][i_tr] = math.degrees(root_chain.track_theta[i_tr])
         variables["track_length"][i_tr] = root_chain.track_len[i_tr]
         variables["track_start_x"][i_tr] = root_chain.track_start_x[i_tr]
         variables["track_start_y"][i_tr] = root_chain.track_start_y[i_tr]
         variables["track_start_z"][i_tr] = root_chain.track_start_z[i_tr]
-        variables["track_pca"][i_tr] = max(-999, root_chain.track_pca[i_tr])
+        variables["track_pca"][i_tr] = max(-999, root_chain.track_pca[i_tr][2])
         variables["track_res_mean"][i_tr] = max(-999, root_chain.track_res_mean[i_tr])
         variables["track_res_std"][i_tr] = max(-999, root_chain.track_res_std[i_tr])
         variables["track_end_x"][i_tr] = root_chain.track_end_x[i_tr]
@@ -455,7 +468,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         length_e = length2energy(root_chain.track_len[i_tr])
         total_track_energy_length += length_e
         costheta_shower_track = v_track.Dot(vec_shower) / (v_track.Mag() * vec_shower.Mag())
-        variables["track_shower_angle"][root_chain.n_tracks + converted_showers] = costheta_shower_track
+        variables["track_shower_angle"][i_tr] = costheta_shower_track
         track_vertex_d = math.sqrt(
             sum([(t - n)**2 for t, n in zip(track_vertex, neutrino_vertex)]))
         variables["track_distance"][i_tr] = track_vertex_d
@@ -607,10 +620,10 @@ data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
 samples = ["nue", "bnb", "bnb_data", "ext_data"]
 
-tree_files = [glob("data_files/mc_nue_newcrhit/*.root"),
-              glob("data_files/mc_bnb_newcrhit/*/*.root"),
-              glob("data_files/data_bnb_newcrhit/*/*.root"),
-              glob("data_files/data_ext_newcrhit/*/*.root")]
+tree_files = [glob("data_files/mc_nue_pid/*.root"),
+              glob("data_files/mc_bnb_pid/*/*.root"),
+              glob("data_files/data_bnb_pid/*/*.root"),
+              glob("data_files/data_ext_pid/*/*.root")]
 
 chains = []
 chains_pot = []
@@ -656,11 +669,11 @@ for n, b in variables.items():
     for t in trees:
         if len(b) > 1:
             if "track" in n:
-                t.Branch(n, b, "%s[%i]/f" % (n, MAX_N_TRACKS))
-            elif "shower" in n or "dedx" in n:
-                t.Branch(n, b, "%s[%i]/f" % (n, MAX_N_SHOWERS))
+                t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_TRACKS, b.typecode))
+            elif "shower" in n:
+                t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_SHOWERS, b.typecode))
         else:
-            t.Branch(n, b, n + "/f")
+            t.Branch(n, b, n + "/%s" % b.typecode)
 
 samples = ["nue", "bnb", "bnb_data", "ext_data"]
 

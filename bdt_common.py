@@ -322,33 +322,35 @@ def find_interaction(dictionary, interaction):
 
 
 def manual_cuts(chain):
-    track_shower_angle = -0.9 < chain.track_shower_angle
-    shower_distance = chain.shower_distance < 5
-    shower_open_angle = 1 < chain.shower_open_angle < 19
-    shower_dedx = 1 < chain.shower_dedx_merged < 3.2
+    tr_id = int(chain.track_id)
+    sh_id = int(chain.shower_id)
+    track_proton_chi2 = True
+    for i_tr in range(int(chain.n_tracks)):
+        track_proton_chi2 = track_proton_chi2 and chain.track_pidchipr[i_tr] < 80
+    track_shower_angle = -0.9 < chain.track_shower_angle[tr_id]
+    shower_distance = chain.shower_distance[sh_id] < 5
+    shower_open_angle = 1 < chain.shower_open_angle[sh_id] < 19
+    shower_dedx = True
+    for i_sh in range(int(chain.n_showers)):
+        shower_dedx = shower_dedx and 1 < chain.shower_dedx_cali[sh_id] < 3.2
     total_hits_y = chain.total_hits_y > 100
-    shower_energy = chain.total_shower_energy_cali > 0.06
-    track_length = chain.track_length < 80
-    track_distance = chain.track_distance < 5
-    track_res = chain.track_res_std < 2
-    shower_angle = not 5 < chain.shower_angle < 45
-    dqdx = chain.dqdx_bdt_max > 0.1 # and (chain.dqdx_bdt > 0.1 or chain.dqdx_bdt < -0.2)
+    shower_energy = chain.total_shower_energy_cali > 0.1
+    track_length = chain.track_length[tr_id] < 80
+    track_distance = chain.track_distance[tr_id] < 5
+    track_res = chain.track_res_std[tr_id] < 2
     corrected_energy = 0.300 < (chain.total_shower_energy_cali + 0.02) / \
         0.78 + chain.total_track_energy_length < 0.425
 
     numu_exclude = chain.numu_score != 17 and chain.numu_score != 2
 
     ratio = chain.hits_ratio > 0.55
-    shower_dedx_bdt = chain.shower_dedx_bdt > -10
 
     if chain.no_tracks == 1:
-        shower_dedx_bdt = chain.shower_dedx_bdt > -0.1
-        shower_distance = chain.shower_distance < 2
-        track_distance = chain.track_distance < 2
+        shower_distance = chain.shower_distance[sh_id] < 2
+        track_distance = chain.track_distance[tr_id] < 2
 
-
-    collabmeeting_cuts = [shower_dedx, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, track_res,
-                          track_distance, shower_distance, shower_open_angle, track_length, chain.dqdx_bdt > 0.1]
+    collabmeeting_cuts = [track_proton_chi2, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, track_res,
+                          track_distance, shower_distance, shower_open_angle, track_length, shower_dedx]
 
     # collabmeeting_cuts = [total_hits_y, numu_exclude, shower_energy, ratio, dqdx, track_res, shower_dedx_bdt,
     #                       track_shower_angle, shower_open_angle, track_length]
@@ -357,33 +359,43 @@ def manual_cuts(chain):
     #                     track_length, track_distance, dqdx, total_hits_y,
     #                     track_shower_angle, shower_energy, shower_dedx]
 
-    shower_dedx_inverted = 3.2 < chain.shower_dedx < 6
-    inverted_cuts = [shower_dedx_inverted, shower_open_angle, total_hits_y, track_length, track_distance,
-                     track_shower_angle, shower_energy, dqdx]
+    # shower_dedx_inverted = 3.2 < chain.shower_dedx < 6
+    # inverted_cuts = [shower_dedx_inverted, shower_open_angle, total_hits_y, track_length, track_distance,
+    #                  track_shower_angle, shower_energy, dqdx]
 
 
-    shower_dedx_harder = 1.5 < chain.shower_dedx < 2.6
-    bdt_harder = chain.dqdx_bdt > 0.1
-    energy_harder = chain.shower_energy > 0.1
-    harder_cuts = collabmeeting_cuts + [energy_harder, shower_dedx_harder, bdt_harder, chain.no_tracks == 0]
+    # shower_dedx_harder = 1.5 < chain.shower_dedx < 2.6
+    # bdt_harder = chain.dqdx_bdt > 0.1
+    # energy_harder = chain.shower_energy > 0.1
+    # harder_cuts = collabmeeting_cuts + [energy_harder, shower_dedx_harder, bdt_harder, chain.no_tracks == 0]
 
-    track_length2 = chain.track_length > 20
+    # track_length2 = chain.track_length > 20
 
-    numu_cuts = [shower_dedx, chain.shower_dedx < 3, shower_open_angle, total_hits_y, track_length2,
-                 not numu_exclude, chain.numu_score != 2, track_shower_angle, shower_energy, not dqdx]
+    # numu_cuts = [shower_dedx, chain.shower_dedx < 3, shower_open_angle, total_hits_y, track_length2,
+    #              not numu_exclude, chain.numu_score != 2, track_shower_angle, shower_energy, not dqdx]
 
-    passed_numu = len(numu_cuts) == sum(numu_cuts)
+    # passed_numu = len(numu_cuts) == sum(numu_cuts)
+    # passed_inverted = len(inverted_cuts) == sum(inverted_cuts)
+    # passed_harder = len(harder_cuts) == sum(harder_cuts)
 
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
-    passed_inverted = len(inverted_cuts) == sum(inverted_cuts)
-    passed_harder = len(harder_cuts) == sum(harder_cuts)
+
     return passed_collab
 
-def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
+def sigma_calc_matrix(h_signal, h_background, scale_factor=10, sys=0):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
     #(2D Matrix - (statistical uncertainty)^2 in a the diagonal of the matrix)^-1
     #(number of events signal in Energy bins in a 1D matrix)^Transpose
     tries = 50
+
+    # chi2 = 0
+    # for s, b in zip(h_signal, h_background):
+    #     s *= scale_factor
+    #     b *= scale_factor
+    #     if s+b:
+    #         chi2 += s**2/(s+b+0.2*b)
+    # return math.sqrt(chi2)
+
     sig_array = h_signal * scale_factor
     bkg_array = h_background * scale_factor
 
@@ -402,6 +414,7 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
             emtx_err[i][x][x] = max(1, r + (sys*r)**2)
 
     emtxinv = np.linalg.inv(emtx)
+
     sigmas = []
     for i in range(tries):
         try:
@@ -520,8 +533,8 @@ pi0_mass = array("f", [0])
 
 shower_angle = array("f", [0])
 track_angle = array("f", [0])
-shower_pdg = array("f", [0])
-track_pdg = array("f", [0])
+shower_pdg = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
+track_pdg = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 
 track_length = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_theta = array("f", MAX_N_TRACKS * [-sys.float_info.max])
@@ -536,6 +549,7 @@ track_res_mean = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_res_std = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pca = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pidchipr = array("f", MAX_N_TRACKS * [-sys.float_info.max])
+track_likelihood = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pidchi = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pida = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_shower_angle = array("f", MAX_N_TRACKS * [-sys.float_info.max])
@@ -557,8 +571,7 @@ shower_dedx_v = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 shower_pca = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 shower_open_angle = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 shower_distance = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
-shower_pdgs = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
-track_pdgs = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
+
 
 b_shower_id = array("f", [0])
 b_track_id = array("f", [0])
@@ -602,13 +615,14 @@ dqdx_bdt_max = array("f", [0])
 shower_dedx_bdt = array("f", [0])
 
 spectators = [
-    # ("track_pdg", track_pdg),
-    # ("shower_pdg", shower_pdg),
+    ("track_pdg", track_pdg),
+    ("shower_pdg", shower_pdg),
     ("shower_dedx_bdt", shower_dedx_bdt),
     ("true_nu_is_fidvol", true_nu_is_fidvol),
     ("total_hits_u", total_hits_u),
     ("total_hits_v", total_hits_v),
-    # ("track_pidchipr", track_pidchipr),
+    ("track_pidchipr", track_pidchipr),
+    ("track_likelihood", track_likelihood),
     # ("track_pidchi", track_pidchi),
     # ("track_pida", track_pida),
     ("nu_E", nu_E),
@@ -695,7 +709,8 @@ binning = {
     "true_nu_is_fidvol": [2, 0, 2],
     "total_hits_u": [1, 0, 1],
     "total_hits_v": [1, 0, 1],
-    "track_pidchipr": [20, 0, 40],
+    "track_pidchipr": [50, 0, 300],
+    "track_likelihood": [50, -10, 10],
     "track_pidchi": [20, 0, 40],
     "track_pida": [20, 0, 25],
     "track_res_mean": [20, -2, 2],
@@ -737,10 +752,10 @@ binning = {
     "pt": [20, 0, 1],
     "reco_energy": [40, 0, 2],
     "shower_open_angle": [46, 0, 46],
-    "shower_dedx": [20, 0, 5],
-    "shower_dedx_cali": [20, 0, 5],
-    "shower_dedx_u": [20, 0, 5],
-    "shower_dedx_v": [20, 0, 5],
+    "shower_dedx": [20, 0.3, 6],
+    "shower_dedx_cali": [20, 0.3, 6],
+    "shower_dedx_u": [20, 0.3, 6],
+    "shower_dedx_v": [20, 0.3, 6],
 
     "shower_dedx_merged": [20, 0, 5],
     "numu_score": [20, 0, 20],
@@ -793,6 +808,8 @@ labels = {
     "total_hits_v": "; total hits u;",
     "no_tracks": ";No tracks",
     "track_pidchipr": ";Track proton PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchipr"),
+    "track_likelihood": ";log(L_{MIP}/L_{p});N. Entries / %.1f" % bin_size("track_likelihood"),
+
     "track_pidchi": ";Track min. PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchi"),
     "track_pida": ";Track PIDa; N. Entries / %.1f" % bin_size("track_pida"),
     "track_res_mean": ";Track res. #mu [cm]; N. Entries / %.2f" % bin_size("track_res_mean"),

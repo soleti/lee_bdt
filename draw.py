@@ -15,7 +15,7 @@ ROOT.gStyle.SetOptStat(0)
 
 SYS_ERR = 0.1
 
-DRAW_POT = False
+DRAW_POT = True
 DRAW_SUBTRACTION = False
 DRAW_EXT = False
 DRAW_LEE = False
@@ -170,13 +170,13 @@ for i, h in enumerate(histograms_mc):
                 histo,
                 "{}: {:.1f} events".format(d, n_events), "f")
 
-    if DRAW_LEE:
-        histograms_lee[i].SetLineColor(ROOT.kBlack)
+    if DRAW_LEE and i == RECO_ENERGY:
+        histograms_lee[i].SetLineWidth(0)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 2)
         histograms_lee[i].SetFillStyle(3002)
         if i != RECO_ENERGY:
             legends[i].AddEntry(histograms_lee[i],
-                                "Low-energy excess: {:.0f} events"
+                                "Low-energy excess: {:.1f} events"
                                 .format(histograms_lee[i].Integral()
                                         * POST_SCALING), "f")
 
@@ -204,21 +204,21 @@ for h in histograms_mc:
 #             "lep")
 
 
-# h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
+h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
 
-# scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
-#            2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
-#            2, 1, 1, 1]
+scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
+           2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
+           2, 1, 1, 1]
 
-# h_lee.SetFillColor(ROOT.kGreen - 2)
-# h_lee.SetFillStyle(3001)
-# h_lee.SetLineColor(1)
-# for i, scale in enumerate(scaling):
-#     if scaling[i] - 1 > 0:
-#         h_lee.SetBinContent(i + 1, histograms_mc[RECO_ENERGY].GetHists()[0].
-#                             GetBinContent(i + 1) * (scale - 1))
+h_lee.SetFillColor(ROOT.kGreen - 2)
+h_lee.SetFillStyle(3001)
+h_lee.SetLineWidth(0)
+for i, scale in enumerate(scaling):
+    if scaling[i] - 1 > 0:
+        h_lee.SetBinContent(i + 1, histograms_mc[RECO_ENERGY].GetHists()[-1].
+                            GetBinContent(i + 1) * (scale - 1))
 
-# histograms_lee[RECO_ENERGY] = h_lee
+histograms_lee[RECO_ENERGY] = h_lee
 
 if DRAW_LEE:
     legends[RECO_ENERGY].AddEntry(histograms_lee[RECO_ENERGY],
@@ -316,36 +316,43 @@ for i in range(len(VARIABLES)):
             print(h_sig.Integral(), h_bkg.Integral()+h_sig.Integral())
             print("Purity", h_sig.Integral()/(h_bkg.Integral() + h_sig.Integral()))
         if DRAW_LEE:
+
             histograms_lee[i].Scale(POST_SCALING)
             if i == RECO_ENERGY:
                 if DRAW_POT:
                     sig_err = []
                     bkg_err = []
-                    sig = hist2array(histograms_lee[i])
-                    bkg = hist2array(h_mc_err_nobinning)
+                    sig = []
+                    bkg = []
 
                     for i_bin in range(1, histograms_lee[i].GetNbinsX()+1):
+                        sig.append(histograms_lee[i].GetBinContent(i_bin))
+                        bkg.append(h_mc_err_nobinning.GetBinContent(i_bin))
                         sig_err.append(histograms_lee[i].GetBinError(i_bin))
                         bkg_err.append(h_mc_err_nobinning.GetBinError(i_bin))
 
+                    bkg[0] = 0.01
+                    print(sig, bkg)
+                    sig = np.array(sig)
+                    bkg = np.array(bkg)
                     sig_err = np.array(sig_err)
                     bkg_err = np.array(bkg_err)
-                    print("Significance: ", sigma_calc_matrix(sig, bkg))
+                    print("Significance: ", sigma_calc_matrix(sig, bkg, 15.2))
 
-                    for i_pot in range(step):
-                        pot = total_pot + (1.32e21 - total_pot)/step * i_pot
-                        scale = pot/total_pot
-                        pots_err.append(0)
-                        significance = sigma_calc_matrix(sig, bkg, scale)
-                        significance20 = sigma_calc_matrix(sig, bkg, scale, 0.2)
-                        significance5 = sigma_calc_matrix(sig, bkg, scale, 0.05)
-                        sigma.append(significance[0])
-                        sigma_err.append(significance[1])
-                        sigma20.append(significance20[0])
-                        sigma20_err.append(significance[1])
-                        sigma5.append(significance5[0])
-                        sigma5_err.append(significance5[1])
-                        pots.append(pot)
+                    # for i_pot in range(step):
+                    #     pot = total_pot + (1.32e21 - total_pot)/step * i_pot
+                    #     scale = pot/total_pot
+                    #     pots_err.append(0)
+                    #     significance = sigma_calc_matrix(sig, bkg, scale)
+                    #     significance20 = sigma_calc_matrix(sig, bkg, scale, 0.2)
+                    #     significance5 = sigma_calc_matrix(sig, bkg, scale, 0.05)
+                    #     # sigma.append(significance[0])
+                    #     # sigma_err.append(significance[1])
+                    #     # sigma20.append(significance20[0])
+                    #     # sigma20_err.append(significance[1])
+                    #     # sigma5.append(significance5[0])
+                    #     # sigma5_err.append(significance5[1])
+                    #     pots.append(pot)
 
                 fix_binning(histograms_lee[i])
 
@@ -610,7 +617,7 @@ c_fixed.SaveAs("plots/h_fixed_energy.pdf")
 # END FIXED BIN WIDTH PLOT
 # *******************************
 
-if DRAW_LEE and DRAW_POT:
+if DRAW_LEE and DRAW_POT and False:
     c_pot = ROOT.TCanvas("c_pot")
     g_pot = ROOT.TGraphErrors(step, pots, sigma, pots_err, sigma_err)
     g_pot5 = ROOT.TGraphErrors(step, pots, sigma5, pots_err, sigma_err)
