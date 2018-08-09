@@ -14,7 +14,7 @@ ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
 ELECTRON_MASS = 0.00052
 
-nue_cosmic = glob("mc_nue_new/*.root")
+nue_cosmic = glob("data_files/mc_nue_pid/*.root")
 c = ROOT.TChain("robertoana/pandoratree")
 
 for f in nue_cosmic:

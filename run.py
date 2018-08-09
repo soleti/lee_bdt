@@ -333,16 +333,18 @@ for v in h_pdgs:
                              binning[v][0],
                              binning[v][1],
                              binning[v][2])
-        h_tot_mc.SetTitle("Stat. uncertainties")
-        h_tot_mc_clone = h_tot_mc.Clone()
-        h_tot_mc.SetFillStyle(3002)
-        h_tot_mc.SetFillColor(1)
+        h_tot_mc.SetTitle("Stat. uncertainty")
+
         for pdg in h_pdgs[v]:
             h_pdgs[v][pdg].SetLineWidth(0)
             h_pdgs[v][pdg].SetMarkerStyle(0)
             h_pdgs[v][pdg].SetMarkerSize(0)
             h_stack.Add(h_pdgs[v][pdg])
             h_tot_mc.Add(h_pdgs[v][pdg])
+
+        h_tot_mc_clone = h_tot_mc.Clone()
+        h_tot_mc.SetFillStyle(3002)
+        h_tot_mc.SetFillColor(1)
         c = ROOT.TCanvas("c_%s" % v)
         h_stack.Draw("hist pfc")
         f = ROOT.TFile("plots/h_%s_bnb.root" % v)
@@ -363,5 +365,6 @@ for v in h_pdgs:
         h_tot_mc_clone.Draw("hist same")
         OBJECTS.append(h_tot_mc_clone)
         c.Update()
+        c.SaveAs("plots/%s.pdf" % h_stack.GetName())
         OBJECTS.append(c)
 input()

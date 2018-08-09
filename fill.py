@@ -323,6 +323,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         variables["track_distance"][i_tr] = -999
         variables["track_pidchipr"][i_tr] = -999
         variables["track_likelihood"][i_tr] = -999
+        variables["track_mip_likelihood"][i_tr] = -999
+        variables["track_p_likelihood"][i_tr] = -999
+        variables["track_dqdx"][i_tr] = -999
+
     for i_sh in range(MAX_N_SHOWERS):
         variables["shower_pdg"][i_sh] = -999
         variables["shower_start_x"][i_sh] = -999
@@ -393,6 +397,10 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             variables["track_res_std"][root_chain.n_tracks + converted_showers] = max(-999, root_chain.shower_res_std[i_sh])
             variables["track_pidchipr"][root_chain.n_tracks + converted_showers] = -999
             variables["track_likelihood"][root_chain.n_tracks + converted_showers] = -999
+            variables["track_mip_likelihood"][root_chain.n_tracks + converted_showers] = -999
+            variables["track_p_likelihood"][root_chain.n_tracks + converted_showers] = -999
+            variables["track_dqdx"][root_chain.n_tracks + converted_showers] = -999
+            variables["track_p_likelihood"][root_chain.n_tracks + converted_showers] = -999
             variables["track_end_x"][root_chain.n_tracks + converted_showers] = shower_end[0]
             variables["track_end_y"][root_chain.n_tracks + converted_showers] = shower_end[1]
             variables["track_end_z"][root_chain.n_tracks + converted_showers] = shower_end[2]
@@ -453,6 +461,9 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
             variables["track_likelihood"][i_tr] = math.log(root_chain.track_bragg_mip[i_tr]/root_chain.track_bragg_p[i_tr])
         else:
             variables["track_likelihood"][i_tr] = -999
+        variables["track_mip_likelihood"][i_tr] = root_chain.track_bragg_mip[i_tr]
+        variables["track_p_likelihood"][i_tr] = root_chain.track_bragg_p[i_tr]
+        variables["track_dqdx"][i_tr] = max(-999, root_chain.track_dQdx[i_tr][2])
         variables["track_phi"][i_tr] = math.degrees(root_chain.track_phi[i_tr])
         variables["track_theta"][i_tr] = math.degrees(root_chain.track_theta[i_tr])
         variables["track_length"][i_tr] = root_chain.track_len[i_tr]
@@ -480,7 +491,8 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     variables["total_shower_energy"][0] = total_shower_energy
     variables["total_shower_energy_cali"][0] = total_shower_energy_cali
     variables["total_track_energy_length"][0] = total_track_energy_length
-    variables["reco_energy"][0] = ((total_shower_energy_cali + 1.36881e-02) / 7.69908e-01) + total_track_energy_length
+    variables["reco_energy"][0] = ((total_shower_energy_cali + 9.85322e-03) / 7.82554e-01) + total_track_energy_length
+    # variables["reco_energy"][0] = ((total_shower_energy_cali + 1.36881e-02) / 7.69908e-01) + total_track_energy_length
     variables["numu_score"][0] = root_chain.numu_cuts
 
 

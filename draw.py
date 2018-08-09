@@ -172,8 +172,8 @@ for i, h in enumerate(histograms_mc):
 
     if DRAW_LEE and i == RECO_ENERGY:
         histograms_lee[i].SetLineWidth(0)
-        histograms_lee[i].SetFillColor(ROOT.kGreen - 2)
-        histograms_lee[i].SetFillStyle(3002)
+        histograms_lee[i].SetFillColor(ROOT.TColor.GetColor("#11ff00"))
+        # histograms_lee[i].SetFillStyle(3002)
         if i != RECO_ENERGY:
             legends[i].AddEntry(histograms_lee[i],
                                 "Low-energy excess: {:.1f} events"
@@ -210,8 +210,8 @@ scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
            2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
            2, 1, 1, 1]
 
-h_lee.SetFillColor(ROOT.kGreen - 2)
-h_lee.SetFillStyle(3001)
+h_lee.SetFillColor(ROOT.kGreen - 10)
+# h_lee.SetFillStyle(3001)
 h_lee.SetLineWidth(0)
 for i, scale in enumerate(scaling):
     if scaling[i] - 1 > 0:
@@ -222,7 +222,7 @@ histograms_lee[RECO_ENERGY] = h_lee
 
 if DRAW_LEE:
     legends[RECO_ENERGY].AddEntry(histograms_lee[RECO_ENERGY],
-                                  "Low-energy excess: {:.0f} events"
+                                  "Low-energy excess: {:.1f} events"
                                   .format(histograms_lee[RECO_ENERGY].Integral() * POST_SCALING),
                                   "f")
 
@@ -337,7 +337,7 @@ for i in range(len(VARIABLES)):
                     bkg = np.array(bkg)
                     sig_err = np.array(sig_err)
                     bkg_err = np.array(bkg_err)
-                    print("Significance: ", sigma_calc_matrix(sig, bkg, 15.2))
+                    print("Significance: ", sigma_calc_matrix(sig, bkg, 30.41))
 
                     # for i_pot in range(step):
                     #     pot = total_pot + (1.32e21 - total_pot)/step * i_pot
@@ -464,7 +464,7 @@ for i in range(len(VARIABLES)):
         h_mc_err_clone.SetFillStyle(0)
         h_mc_err_clone.Draw("hist same")
         OBJECTS.append(h_mc_err_clone)
-        legends[i].AddEntry(h_mc_err, "Stat. error", "lf")
+        legends[i].AddEntry(h_mc_err, "Stat. uncertainty", "lf")
 
         if DRAW_SYS:
             l_errs[i].AddEntry(h_mc_err, "Stat. uncertainties", "lf")

@@ -550,10 +550,13 @@ track_res_std = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pca = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pidchipr = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_likelihood = array("f", MAX_N_TRACKS * [-sys.float_info.max])
+track_mip_likelihood = array("f", MAX_N_TRACKS * [-sys.float_info.max])
+track_p_likelihood = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pidchi = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_pida = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_shower_angle = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_distance = array("f", MAX_N_TRACKS * [-sys.float_info.max])
+track_dqdx = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 
 shower_theta = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 shower_phi = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
@@ -596,7 +599,6 @@ total_track_energy = array("f", [0])
 shower_hits = array("f", [0])
 hits_ratio = array("f", [0])
 track_hits = array("f", [0])
-track_dedx = array("f", [0])
 total_track_energy_length = array("f", [0])
 n_objects = array("f", [0])
 total_hits = array("f", [0])
@@ -623,6 +625,9 @@ spectators = [
     ("total_hits_v", total_hits_v),
     ("track_pidchipr", track_pidchipr),
     ("track_likelihood", track_likelihood),
+    ("track_mip_likelihood", track_mip_likelihood),
+    ("track_p_likelihood", track_p_likelihood),
+
     # ("track_pidchi", track_pidchi),
     # ("track_pida", track_pida),
     ("nu_E", nu_E),
@@ -649,7 +654,7 @@ spectators = [
     ("track_phi", track_phi),
     ("shower_hits", shower_hits),
     ("track_hits", track_hits),
-    ("track_dedx", track_dedx),
+    ("track_dqdx", track_dqdx),
     ("shower_start_x", shower_start_x),
     ("shower_theta", shower_theta),
     # ("shower_length", shower_length),
@@ -709,8 +714,11 @@ binning = {
     "true_nu_is_fidvol": [2, 0, 2],
     "total_hits_u": [1, 0, 1],
     "total_hits_v": [1, 0, 1],
-    "track_pidchipr": [50, 0, 300],
-    "track_likelihood": [50, -10, 10],
+    "track_pidchipr": [20, 0, 300],
+    "track_likelihood": [20, -10, 10],
+    "track_mip_likelihood": [20, 0, 0.8],
+    "track_p_likelihood": [20, 0, 0.8],
+
     "track_pidchi": [20, 0, 40],
     "track_pida": [20, 0, 25],
     "track_res_mean": [20, -2, 2],
@@ -779,8 +787,8 @@ binning = {
     "E_dep": [30, 0, 3],
 
     "track_hits": [20, 0, 400],
-    "track_dedx": [40, 0, 700],
-    "total_track_energy_length": [20, 0, 2]
+    "track_dqdx": [40, 0, 700],
+    "total_track_energy_length": [12, 0, 1.2]
 }
 
 if manual:
@@ -809,6 +817,8 @@ labels = {
     "no_tracks": ";No tracks",
     "track_pidchipr": ";Track proton PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchipr"),
     "track_likelihood": ";log(L_{MIP}/L_{p});N. Entries / %.1f" % bin_size("track_likelihood"),
+    "track_mip_likelihood": ";L_{MIP};N. Entries / %.1f" % bin_size("track_mip_likelihood"),
+    "track_p_likelihood": ";L_{p};N. Entries / %.1f" % bin_size("track_p_likelihood"),
 
     "track_pidchi": ";Track min. PID #chi^{2};N. Entries / %.1f" % bin_size("track_pidchi"),
     "track_pida": ";Track PIDa; N. Entries / %.1f" % bin_size("track_pida"),
@@ -873,6 +883,6 @@ labels = {
     "total_hits_v": ";Total hits (V plane); N. Entries / %i" % bin_size("shower_hits"),
     "total_hits_y": ";Total hits (Y plane); N. Entries / %i" % bin_size("shower_hits"),
     "track_hits": ";Track hits; N. Entries / %i" % bin_size("track_hits"),
-    "track_dedx": ";Track dQ/dx [a.u.]; N. Entries / %.2f a.u." % bin_size("track_dedx"),
+    "track_dqdx": ";Track dQ/dx [a.u.]; N. Entries / %.2f a.u." % bin_size("track_dqdx"),
     "total_track_energy_length": ";Total track E (stopping power) [GeV]; N. Entries / %.2f GeV" % bin_size("total_track_energy_length")
 }
