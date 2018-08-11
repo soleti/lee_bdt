@@ -42,17 +42,17 @@ for name, var in spectators:
 # sigCut = ROOT.TCut("shower_track_d < 5 && track_distance < 5 && shower_distance < 5 && total_shower_energy > 0.01 && total_track_energy_length > 0 && numu_score < 17 && track_hits > 5 && shower_hits_y > 5 && total_hits_y > 0 && total_hits_u > 0 && total_hits_v > 0 && category == 2")
 # bgCut = ROOT.TCut("shower_track_d < 5 && track_distance < 5 && shower_distance < 5 && total_shower_energy > 0.01  && total_track_energy_length > 0 && category != 2 && numu_score < 17 && track_hits > 5 && shower_hits_y > 5 && total_hits_y > 0 && total_hits_u > 0 && total_hits_v > 0")
 
-sigCut = ROOT.TCut("category == 2")
-bgCut = ROOT.TCut("category != 2")
+sigCut = ROOT.TCut("category == 10 && shower_dedx_cali > -999 && track_likelihood > -999 && track_distance > -999 && track_distance < 6 && shower_distance > -999 && numu_score < 17 && track_hits > 5 && shower_hits > 5")
+bgCut = ROOT.TCut("category != 2 && shower_dedx_cali > -999 && track_likelihood > -999 && track_distance > -999 && track_distance < 6 && shower_distance > -999 && numu_score < 17 && track_hits > 5 && shower_hits > 5")
 
 dataloader.AddBackgroundTree(t_nue)
-dataloader.AddSignalTree(t_nue)
+dataloader.AddSignalTree(t_lee)
 dataloader.AddBackgroundTree(t)
 dataloader.AddBackgroundTree(t_cosmic)
 
 dataloader.PrepareTrainingAndTestTree(sigCut, bgCut,
                                       ":".join([
-                                          "SplitMode=Alternate",
+                                        #   "SplitMode=Alternate",
                                           "NormMode=NumEvents:!V"]))
 
 

@@ -18,14 +18,15 @@ SYS_ERR = 0.1
 DRAW_POT = True
 DRAW_SUBTRACTION = False
 DRAW_EXT = False
-DRAW_LEE = False
+DRAW_LEE = True
 DRAW_DATA = True
 DRAW_COSMIC = False
 DRAW_SYS = False
 OBJECTS = []
 VARIABLES = variables + spectators
 RECO_ENERGY = list(dict(VARIABLES)).index("reco_energy")
-
+TRUE_ENERGY = list(dict(VARIABLES)).index("nu_E")
+# RECO_ENERGY = TRUE_ENERGY
 histograms_bnb = []
 histograms_bnbext = []
 histograms_mc = []
@@ -37,7 +38,7 @@ histograms = [histograms_bnb, histograms_mc, histograms_lee]
 if DRAW_DATA:
     POST_SCALING = 1
 else:
-    POST_SCALING = 6.6e20 / total_data_bnb_pot
+    POST_SCALING = 1#6.6e20 / total_data_bnb_pot
 
 total_pot *= POST_SCALING
 
@@ -170,10 +171,9 @@ for i, h in enumerate(histograms_mc):
                 histo,
                 "{}: {:.1f} events".format(d, n_events), "f")
 
-    if DRAW_LEE and i == RECO_ENERGY:
+    if DRAW_LEE:
         histograms_lee[i].SetLineWidth(0)
-        histograms_lee[i].SetFillColor(ROOT.TColor.GetColor("#11ff00"))
-        # histograms_lee[i].SetFillStyle(3002)
+        histograms_lee[i].SetFillColor(ROOT.kGreen - 10)
         if i != RECO_ENERGY:
             legends[i].AddEntry(histograms_lee[i],
                                 "Low-energy excess: {:.1f} events"
@@ -218,7 +218,7 @@ for i, scale in enumerate(scaling):
         h_lee.SetBinContent(i + 1, histograms_mc[RECO_ENERGY].GetHists()[-1].
                             GetBinContent(i + 1) * (scale - 1))
 
-histograms_lee[RECO_ENERGY] = h_lee
+# histograms_lee[RECO_ENERGY] = h_lee
 
 if DRAW_LEE:
     legends[RECO_ENERGY].AddEntry(histograms_lee[RECO_ENERGY],
@@ -355,7 +355,16 @@ for i in range(len(VARIABLES)):
                     #     pots.append(pot)
 
                 fix_binning(histograms_lee[i])
-
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
+            h_mc_err.Add(histograms_lee[i])
             histograms_mc[i].Add(histograms_lee[i])
 
         if DRAW_DATA:
@@ -375,7 +384,7 @@ for i in range(len(VARIABLES)):
 
         if i == RECO_ENERGY:
             new_max = h_mc_err.GetMaximum() + histograms_lee[i].GetMaximum()
-            histograms_mc[i].SetMaximum(new_max * 1.3)
+            # histograms_mc[i].SetMaximum(new_max * 1.3)
 
         h_mc_err.SetFillStyle(3002)
         h_mc_err.SetFillColor(1)
@@ -495,13 +504,13 @@ for i in range(len(VARIABLES)):
 
         legends[i].Draw("same")
         c.cd()
+        # histograms_mc[i].GetHists()[-1].Draw("hist")
 
         if DRAW_DATA and h_mc_err_sys.Integral() > 0:
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
 
             draw_ratio(histograms_bnb[i], h_mc_err)
-
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
 
@@ -683,7 +692,8 @@ if DRAW_NORMALIZED:
         c_norm = ROOT.TCanvas("c%i_norm" % i, "", 900, 44, 700, 645)
 
 
-        h_signal = histograms_mc[i].GetHists()[0].Clone()
+        h_signal = histograms_lee[i]
+        print(h_signal.GetName())
         if h_signal.Integral() <= 0:
             continue
         h_signal.SetLineColor(ROOT.TColor.GetColor("#1e7a2e"))
@@ -703,8 +713,8 @@ if DRAW_NORMALIZED:
         h_neutrino_bkg.SetLineColor(ROOT.kBlue + 1)
 
         h_cosmic_bkg = histograms_mc[i].GetHists()[5].Clone()
-        h_cosmic_bkg.Add(histograms_mc[i].GetHists()[6])
-        h_cosmic_bkg.Add(histograms_mc[i].GetHists()[7])
+        # h_cosmic_bkg.Add(histograms_mc[i].GetHists()[6])
+        # h_cosmic_bkg.Add(histograms_mc[i].GetHists()[7])
         if h_cosmic_bkg.Integral() > 0:
             h_cosmic_bkg.Scale(1 / h_cosmic_bkg.Integral())
         h_cosmic_bkg.SetFillStyle(0)

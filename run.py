@@ -204,7 +204,7 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
 
 
 
-# print("LEE events", fill_histos_data("lee", bdt, manual))
+print("LEE events", fill_histos_data("lee", bdt, manual))
 print("Data events", fill_histos_data("bnb", bdt, manual))
 
 
@@ -229,7 +229,7 @@ for i, n in enumerate(variables_dict.keys()):
     h_stack = ROOT.THStack("h_" + n, labels[n])
 
     for c in categories:
-        if n != "reco_energy":
+        if n != "reco_energy" and n != "nu_E":
             h = ROOT.TH1F("h_%s_%s" % (n, c), labels[n],
                           binning[n][0], binning[n][1], binning[n][2])
         else:

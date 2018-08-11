@@ -13,14 +13,14 @@ ELECTRON_THRESHOLD = 0.020
 MAX_N_TRACKS = 15
 MAX_N_SHOWERS = 15
 
-bdt, manual = False, False
+bdt, manual = True, True
 # Number to be obtained from Zarko's POT counting tool
 total_data_bnb_goodruns_remap = 4.341e+19
 total_data_bnb_pot = total_data_bnb_goodruns_remap
 
 # bdt_cut = 0.1470
 
-bdt_cut = -0
+bdt_cut = 0.1
 rectangular_cut = 0.03
 
 bins = array("f", [0, 0.200, 0.300, 0.375, 0.475, 0.550,
@@ -194,7 +194,7 @@ def pre_cuts(chain):
     # track_end = [chain.track_end_x, chain.track_end_y, chain.track_end_z]
     # shower_start = [chain.shower_start_x, chain.shower_start_y, chain.shower_start_z]
     # fiducial = is_fiducial(track_start) and is_fiducial(track_end) and is_fiducial(shower_start)
-    numu = chain.numu_score < 17 or manual
+    numu = chain.numu_score < 17
     n_showers = chain.n_showers == 2
     sh_id = int(chain.shower_id)
     shower_track_energy = chain.total_shower_energy > 0.01 and chain.total_track_energy_length > 0 and chain.shower_energy[sh_id] > 0.01
@@ -255,7 +255,7 @@ def fill_histos_data(tree_name, bdt, manual):
     histograms = []
 
     for i, n in enumerate(variables_dict.keys()):
-        if n != "reco_energy":
+        if n != "reco_energy" and n != "nu_E":
             h = ROOT.TH1F("h_%s" % n, labels[n],
                           binning[n][0], binning[n][1], binning[n][2])
         else:
@@ -324,19 +324,25 @@ def find_interaction(dictionary, interaction):
 def manual_cuts(chain):
     tr_id = int(chain.track_id)
     sh_id = int(chain.shower_id)
+
     track_proton_chi2 = True
+    track_distance = True
     for i_tr in range(int(chain.n_tracks)):
+        track_distance = track_distance and chain.track_distance[i_tr] < 6
         track_proton_chi2 = track_proton_chi2 and chain.track_pidchipr[i_tr] < 80
+
     track_shower_angle = -0.9 < chain.track_shower_angle[tr_id]
-    shower_distance = chain.shower_distance[sh_id] < 5
     shower_open_angle = 1 < chain.shower_open_angle[sh_id] < 19
+
     shower_dedx = True
+    shower_distance = True
     for i_sh in range(int(chain.n_showers)):
-        shower_dedx = shower_dedx and 1 < chain.shower_dedx_cali[sh_id] < 3.2
+        shower_dedx = shower_dedx and 0.5 < chain.shower_dedx_cali[sh_id] < 3.2
+        shower_distance = shower_distance and chain.shower_distance[sh_id] < 10
+
     total_hits_y = chain.total_hits_y > 100
     shower_energy = chain.total_shower_energy_cali > 0.1
     track_length = chain.track_length[tr_id] < 80
-    track_distance = chain.track_distance[tr_id] < 5
     track_res = chain.track_res_std[tr_id] < 2
     corrected_energy = 0.300 < (chain.total_shower_energy_cali + 0.02) / \
         0.78 + chain.total_track_energy_length < 0.425
@@ -349,6 +355,7 @@ def manual_cuts(chain):
         shower_distance = chain.shower_distance[sh_id] < 2
         track_distance = chain.track_distance[tr_id] < 2
 
+    lee_cuts = [track_distance, ratio, shower_dedx]
     collabmeeting_cuts = [track_proton_chi2, total_hits_y, track_shower_angle, numu_exclude, shower_energy, ratio, track_res,
                           track_distance, shower_distance, shower_open_angle, track_length, shower_dedx]
 
@@ -379,8 +386,9 @@ def manual_cuts(chain):
     # passed_harder = len(harder_cuts) == sum(harder_cuts)
 
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
+    passed_lee = len(lee_cuts) == sum(lee_cuts)
 
-    return passed_collab
+    return passed_lee
 
 def sigma_calc_matrix(h_signal, h_background, scale_factor=10, sys=0):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
@@ -624,7 +632,6 @@ spectators = [
     ("total_hits_u", total_hits_u),
     ("total_hits_v", total_hits_v),
     ("track_pidchipr", track_pidchipr),
-    ("track_likelihood", track_likelihood),
     ("track_mip_likelihood", track_mip_likelihood),
     ("track_p_likelihood", track_p_likelihood),
 
@@ -673,7 +680,6 @@ spectators = [
     ("total_shower_energy_cali", total_shower_energy_cali),
     ("total_track_energy_length", total_track_energy_length),
     ("numu_score", numu_score),
-    ("shower_dedx_cali", shower_dedx_cali),
     ("shower_dedx", shower_dedx),
     ("shower_dedx_u", shower_dedx_u),
     ("shower_dedx_v", shower_dedx_v),
@@ -685,7 +691,6 @@ spectators = [
     ("track_shower_angle", track_shower_angle),
     ("dqdx_bdt", dqdx_bdt),
     ("dqdx_bdt_max", dqdx_bdt_max),
-    ("hits_ratio", hits_ratio),
     ("shower_angle", shower_angle),
     ("shower_id", b_shower_id),
     ("track_id", b_track_id)
@@ -695,7 +700,10 @@ spectators = [
 variables = [
     ("n_showers", n_showers),
     ("n_tracks", n_tracks),
-    ("shower_energy", shower_energy)
+    ("shower_energy", shower_energy),
+    ("shower_dedx_cali", shower_dedx_cali),
+    ("track_likelihood", track_likelihood),
+    ("hits_ratio", hits_ratio)
 ]
 
 binning = {
@@ -787,7 +795,7 @@ binning = {
     "E_dep": [30, 0, 3],
 
     "track_hits": [20, 0, 400],
-    "track_dqdx": [40, 0, 700],
+    "track_dqdx": [40, 0, 2000],
     "total_track_energy_length": [12, 0, 1.2]
 }
 

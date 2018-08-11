@@ -598,6 +598,9 @@ def fill_tree(chain, weight, tree, option=""):
         if "nue" in option:
             option_check = abs(chain.nu_pdg) == 12
 
+        if option == "lee":
+            event_weight = weight * chain.bnbweight * chain.leeweight
+
         if not option_check:
             continue
 
@@ -630,12 +633,13 @@ begin_time = time.time()
 # To be obtained with Zarko's POT tool
 data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
-samples = ["nue", "bnb", "bnb_data", "ext_data"]
+samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
 
 tree_files = [glob("data_files/mc_nue_pid/*.root"),
               glob("data_files/mc_bnb_pid/*/*.root"),
               glob("data_files/data_bnb_pid/*/*.root"),
-              glob("data_files/data_ext_pid/*/*.root")]
+              glob("data_files/data_ext_pid/*/*.root"),
+              glob("data_files/lee/*.root"),]
 
 chains = []
 chains_pot = []
@@ -664,13 +668,16 @@ variables = dict(variables + spectators)
 weights = [total_pot / pots_dict["nue"] * 1.028, # Position of the detector is slightly wrong
            total_pot / pots_dict["bnb"] * 1.028,
            1,
-           data_ext_scaling_factor]
+           data_ext_scaling_factor,
+           total_pot / pots_dict["lee"] * 1.028]
 
 print(weights)
 files = ["nue_file.root", "mc_file.root",
-         "bnb_file.root", "bnbext_file.root"]
+         "bnb_file.root", "bnbext_file.root",
+         "lee_file.root"]
 tree_names = ["nue_tree", "mc_tree",
-              "bnb_tree", "bnbext_tree"]
+              "bnb_tree", "bnbext_tree",
+              "lee_tree"]
 
 trees = []
 
@@ -687,7 +694,7 @@ for n, b in variables.items():
         else:
             t.Branch(n, b, n + "/%s" % b.typecode)
 
-samples = ["nue", "bnb", "bnb_data", "ext_data"]
+samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
 
 for i, s in enumerate(samples):
     start_time = time.time()
