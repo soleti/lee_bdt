@@ -6,6 +6,7 @@ import numpy as np
 from array import array
 # from root_numpy import hist2array
 import ROOT
+import os.path
 
 from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
@@ -17,11 +18,10 @@ SYS_ERR = 0.1
 
 DRAW_POT = True
 DRAW_SUBTRACTION = False
-DRAW_EXT = False
-DRAW_LEE = True
+DRAW_LEE = False
 DRAW_DATA = True
 DRAW_COSMIC = False
-DRAW_SYS = False
+DRAW_SYS = True
 OBJECTS = []
 VARIABLES = variables + spectators
 RECO_ENERGY = list(dict(VARIABLES)).index("reco_energy")
@@ -62,7 +62,7 @@ def draw_top():
     OBJECTS.append(pad_top)
 
 
-def draw_ratio(num, den):
+def draw_ratio(num, den, den_sys=None):
     pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)
     pad_bottom.Range(-22.5, -0.6346511, 202.5, 1.99)
 
@@ -76,12 +76,6 @@ def draw_ratio(num, den):
     OBJECTS.append(pad_bottom)
     h_ratio = num.Clone()
     h_ratio_sys = num.Clone()
-    den_sys = den.Clone()
-    den_sys.SetName("den_sys%i" % i)
-    for k in range(1, den_sys.GetNbinsX() + 1):
-        stat_err = den_sys.GetBinError(k)
-        sys_err = SYS_ERR * den_sys.GetBinContent(k)
-        den_sys.SetBinError(k, math.sqrt(stat_err**2 + sys_err**2))
 
     OBJECTS.append(h_ratio)
     OBJECTS.append(h_ratio_sys)
@@ -91,7 +85,8 @@ def draw_ratio(num, den):
 
     h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
     h_ratio.Divide(den)
-    h_ratio_sys.Divide(den_sys)
+    if DRAW_SYS:
+        h_ratio_sys.Divide(den_sys)
 
     h_ratio.GetXaxis().SetLabelFont(42)
     h_ratio.GetXaxis().SetLabelSize(0.1)
@@ -159,7 +154,7 @@ for i, h in enumerate(histograms_mc):
 
     if DRAW_DATA:
         legends[i].AddEntry(histograms_bnb[i],
-                            "Data beam-on: {:.0f} events"
+                            "Data beam-on: {:.0f} entries"
                             .format(histograms_bnb[i].Integral()
                                     * POST_SCALING), "lep")
 
@@ -169,14 +164,14 @@ for i, h in enumerate(histograms_mc):
             n_events = histo.Integral() * POST_SCALING
             legends[i].AddEntry(
                 histo,
-                "{}: {:.1f} events".format(d, n_events), "f")
+                "{}: {:.1f} entries".format(d, n_events), "f")
 
     if DRAW_LEE:
         histograms_lee[i].SetLineWidth(0)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 10)
         if i != RECO_ENERGY:
             legends[i].AddEntry(histograms_lee[i],
-                                "Low-energy excess: {:.1f} events"
+                                "Low-energy excess: {:.1f} entries"
                                 .format(histograms_lee[i].Integral()
                                         * POST_SCALING), "f")
 
@@ -222,7 +217,7 @@ for i, scale in enumerate(scaling):
 
 if DRAW_LEE:
     legends[RECO_ENERGY].AddEntry(histograms_lee[RECO_ENERGY],
-                                  "Low-energy excess: {:.1f} events"
+                                  "Low-energy excess: {:.1f} entries"
                                   .format(histograms_lee[RECO_ENERGY].Integral() * POST_SCALING),
                                   "f")
 
@@ -304,17 +299,12 @@ for i in range(len(VARIABLES)):
         h_bkg = h_mc_err_nobinning.Clone()
         h_bkg.Add(h_sig, -1)
 
-        h_mc_err_sys = h_mc_err.Clone()
-        h_mc_err_sys.SetName("h_mc_err_sys%i" % i)
-        for k in range(1, h_mc_err.GetNbinsX() + 1):
-            stat_err = h_mc_err.GetBinError(k)
-            sys_err = SYS_ERR * h_mc_err.GetBinContent(k)
-            h_mc_err_sys.SetBinError(k, math.sqrt(stat_err**2 + sys_err**2))
 
         if i == RECO_ENERGY:
             reco_err = h_mc_err
             print(h_sig.Integral(), h_bkg.Integral()+h_sig.Integral())
             print("Purity", h_sig.Integral()/(h_bkg.Integral() + h_sig.Integral()))
+
         if DRAW_LEE:
 
             histograms_lee[i].Scale(POST_SCALING)
@@ -388,8 +378,6 @@ for i in range(len(VARIABLES)):
 
         h_mc_err.SetFillStyle(3002)
         h_mc_err.SetFillColor(1)
-        h_mc_err_sys.SetFillStyle(3002)
-        h_mc_err_sys.SetFillColor(1)
 
         max_hist = histograms_bnb[i].GetMaximum() * 1.35
 
@@ -467,40 +455,64 @@ for i in range(len(VARIABLES)):
             OBJECTS.append(l1)
 
         h_mc_err.Draw("e2 same")
-
         h_mc_err_clone = h_mc_err.Clone()
         h_mc_err_clone.SetLineWidth(2)
         h_mc_err_clone.SetFillStyle(0)
         h_mc_err_clone.Draw("hist same")
         OBJECTS.append(h_mc_err_clone)
-        legends[i].AddEntry(h_mc_err, "Stat. uncertainty", "lf")
+        if DRAW_SYS:
+            legends[i].AddEntry(h_mc_err, "Stat. #oplus sys. uncertainty", "lef")
+        else:
+            legends[i].AddEntry(h_mc_err, "Stat. uncertainty", "lf")
 
         if DRAW_SYS:
-            l_errs[i].AddEntry(h_mc_err, "Stat. uncertainties", "lf")
-            l_errs[i].AddEntry(h_mc_err_sys, "Stat. #oplus 10% sys. uncertainties", "le")
-            l_errs[i].Draw("same")
-            h_mc_err_sys.Draw("e1 same")
+            h_mc_err_sys = h_mc_err.Clone()
+            fname_flux = "plots/sys/h_%s_flux_sys.root" % VARIABLES[i][0]
+            fname_genie = "plots/sys/h_%s_genie_sys.root" % VARIABLES[i][0]
+            OBJECTS.append(h_mc_err_sys)
+            if DRAW_SYS and os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
+                f_flux = ROOT.TFile(fname_flux)
+                h_flux = f_flux.Get("h_%s_cv" % VARIABLES[i][0])
+                f_genie = ROOT.TFile(fname_genie)
+                h_genie = f_genie.Get("h_%s_cv" % VARIABLES[i][0])
+
+                OBJECTS.append(h_flux)
+                OBJECTS.append(h_genie)
+
+                for k in range(1, h_mc_err_sys.GetNbinsX() + 1):
+                    stat_err = h_mc_err_sys.GetBinError(k)
+                    flux_err = h_flux.GetBinError(k)
+                    genie_err = h_genie.GetBinError(k)
+                    h_mc_err_sys.SetBinError(
+                        k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
+                f_genie.Close()
+                f_flux.Close()
+            p_chi2 = ROOT.TPaveText(0.679, 0.604, 0.872, 0.715, "NDC")
+            p_chi2.AddText("#chi^{2} prob. = %.2f" %
+                           histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
+            ks = histograms_bnb[i].KolmogorovTest(h_mc_err_sys)
+            p_chi2.AddText("K-S prob. = %.2f" % ks)
+            p_chi2.SetTextAlign(11)
+            if i == RECO_ENERGY:
+                reco_chi2 = p_chi2
+                h_reco_sys = h_mc_err_sys
+            h_mc_err_sys.Draw("e1p same")
+            OBJECTS.append(h_mc_err_sys)
+
 
         if DRAW_DATA:
-            p_chi2 = ROOT.TPaveText(0.679, 0.634, 0.872, 0.745, "NDC")
-            p_chi2.AddText("#chi^{2} / n.d.f. = %.2f" %
-                           histograms_bnb[i].Chi2Test(h_mc_err_nobinning, "UW CHI2/NDF"))
 
             if i == RECO_ENERGY:
                 ratio = histograms_bnb[i].Integral() / (h_mc_err_nobinning.Integral())
                 fix_binning(histograms_bnb[i])
 
-            if i == RECO_ENERGY:
-                reco_chi2 = p_chi2
-
-            histograms_bnb[i].Draw("ep same")
+            histograms_bnb[i].Draw("e1p same")
             p_chi2.Draw("same")
             p_chi2.SetFillStyle(0)
             p_chi2.SetBorderSize(0)
             OBJECTS.append(p_chi2)
 
         OBJECTS.append(h_mc_err)
-        OBJECTS.append(h_mc_err_sys)
 
         legends[i].Draw("same")
         c.cd()
@@ -510,7 +522,7 @@ for i in range(len(VARIABLES)):
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
 
-            draw_ratio(histograms_bnb[i], h_mc_err)
+            draw_ratio(histograms_bnb[i], h_mc_err, h_mc_err_sys)
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
 
@@ -536,6 +548,7 @@ for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
         h_fixed.SetBinError(i, h_clone.GetBinError(i))
         h_mc_fixed.SetBinContent(i, h_mc_fixed.GetBinContent(i) + h_clone.GetBinContent(i))
 
+
     if j != 0 and not DRAW_SUBTRACTION:
         h_fixed.SetLineWidth(0)
 
@@ -545,9 +558,11 @@ for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
 
     h_true_e.Add(h_fixed)
 
+
+h_mc_fixed_sys = h_mc_fixed.Clone()
 for i in range(1, h_mc_fixed.GetNbinsX() + 1):
     h_mc_fixed.SetBinError(i, reco_err.GetBinError(i))
-
+    h_mc_fixed_sys.SetBinError(i, h_reco_sys.GetBinError(i))
 
 h_clone_data = histograms_bnb[RECO_ENERGY].Clone()
 h_fixed_data = ROOT.TH1F("h_fixed_data", "", len(bins) - 1, bins2)
@@ -565,6 +580,8 @@ h_true_e.GetYaxis().SetTitleOffset(0.95)
 h_mc_fixed.SetLineWidth(2)
 h_mc_fixed.SetLineColor(1)
 h_mc_fixed.Draw("e2 same")
+h_mc_fixed_sys.SetLineColor(1)
+h_mc_fixed_sys.Draw("e1 same")
 h_mc_fixed_clone = h_mc_fixed.Clone()
 h_mc_fixed_clone.Draw("hist same")
 
@@ -574,7 +591,7 @@ h_true_e.SetMaximum(max(h_true_e.GetMaximum(), h_fixed_data.GetMaximum()) * 1.3)
 h_true_e.SetMinimum(0.001)
 
 if DRAW_DATA:
-    h_fixed_data.Draw("ep same")
+    h_fixed_data.Draw("e1p same")
     # reco_chi2.Draw()
     p_datamc = ROOT.TPaveText(0.563, 0.58947, 0.882, 0.703, "NDC")
     p_datamc.SetFillStyle(0)
@@ -846,7 +863,7 @@ if DRAW_NORMALIZED:
 
 if DRAW_COSMIC:
     legend_cosmic = ROOT.TLegend(0.099, 0.909, 0.900, 0.987, "", "brNDC")
-    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} events".format(
+    legend_cosmic.AddEntry(histograms_bnbext[RECO_ENERGY], "Data EXT: {:.0f} entries".format(
         histograms_bnbext[RECO_ENERGY].Integral() * POST_SCALING), "lep")
     legend_cosmic.AddEntry(histograms_mc[RECO_ENERGY].GetHists()[1],
                            "CORSIKA in-time Monte Carlo: integral normalized", "f")

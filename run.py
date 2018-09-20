@@ -1,27 +1,50 @@
 #!/usr/local/bin/python3
 
 import ROOT
-
+import collections
 from bdt_common import bdt_cut, binning, labels, variables, spectators, fill_histos_data
 from bdt_common import manual_cuts, bdt, manual, bins, colors, inv_interactions, interactions
 from bdt_common import pre_cuts, rectangular_cut, fix_binning, total_data_bnb_pot, description2
 from array import array
+import math
 import collections
 import sys
-ROOT.gStyle.SetPalette(ROOT.kColorPrintableOnGrey)
+import os.path
+
+
+ROOT.gStyle.SetPalette(ROOT.kCMYK)
 print("BDT: ", bdt, "Manual: ", manual)
 
-pdgs = {
-    "#gamma": 22,
-    "#pi^{0}": 111,
-    "e^{#pm}": 11,
-    "n": 2112,
-    "#mu^{#pm}": 13,
-    "#pi^{#pm}": 211,
-    "p": 2212,
-    "Other": 99999,
-    "Data off-beam": 2147483648,
+DRAW_SYS = True
+
+pdg_colors = {
+    2147483648: "#ffffff",
+    22: '#e6194b',
+    11: '#f58231',
+    2112: '#ffe119',
+    13: '#bfef45',
+    211: '#3cb44b',
+    2212: '#42d4f4',
+    999999: '#4363db',
+    99999: '#a9a9a9'
 }
+
+pdgs = [
+    ("Data off-beam", 2147483648),
+    ("#gamma", 22),
+    ("e^{#pm}", 11),
+    ("n", 2112),
+    ("#mu^{#pm}", 13),
+    ("#pi^{#pm}", 211),
+    ("p", 2212),
+    ("Overlay cosmic", 999999),
+    ("Other", 99999),
+]
+
+pdgs = collections.OrderedDict(pdgs)
+
+inv_pdgs = {v: k for k, v in pdgs.items()}
+
 
 h_pdgs = {}
 vars = dict(variables + spectators)
@@ -112,27 +135,10 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             #     corr = 1.2
 
             corrected_energy_cali = ((chain.total_shower_energy_cali + 1.36881e-02) /
-                                        7.69908e-01) + chain.total_track_energy_length
+                                     7.69908e-01) + chain.total_track_energy_length
 
             corrected_energy_hits = ((chain.total_shower_energy_cali + 1.36881e-02) /
                                      7.69908e-01) + (chain.total_track_energy + 3.57033e-02) / 7.70870e-01
-
-            # if category == 2:
-            #     h_angle_energy_sig.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
-            # elif category == 4:
-            #     h_angle_energy_bkg.Fill(chain.shower_open_angle, chain.shower_energy, chain.event_weight * corr)
-
-            # if category != 0 and category != 6 and category != 1 and category != 7 and category == 8:
-            #     h_int[chain.interaction_type].Fill(corrected_energy, chain.event_weight * corr)
-
-            # if abs(chain.shower_pdg) not in h_shower_d_pdgs[category]:
-            #     h_shower_d_pdgs[category][abs(chain.shower_pdg)] = ROOT.TH1F(
-            #         "%i %s" % (int(abs(chain.shower_pdg)), description2[category]), ";Shower distance;", 30, 0, 15)
-            # h_shower_d_pdgs[category][abs(chain.shower_pdg)].Fill(chain.shower_true_distance, chain.event_weight * corr)
-
-            # if abs(chain.shower_pdg) not in h_dedx_pdgs:
-            #     h_dedx_pdgs[abs(chain.shower_pdg)] = ROOT.TH1F("%i" % int(abs(chain.shower_pdg)), ";Shower dE/dx", 30, 0, 6)
-            # h_dedx_pdgs[abs(chain.shower_pdg)].Fill(chain.dedx, chain.event_weight * corr)
 
             if chain.true_nu_is_fidvol:
                 h_energy_sig.Fill(chain.nu_E, chain.event_weight * corr)
@@ -149,19 +155,23 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
             for name, var in variables:
                 for i, v in enumerate(var):
                     if v > -999:
-                        # print(var_dict["track_pdg"])
                         if "track" in name:
                             pdg_code = int(var_dict["track_pdg"][i])
-                        if "shower" in name:
+                            if option != "bnbext" and abs(pdg_code) == 2147483648:
+                                pdg_code = int(var_dict["shower_pdg"][0])
+                        elif "shower" in name:
                             pdg_code = int(var_dict["shower_pdg"][i])
+                            if option != "bnbext" and abs(pdg_code) == 2147483648:
+                                pdg_code = int(var_dict["track_pdg"][0])
+
+                        if option != "bnbext" and abs(pdg_code) == 2147483648:
+                            pdg_code = 99999
 
                         if abs(pdg_code) in h_pdgs[name]:
                             h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
                         else:
                             h_pdgs[name][99999].Fill(v, chain.event_weight)
 
-                        # if "track" in name:
-                        #     h_pdgs[name[variables["track_pdg"][i]]].Fill(v, chain.event_weight)
                         histo_dict[name][category].Fill(v, chain.event_weight)
 
             for name, var in spectators:
@@ -169,9 +179,16 @@ def fill_histos(chain, histo_dict, h_bdts, option=""):
                     if v > -999:
                         if "track" in name:
                             pdg_code = int(var_dict["track_pdg"][i])
-                        if "shower" in name:
+                            if option != "bnbext" and abs(pdg_code) == 2147483648:
+                                pdg_code = int(var_dict["shower_pdg"][0])
+                        elif "shower" in name:
                             pdg_code = int(var_dict["shower_pdg"][i])
+                            if option != "bnbext" and abs(pdg_code) == 2147483648:
+                                pdg_code = int(var_dict["track_pdg"][0])
 
+
+                        if option != "bnbext" and abs(pdg_code) == 2147483648:
+                            pdg_code = 99999
                         if abs(pdg_code) in h_pdgs[name]:
                             h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
                         else:
@@ -212,8 +229,8 @@ mc_chain = ROOT.TChain("mc_tree")
 nue_chain = ROOT.TChain("nue_tree")
 bnbext_chain = ROOT.TChain("bnbext_tree")
 
-mc_chain.Add("root_files/mc_file.root")
-nue_chain.Add("root_files/nue_file.root")
+mc_chain.Add("root_files_overlay/mc_file.root")
+nue_chain.Add("root_files_overlay/nue_file.root")
 bnbext_chain.Add("root_files/bnbext_file.root")
 
 kinds = []
@@ -325,7 +342,7 @@ for h in stacked_histos:
 
 OBJECTS = []
 for v in h_pdgs:
-    if h_pdgs[v]:
+    if h_pdgs[v] and ("track" in v or "shower" in v):
         h_stack = ROOT.THStack("h_stack_%s" % v, labels[v])
         OBJECTS.append(h_stack)
         h_tot_mc = ROOT.TH1F("h_tot_mc_%s" % v,
@@ -335,36 +352,103 @@ for v in h_pdgs:
                              binning[v][2])
         h_tot_mc.SetTitle("Stat. uncertainty")
 
+        l_pdg = ROOT.TLegend(0.09025788,0.8105263,0.9040115,0.9852632)
+        l_pdg.SetNColumns(3)
+        l_pdg.SetTextSize(16)
+        l_pdg.SetTextFont(63)
+        l_pdg.SetHeader("MicroBooNE Preliminary %.1e POT" % total_data_bnb_pot)
+        l_pdg.SetTextFont(43)
         for pdg in h_pdgs[v]:
             h_pdgs[v][pdg].SetLineWidth(0)
             h_pdgs[v][pdg].SetMarkerStyle(0)
             h_pdgs[v][pdg].SetMarkerSize(0)
-            h_stack.Add(h_pdgs[v][pdg])
-            h_tot_mc.Add(h_pdgs[v][pdg])
+            h_pdgs[v][pdg].SetFillColor(ROOT.TColor.GetColor(pdg_colors[pdg]))
+            if pdg != 2147483648:
+                h_stack.Add(h_pdgs[v][pdg])
+                h_tot_mc.Add(h_pdgs[v][pdg])
+
+        for pdg in h_pdgs[v]:
+            integral = h_pdgs[v][pdg].Integral()
+            if integral > 0 and pdg != 2147483648:
+                l_pdg.AddEntry(h_pdgs[v][pdg],
+                               "%s: %.1f%%" % (inv_pdgs[pdg], (integral / h_tot_mc.Integral()) * 100),
+                               "f")
 
         h_tot_mc_clone = h_tot_mc.Clone()
         h_tot_mc.SetFillStyle(3002)
         h_tot_mc.SetFillColor(1)
         c = ROOT.TCanvas("c_%s" % v)
-        h_stack.Draw("hist pfc")
+        c.SetTopMargin(0.1978947)
+        c.Range(-0.4035779,-33.09252,6.713775,294.3855)
+
+        h_stack.Draw("hist")
+
+        if DRAW_SYS:
+            h_mc_err_sys = h_tot_mc.Clone()
+            fname_flux = "plots/sys/h_%s_flux_sys.root" % v
+            fname_genie = "plots/sys/h_%s_genie_sys.root" % v
+            OBJECTS.append(h_mc_err_sys)
+            if DRAW_SYS and os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
+                f_flux = ROOT.TFile(fname_flux)
+                h_flux = f_flux.Get("h_%s_cv" % v)
+                f_genie = ROOT.TFile(fname_genie)
+                h_genie = f_genie.Get("h_%s_cv" % v)
+
+                OBJECTS.append(h_flux)
+                OBJECTS.append(h_genie)
+
+                for k in range(1, h_mc_err_sys.GetNbinsX() + 1):
+                    stat_err = h_mc_err_sys.GetBinError(k)
+                    flux_err = h_flux.GetBinError(k)
+                    genie_err = h_genie.GetBinError(k)
+                    h_mc_err_sys.SetBinError(
+                        k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
+                f_genie.Close()
+                f_flux.Close()
+
+            h_mc_err_sys.SetLineColor(1)
+            h_mc_err_sys.Draw("e1p same")
+            OBJECTS.append(h_mc_err_sys)
+
         f = ROOT.TFile("plots/h_%s_bnb.root" % v)
         h = f.Get("h_%s" % v)
         h.SetLineColor(1)
-        h.SetTitle("Data beam-on")
+        h.SetTitle("Data beam-on - beam-off")
         h.SetMarkerStyle(20)
         h_tot_mc.SetLineColor(1)
         h_tot_mc.SetLineWidth(2)
+        h.Add(h_pdgs[v][2147483648], -1)
         h.Draw("ep same")
+        l_pdg.AddEntry(h, "Data (beam-on - beam-off)", "lep")
 
         OBJECTS.append(f)
         OBJECTS.append(h_tot_mc)
         h_tot_mc.Draw("e2 same")
-        c.BuildLegend()
         h_tot_mc_clone.SetLineWidth(2)
         h_tot_mc_clone.SetLineColor(1)
         h_tot_mc_clone.Draw("hist same")
+        l_pdg.Draw()
+        if DRAW_SYS:
+            chi2 = h.Chi2Test(h_mc_err_sys, "WW")
+            ks = h.KolmogorovTest(h_mc_err_sys)
+        else:
+            chi2 = h.Chi2Test(h_tot_mc, "WW")
+            ks = h.KolmogorovTest(h_tot_mc)
+
+        p_test = ROOT.TPaveText(0.677, 0.642, 0.871, 0.751, "NDC")
+        p_test.AddText("#chi^{2} prob. = %.2f" % chi2)
+        p_test.AddText("K-S prob. = %.2f" % ks)
+        p_test.SetFillStyle(0)
+        p_test.SetBorderSize(0)
+        p_test.SetTextAlign(11)
+        p_test.Draw()
+
+        OBJECTS.append(p_test)
         OBJECTS.append(h_tot_mc_clone)
+        h_stack.SetMaximum(max(h_tot_mc.GetMaximum(), h.GetMaximum()) * 1.2)
+        h_stack.GetYaxis().SetTitleOffset(0.9)
         c.Update()
-        c.SaveAs("plots/%s.pdf" % h_stack.GetName())
+        c.SaveAs("plots/pdg/%s_pdg.pdf" % h_stack.GetName())
         OBJECTS.append(c)
+        OBJECTS.append(l_pdg)
 input()
