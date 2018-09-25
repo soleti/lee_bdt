@@ -8,7 +8,7 @@ from array import array
 import ROOT
 import os.path
 
-from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot
+from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, labels
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
 
 ROOT.gStyle.SetOptStat(0)
@@ -269,8 +269,8 @@ pots_err = array("f", [])
 pots = array("f", [])
 step = 100
 
-for i in range(len(VARIABLES)):
-# for i in range(RECO_ENERGY, RECO_ENERGY+1):
+# for i in range(len(VARIABLES)):
+for i in range(RECO_ENERGY, RECO_ENERGY+1):
     if histograms_mc[i].GetHists()[0].Integral() > -10:
 
         c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
@@ -475,7 +475,7 @@ for i in range(len(VARIABLES)):
                 h_flux = f_flux.Get("h_%s_cv" % VARIABLES[i][0])
                 f_genie = ROOT.TFile(fname_genie)
                 h_genie = f_genie.Get("h_%s_cv" % VARIABLES[i][0])
-
+                print(h_flux, h_genie)
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
 
@@ -565,16 +565,20 @@ for i in range(1, h_mc_fixed.GetNbinsX() + 1):
     h_mc_fixed_sys.SetBinError(i, h_reco_sys.GetBinError(i))
 
 h_clone_data = histograms_bnb[RECO_ENERGY].Clone()
-h_fixed_data = ROOT.TH1F("h_fixed_data", "", len(bins) - 1, bins2)
+h_fixed_data = ROOT.TH1F("h_fixed_data", labels["reco_energy"], len(bins) - 1, bins2)
 
 for i in range(1, h_clone_data.GetNbinsX() + 1):
     h_fixed_data.SetBinContent(i, h_clone_data.GetBinContent(i))
     h_fixed_data.SetBinError(i, h_clone_data.GetBinError(i))
-    h_fixed_data.GetXaxis().SetBinLabel(i, "")
+    # h_fixed_data.GetXaxis().SetBinLabel(i, "")
 
 h_fixed_data.SetLineColor(ROOT.kBlack)
 h_fixed_data.SetMarkerStyle(20)
-c_fixed = ROOT.TCanvas("c_true")
+c_fixed = ROOT.TCanvas("c_true", "", 900, 44, 700, 645)
+
+# c_fixed.SetTopMargin(0.245)
+# c_fixed.SetBottomMargin(0.105)
+draw_top()
 h_true_e.Draw("hist")
 h_true_e.GetYaxis().SetTitleOffset(0.95)
 h_mc_fixed.SetLineWidth(2)
@@ -599,11 +603,14 @@ if DRAW_DATA:
     p_datamc.SetBorderSize(0)
     p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
     # p_datamc.Draw()
-legends[RECO_ENERGY].Draw()
-c_fixed.SetTopMargin(0.245)
-c_fixed.SetBottomMargin(0.105)
 
-p_15 = ROOT.TPaveText(0.7679, 0.06, 0.843, 0.105, "NDC")
+legends[RECO_ENERGY].Draw()
+
+c_fixed.cd()
+draw_ratio(h_fixed_data, h_mc_fixed, h_mc_fixed_sys)
+
+
+p_15 = ROOT.TPaveText(0.77,0.17,0.84,0.282, "NDC")
 p_15.AddText("1.5")
 p_15.SetFillStyle(0)
 p_15.SetShadowColor(0)
@@ -611,7 +618,7 @@ p_15.SetBorderSize(0)
 p_15.SetTextFont(42)
 p_15.Draw()
 
-p_white = ROOT.TPaveText(0.832, 0.065, 0.871, 0.10, "NDC")
+p_white = ROOT.TPaveText(0.83,0.17,0.87,0.27, "NDC")
 p_white.AddText("  ")
 p_white.SetFillColor(ROOT.kWhite)
 p_white.SetShadowColor(0)
@@ -621,7 +628,7 @@ p_white.SetTextSize(14)
 p_white.Draw()
 
 
-p_3 = ROOT.TPaveText(0.861, 0.06, 0.936, 0.105, "NDC")
+p_3 = ROOT.TPaveText(0.865,0.17,0.935,0.282, "NDC")
 p_3.AddText("3")
 p_3.SetFillStyle(0)
 p_3.SetShadowColor(0)

@@ -13,8 +13,7 @@ import time
 import statistics
 import sys
 
-
-STORE_SYS = True
+STORE_SYS = False
 
 TMVA.Tools.Instance()
 reader_dqdx = TMVA.Reader(":".join([
@@ -232,7 +231,6 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
     hit_index = 2
     shower_id = choose_shower(root_chain, hit_index)
     track_id = choose_track(root_chain)
-
 
     if STORE_SYS and option == "bnb":
 
@@ -475,8 +473,7 @@ def fill_kin_branches(root_chain, weight, variables, option=""):
         total_track_nhits += root_chain.track_nhits[i_tr][2]
         variables["n_tracks"][0] += 1
         variables["track_pdg"][i_tr] = root_chain.matched_tracks[i_tr]
-        if abs(root_chain.matched_tracks[i_tr]) == 2147483648 and option == "bnb":
-            print(list(root_chain.matched_tracks))
+
         # variables["track_pidchipr"][i_tr] = root_chain.track_pid_chipr[i_tr]
         # if root_chain.track_bragg_p[i_tr] != 0:
         #     variables["track_likelihood"][i_tr] = math.log(root_chain.track_bragg_mip[i_tr]/root_chain.track_bragg_p[i_tr])
@@ -563,7 +560,7 @@ def pt_plot(root_chain, plane):
 
 def fill_tree(chain, weight, tree, option=""):
     total_events = 0
-    total_entries = int(chain.GetEntries() / 100)
+    total_entries = int(chain.GetEntries() / 1)
 
     for ievt in range(total_entries):
         chain.GetEntry(ievt)
@@ -651,91 +648,93 @@ def fill_tree(chain, weight, tree, option=""):
 
     return total_events
 
-begin_time = time.time()
-# To be obtained with Zarko's POT tool
-data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
-samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
+if __name__ == "__main__":
+    begin_time = time.time()
+    # To be obtained with Zarko's POT tool
+    data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
-tree_files = [glob("data_files/mc_nue_pid/*.root"),
-              glob("data_files/mc_bnb_sys/o*.root"),
-              glob("data_files/data_bnb_pid/*/*.root"),
-              glob("data_files/data_ext_pid/*/*.root"),
-              glob("data_files/lee/*.root"),]
+    samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
 
-chains = []
-chains_pot = []
-for i, files in enumerate(tree_files):
-    chains.append(TChain("robertoana/pandoratree"))
-    if i == 1:
-        chains_pot.append(TChain("nueFilter/pot"))
-    else:
-        chains_pot.append(TChain("robertoana/pot"))
+    tree_files = [glob("data_files/mc_nue_pid/*.root"),
+                glob("data_files/mc_bnb_sys/*.root"),
+                glob("data_files/data_bnb_pid/*/*.root"),
+                glob("data_files/data_ext_pid/*/*.root"),
+                glob("data_files/lee/*.root"),]
 
-    for j, f in enumerate(files):
-        chains[i].Add(f)
-        chains_pot[i].Add(f)
-
-pots = []
-for k, c in enumerate(chains_pot):
-    total_pot_file = 0
-    for i in range(c.GetEntries()):
-        c.GetEntry(i)
-        total_pot_file += c.pot
-
-    pots.append(total_pot_file)
-
-
-pots_dict = dict(zip(samples, pots))
-chains_dict = dict(zip(samples, chains))
-chains_pot_dict = dict(zip(samples, chains_pot))
-variables = dict(variables + spectators)
-
-weights = [total_pot / pots_dict["nue"] * 1.028, # Position of the detector is slightly wrong
-           total_pot / pots_dict["bnb"] * 1.028,
-           1,
-           data_ext_scaling_factor,
-           total_pot / pots_dict["lee"] * 1.028]
-
-print("Weights", weights)
-files = ["nue_file.root", "mc_file.root",
-         "bnb_file.root", "bnbext_file.root",
-         "lee_file.root"]
-tree_names = ["nue_tree", "mc_tree",
-              "bnb_tree", "bnbext_tree",
-              "lee_tree"]
-
-trees = []
-
-for t in tree_names:
-    trees.append(TTree(t, t))
-
-for n, b in variables.items():
-    for t in trees:
-        if len(b) > 1:
-            if "track" in n:
-                t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_TRACKS, b.typecode))
-            elif "shower" in n:
-                t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_SHOWERS, b.typecode))
-            elif "weights" in n:
-                t.Branch(n, b, "%s[%i]/%s" % (n, N_UNI, b.typecode))
+    chains = []
+    chains_pot = []
+    for i, files in enumerate(tree_files):
+        chains.append(TChain("robertoana/pandoratree"))
+        if i == 1:
+            chains_pot.append(TChain("nueFilter/pot"))
         else:
-            t.Branch(n, b, n + "/%s" % b.typecode)
+            chains_pot.append(TChain("robertoana/pot"))
 
-samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
+        for j, f in enumerate(files):
+            chains[i].Add(f)
+            chains_pot[i].Add(f)
 
-for i, s in enumerate(samples):
-    start_time = time.time()
-    print("******************************")
-    print("Sample", s)
-    print("Weight", weights[i])
-    events = fill_tree(chains[i], weights[i], trees[i], s)
-    print("\nEvents", events)
-    print("Time to fill %.1f s"  % (time.time() - start_time))
+    pots = []
+    for k, c in enumerate(chains_pot):
+        total_pot_file = 0
+        for i in range(c.GetEntries()):
+            c.GetEntry(i)
+            total_pot_file += c.pot
 
-for f, t in zip(files, trees):
-    tfile = TFile("root_files/" + f, "RECREATE")
-    t.Write()
-    tfile.Close()
+        pots.append(total_pot_file)
 
-print("Total time %.2f" % (time.time() - begin_time))
+
+    pots_dict = dict(zip(samples, pots))
+    chains_dict = dict(zip(samples, chains))
+    chains_pot_dict = dict(zip(samples, chains_pot))
+    variables = dict(variables + spectators)
+
+    weights = [total_pot / pots_dict["nue"] * 1.028, # Position of the detector is slightly wrong
+            total_pot / pots_dict["bnb"] * 1.028,
+            1,
+            data_ext_scaling_factor,
+            total_pot / pots_dict["lee"] * 1.028]
+
+    print("Weights", weights)
+    files = ["nue_file.root", "mc_file.root",
+            "bnb_file.root", "bnbext_file.root",
+            "lee_file.root"]
+    tree_names = ["nue_tree", "mc_tree",
+                "bnb_tree", "bnbext_tree",
+                "lee_tree"]
+
+    trees = []
+
+    for t in tree_names:
+        trees.append(TTree(t, t))
+
+    for n, b in variables.items():
+        for t in trees:
+            if len(b) > 1:
+                if "track" in n:
+                    t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_TRACKS, b.typecode))
+                elif "shower" in n:
+                    t.Branch(n, b, "%s[%i]/%s" % (n, MAX_N_SHOWERS, b.typecode))
+                elif "weights" in n:
+                    t.Branch(n, b, "%s[%i]/%s" % (n, N_UNI, b.typecode))
+            else:
+                t.Branch(n, b, n + "/%s" % b.typecode)
+
+    samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
+
+    for i, s in enumerate(samples):
+        start_time = time.time()
+        print("******************************")
+        print("Sample", s)
+        print("Weight", weights[i])
+        events = fill_tree(chains[i], weights[i], trees[i], s)
+        print("\nEvents", events)
+        print("Time to fill %.1f s"  % (time.time() - start_time))
+
+    for f, t in zip(files, trees):
+        tfile = TFile("root_files/" + f, "RECREATE")
+        t.Write()
+        tfile.Close()
+
+    print("Total time %.2f" % (time.time() - begin_time))

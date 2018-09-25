@@ -8,7 +8,7 @@ from bdt_common import manual_cuts, bdt, manual, pre_cuts, variables, spectators
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
-SYS_VARIABLES = ["n_tracks", "n_showers", "shower_dqdx"]
+SYS_VARIABLES = ["nu_E"]
 MODE = "genie"
 
 if MODE == "flux":
@@ -240,6 +240,7 @@ for v in SYS_VARIABLES:
     h_cv[v].SetMarkerColor(ROOT.kRed + 1)
     h_cv[v].SetLineColor(ROOT.kRed + 1)
     h_cv[v].GetYaxis().SetTitleOffset(0.9)
+    h_cv[v].GetYaxis().SetRangeUser(0.001, h_cv[v].GetMaximum() * 1.5)
     pt.Draw()
 
     f_cv = ROOT.TFile( "plots/sys/h_%s_%s_sys.root" % (v, MODE), "RECREATE")

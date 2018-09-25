@@ -229,8 +229,8 @@ mc_chain = ROOT.TChain("mc_tree")
 nue_chain = ROOT.TChain("nue_tree")
 bnbext_chain = ROOT.TChain("bnbext_tree")
 
-mc_chain.Add("root_files_overlay/mc_file.root")
-nue_chain.Add("root_files_overlay/nue_file.root")
+mc_chain.Add("root_files/mc_file.root")
+nue_chain.Add("root_files/nue_file.root")
 bnbext_chain.Add("root_files/bnbext_file.root")
 
 kinds = []
@@ -418,7 +418,7 @@ for v in h_pdgs:
         h_tot_mc.SetLineColor(1)
         h_tot_mc.SetLineWidth(2)
         h.Add(h_pdgs[v][2147483648], -1)
-        h.Draw("ep same")
+        h.Draw("e1p same")
         l_pdg.AddEntry(h, "Data (beam-on - beam-off)", "lep")
 
         OBJECTS.append(f)

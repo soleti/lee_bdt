@@ -130,14 +130,15 @@ l_errs = []
 
 cat = ["bnb", "mc", "mc", "mc", "mc"]
 dirs = ["plots_cv", "plots_cv", "plots_with_dic", "plots_with_larg4", "plots_with_sce"]
-
+not_analyze = ["track_likelihood","shower_id","track_id","shower_dedx_cali", "shower_dedx_bdt", "track_mip_likelihood", "track_p_likelihood", "genie_weights", "flux_weights", "track_dqdx", "shower_dedx", "shower_dqdx", "shower_dedx_u", "shower_dedx_v"]
 for name, var in VARIABLES:
-
+    if name in not_analyze:
+        continue
     for i, histos in enumerate(histograms):
 
         f = ROOT.TFile("%s/h_%s_%s.root" % (dirs[i], name, cat[i]))
         h = f.Get("h_%s" % name)
-
+        print(f, name)
         h.SetName("h_%s_%s" % (name, cat[i]))
         if cat[i] == "bnb":
             h.SetDirectory(0)
@@ -159,10 +160,10 @@ for i, h in enumerate(histograms_mc):
         legends[i].AddEntry(histograms_bnb[i], 
                             "Data on - off: {:.0f} events".format(on_off), "lep")
 
-for i in range(len(VARIABLES)):
+for i in range(len(histograms_mc)):
 # for i in range(RECO_ENERGY, RECO_ENERGY+1):
-    if not histograms_mc[i] or histograms_mc[i].GetHists()[0].Integral() <= 0:
-        continue 
+    if not histograms_mc[i]:
+        continue
         
     c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
 
