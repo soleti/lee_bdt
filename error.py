@@ -4,11 +4,11 @@ import ROOT
 from operator import mul
 import functools
 import math
-from bdt_common import manual_cuts, bdt, manual, pre_cuts, variables, spectators, labels, binning, N_UNI, bins, fix_binning, fixed_width_histo, fixed_width_histo_2d
+from bdt_common import manual_cuts, bdt, bdt_cut, manual, pre_cuts, variables, spectators, labels, binning, N_UNI, bins, fix_binning, fixed_width_histo, fixed_width_histo_2d
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
-SYS_VARIABLES = ["nu_E"]
+SYS_VARIABLES = ["reco_energy"]
 MODE = "genie"
 
 if MODE == "flux":
@@ -43,30 +43,55 @@ for n, b in vars.items():
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], len(bins) - 1, bins)
     else:
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], binning[n][0], binning[n][1], binning[n][2])
+ROOT.TMVA.Tools.Instance()
+reader = ROOT.TMVA.Reader(":".join([
+    "!V",
+    "!Silent",
+    "Color"]))
+for name, var in variables:
+    reader.AddVariable(name, var)
+
+for name, var in spectators:
+    reader.AddSpectator(name, var)
+
+reader.BookMVA("BDTCosmic",
+                "dataset/weights/TMVAClassification_BDTCosmic.weights.xml")
+
+reader.BookMVA("BDTNeutrino",
+                "dataset/weights/TMVAClassification_BDTNeutrino.weights.xml")
+
+for name, var in variables:
+    chain.SetBranchAddress(name, var)
+
+for name, var in spectators:
+    chain.SetBranchAddress(name, var)
 
 
 for ievt in range(total_entries):
     chain.GetEntry(ievt)
 
+
+
+    BDT_cosmic = reader.EvaluateMVA("BDTCosmic")
+    BDT_neutrino = reader.EvaluateMVA("BDTNeutrino")
     if ievt % 100 == 0:
         print(ievt)
 
     if not pre_cuts(chain):
         continue
 
+    if bdt:
+        apply_bdt = BDT_cosmic > bdt_cut and BDT_neutrino > bdt_cut
+    else:
+        apply_bdt = True
+
+
     if manual:
         apply_manual = manual_cuts(chain)
     else:
         apply_manual = True
 
-    if apply_manual:
-
-        for name, var in variables:
-            chain.SetBranchAddress(name, var)
-
-        for name, var in spectators:
-            chain.SetBranchAddress(name, var)
-
+    if apply_manual and apply_bdt:
         for name, var in vars.items():
             if name not in SYS_VARIABLES:
                 continue

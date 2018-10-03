@@ -4,7 +4,9 @@ import math
 import ROOT
 
 from glob import glob
-from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end, printProgressBar, bins, bins2, distance, is_fiducial, is_active, N_UNI, variables, spectators
+from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
+from bdt_common import printProgressBar, bins, bins2, distance, is_fiducial, is_active
+from bdt_common import N_UNI, variables, spectators
 from fill import fill_kin_branches
 from array import array
 from proton_energy import length2energy
@@ -43,10 +45,22 @@ h_selected_numu = []
 h_selected_precuts = []
 
 for u in range(N_UNI):
-    h_tot.append(ROOT.TH1F("h_tot_%i" % u, ";#nu_{e} energy [GeV];Efficiency", len(bins) - 1, bins2))
-    h_selected.append(ROOT.TH1F("h_selected_%i" % u, ";#nu_{e} energy [GeV];Efficiency", len(bins) - 1, bins2))
-    h_selected_numu.append(ROOT.TH1F("h_selected_numu_%i" % u, ";#nu_{e} energy [GeV];Efficiency", len(bins) - 1, bins2))
-    h_selected_precuts.append(ROOT.TH1F("h_selected_precuts_%i" % u, ";#nu_{e} energy [GeV];Efficiency", len(bins) - 1, bins2))
+    h_tot.append(ROOT.TH1F("h_tot_%i" % u,
+                           ";#nu_{e} energy [GeV];Efficiency",
+                           len(bins) - 1,
+                           bins2))
+    h_selected.append(ROOT.TH1F("h_selected_%i" % u,
+                                ";#nu_{e} energy [GeV];Efficiency",
+                                len(bins) - 1,
+                                bins2))
+    h_selected_numu.append(ROOT.TH1F("h_selected_numu_%i" % u,
+                                     ";#nu_{e} energy [GeV];Efficiency",
+                                     len(bins) - 1,
+                                     bins2))
+    h_selected_precuts.append(ROOT.TH1F("h_selected_precuts_%i" % u,
+                                        ";#nu_{e} energy [GeV];Efficiency",
+                                        len(bins) - 1,
+                                        bins2))
 
 
 variables = dict(variables + spectators)
@@ -72,8 +86,8 @@ for i_evt in range(entries):
                         chain_nue.nu_daughters_vz[i]]
 
             p_end = [chain_nue.nu_daughters_endx[i],
-                        chain_nue.nu_daughters_endy[i],
-                        chain_nue.nu_daughters_endz[i]]
+                     chain_nue.nu_daughters_endy[i],
+                     chain_nue.nu_daughters_endz[i]]
 
             if energy - 0.938 > PROTON_THRESHOLD:
                 protons += 1
@@ -121,7 +135,7 @@ for i_evt in range(entries):
 
 
         for u in range(N_UNI):
-            weight = flux_weights[u] * chain_nue.genie_weights[0][u] * chain_nue.bnbweight
+            weight = chain_nue.genie_weights[0][u] * chain_nue.bnbweight
 
             if weight > 100:
                 weight = chain_nue.bnbweight
@@ -189,20 +203,26 @@ for i_evt in range(entries):
             continue
 
         for u in range(N_UNI):
-            weight = flux_weights[u] * chain_nue.genie_weights[0][u] * chain_nue.bnbweight
+            weight = chain_nue.genie_weights[0][u] * chain_nue.bnbweight
             if weight > 100:
                 weight = chain_nue.bnbweight
             if u == 0:
                 weight = chain_nue.bnbweight
             h_selected[u].Fill(chain_nue.nu_E, weight)
 
-        fill_kin_branches(chain_nue, 1, variables, "nue")
-        hits = variables["track_hits"][0] > 5 and variables["shower_hits"][0] > 5 and variables["total_hits_y"][0] > 0 and variables["total_hits_u"][0] > 0 and variables["total_hits_v"][0] > 0
+        fill_kin_branches(chain_nue, 1, variables, "nue", False)
+        hits = (variables["track_hits"][0] > 5 and
+                variables["shower_hits"][0] > 5 and
+                variables["total_hits_y"][0] > 0 and
+                variables["total_hits_u"][0] > 0 and
+                variables["total_hits_v"][0] > 0)
         sh_id = int(variables["shower_id"][0])
-        shower_track_energy = variables["total_shower_energy"][0] > 0.01 and variables["total_track_energy_length"][0] > 0 and variables["shower_energy"][sh_id] > 0.01
+        shower_track_energy = (variables["total_shower_energy"][0] > 0.01 and
+                               variables["total_track_energy_length"][0] > 0 and
+                               variables["shower_energy"][sh_id] > 0.01)
 
         for u in range(N_UNI):
-            weight = flux_weights[u] * chain_nue.genie_weights[0][u] * chain_nue.bnbweight
+            weight = chain_nue.genie_weights[0][u] * chain_nue.bnbweight
             if weight > 100:
                 weight = chain_nue.bnbweight
             if u == 0:
@@ -221,7 +241,11 @@ for i_evt in range(entries):
             h_selected_numu[u].Fill(chain_nue.nu_E, weight)
 
 
-h_eff_2d = ROOT.TH2F("h_eff_2d", ";#nu_{e} energy [GeV];Efficiency", len(bins) - 1, bins2, N_UNI, 0, 1)
+h_eff_2d = ROOT.TH2F("h_eff_2d",
+                     ";#nu_{e} energy [GeV];Efficiency",
+                     len(bins) - 1,
+                     bins2,
+                     N_UNI, 0, 1)
 sys_err = [0] * (h_selected[0].GetNbinsX() + 1)
 eff_cv = ROOT.TEfficiency(h_selected[0], h_tot[0])
 for u in range(1, N_UNI):
@@ -230,12 +254,12 @@ for u in range(1, N_UNI):
 
     eff_u = ROOT.TEfficiency(h_selected[u], h_tot[u])
 
-    for bin in range(1, h_selected[u].GetNbinsX() + 1):
-        value = eff_u.GetEfficiency(bin)
-        center = h_selected[u].GetBinCenter(bin)
+    for i_bin in range(1, h_selected[u].GetNbinsX() + 1):
+        value = eff_u.GetEfficiency(i_bin)
+        center = h_selected[u].GetBinCenter(i_bin)
 
-        diff = (eff_cv.GetEfficiency(bin) -
-                eff_u.GetEfficiency(bin))
+        diff = (eff_cv.GetEfficiency(i_bin) -
+                eff_u.GetEfficiency(i_bin))
 
         # if n == "reco_energy":
         #     bin_width = h_sys[n][u].GetBinWidth(bin)
@@ -244,7 +268,7 @@ for u in range(1, N_UNI):
         #     value /= bin_width / 0.05
 
         h_eff_2d.Fill(center, value)
-        sys_err[bin] += diff**2
+        sys_err[i_bin] += diff**2
 
 
 if __name__ == "__main__":

@@ -7,24 +7,33 @@ from array import array
 # from root_numpy import hist2array
 import ROOT
 import os.path
+import sys
 
 from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, labels
-from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix
+from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, bdt, manual
 
 ROOT.gStyle.SetOptStat(0)
 
+if len(sys.argv) > 1:
+    plot  = sys.argv[1]
+else:
+    plot = ""
 
 SYS_ERR = 0.1
 
 DRAW_POT = True
 DRAW_SUBTRACTION = False
-DRAW_LEE = False
+DRAW_LEE = True
 DRAW_DATA = True
 DRAW_COSMIC = False
-DRAW_SYS = True
+DRAW_SYS = False
 OBJECTS = []
 VARIABLES = variables + spectators
 RECO_ENERGY = list(dict(VARIABLES)).index("reco_energy")
+if plot:
+    VARIABLE = list(dict(VARIABLES)).index(plot)
+else:
+    VARIABLE = RECO_ENERGY
 TRUE_ENERGY = list(dict(VARIABLES)).index("nu_E")
 # RECO_ENERGY = TRUE_ENERGY
 histograms_bnb = []
@@ -269,8 +278,12 @@ pots_err = array("f", [])
 pots = array("f", [])
 step = 100
 
-# for i in range(len(VARIABLES)):
-for i in range(RECO_ENERGY, RECO_ENERGY+1):
+if plot:
+    to_plot = range(VARIABLE, VARIABLE+1)
+else:
+    to_plot = range(len(VARIABLES))
+
+for i in to_plot:
     if histograms_mc[i].GetHists()[0].Integral() > -10:
 
         c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
@@ -327,22 +340,7 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
                     bkg = np.array(bkg)
                     sig_err = np.array(sig_err)
                     bkg_err = np.array(bkg_err)
-                    print("Significance: ", sigma_calc_matrix(sig, bkg, 30.41))
-
-                    # for i_pot in range(step):
-                    #     pot = total_pot + (1.32e21 - total_pot)/step * i_pot
-                    #     scale = pot/total_pot
-                    #     pots_err.append(0)
-                    #     significance = sigma_calc_matrix(sig, bkg, scale)
-                    #     significance20 = sigma_calc_matrix(sig, bkg, scale, 0.2)
-                    #     significance5 = sigma_calc_matrix(sig, bkg, scale, 0.05)
-                    #     # sigma.append(significance[0])
-                    #     # sigma_err.append(significance[1])
-                    #     # sigma20.append(significance20[0])
-                    #     # sigma20_err.append(significance[1])
-                    #     # sigma5.append(significance5[0])
-                    #     # sigma5_err.append(significance5[1])
-                    #     pots.append(pot)
+                    # print("Significance: ", sigma_calc_matrix(sig, bkg, 30.41))
 
                 fix_binning(histograms_lee[i])
             # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
@@ -357,7 +355,7 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
             h_mc_err.Add(histograms_lee[i])
             histograms_mc[i].Add(histograms_lee[i])
 
-        if DRAW_DATA:
+        if DRAW_DATA and not (bdt or manual):
             draw_top()
         else:
             c.SetTopMargin(0.2274194)
@@ -464,9 +462,8 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
             legends[i].AddEntry(h_mc_err, "Stat. #oplus sys. uncertainty", "lef")
         else:
             legends[i].AddEntry(h_mc_err, "Stat. uncertainty", "lf")
-
+        h_mc_err_sys = h_mc_err.Clone()
         if DRAW_SYS:
-            h_mc_err_sys = h_mc_err.Clone()
             fname_flux = "plots/sys/h_%s_flux_sys.root" % VARIABLES[i][0]
             fname_genie = "plots/sys/h_%s_genie_sys.root" % VARIABLES[i][0]
             OBJECTS.append(h_mc_err_sys)
@@ -475,7 +472,6 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
                 h_flux = f_flux.Get("h_%s_cv" % VARIABLES[i][0])
                 f_genie = ROOT.TFile(fname_genie)
                 h_genie = f_genie.Get("h_%s_cv" % VARIABLES[i][0])
-                print(h_flux, h_genie)
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
 
@@ -487,19 +483,19 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
                         k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
                 f_genie.Close()
                 f_flux.Close()
-            p_chi2 = ROOT.TPaveText(0.679, 0.604, 0.872, 0.715, "NDC")
-            p_chi2.AddText("#chi^{2} prob. = %.2f" %
-                           histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
-            ks = histograms_bnb[i].KolmogorovTest(h_mc_err_sys)
-            p_chi2.AddText("K-S prob. = %.2f" % ks)
-            p_chi2.SetTextAlign(11)
-            if i == RECO_ENERGY:
-                reco_chi2 = p_chi2
-                h_reco_sys = h_mc_err_sys
+
             h_mc_err_sys.Draw("e1p same")
-            OBJECTS.append(h_mc_err_sys)
+        OBJECTS.append(h_mc_err_sys)
 
-
+        p_chi2 = ROOT.TPaveText(0.679, 0.604, 0.872, 0.715, "NDC")
+        p_chi2.AddText("#chi^{2} prob. = %.2f" %
+                        histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
+        ks = histograms_bnb[i].KolmogorovTest(h_mc_err_sys)
+        p_chi2.AddText("K-S prob. = %.2f" % ks)
+        p_chi2.SetTextAlign(11)
+        if i == RECO_ENERGY:
+            reco_chi2 = p_chi2
+            h_reco_sys = h_mc_err_sys
         if DRAW_DATA:
 
             if i == RECO_ENERGY:
@@ -521,8 +517,8 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
         if DRAW_DATA and h_mc_err_sys.Integral() > 0:
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
-
-            draw_ratio(histograms_bnb[i], h_mc_err, h_mc_err_sys)
+            if not (bdt or manual):
+                draw_ratio(histograms_bnb[i], h_mc_err, h_mc_err_sys)
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
 
@@ -532,123 +528,138 @@ for i in range(RECO_ENERGY, RECO_ENERGY+1):
 # *******************************
 # START FIXED BIN WIDTH PLOT
 # *******************************
+if not plot or plot == "reco_energy":
+    h_true_e = ROOT.THStack(
+        "h_true_e", ";E_{deposited} [GeV]; N. Entries / 0.05 GeV")
 
-h_true_e = ROOT.THStack(
-    "h_true_e", ";E_{deposited} [GeV]; N. Entries / 0.05 GeV")
+    h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, bins2)
 
-h_mc_fixed = ROOT.TH1F("h_mc_fixed", "", len(bins) - 1, bins2)
+    for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
 
-for j in range(histograms_mc[RECO_ENERGY].GetNhists()):
+        h_clone = histograms_mc[RECO_ENERGY].GetHists()[j].Clone()
+        h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, bins2)
 
-    h_clone = histograms_mc[RECO_ENERGY].GetHists()[j].Clone()
-    h_fixed = ROOT.TH1F("h_fixed%i" % j, "", len(bins) - 1, bins2)
-
-    for i in range(1, h_clone.GetNbinsX() + 1):
-        h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
-        h_fixed.SetBinError(i, h_clone.GetBinError(i))
-        h_mc_fixed.SetBinContent(i, h_mc_fixed.GetBinContent(i) + h_clone.GetBinContent(i))
-
-
-    if j != 0 and not DRAW_SUBTRACTION:
-        h_fixed.SetLineWidth(0)
-
-    h_fixed.SetLineColor(1)
-    h_fixed.SetFillColor(h_clone.GetFillColor())
-    h_fixed.SetFillStyle(h_clone.GetFillStyle())
-
-    h_true_e.Add(h_fixed)
+        for i in range(1, h_clone.GetNbinsX() + 1):
+            h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
+            h_fixed.SetBinError(i, h_clone.GetBinError(i))
+            h_mc_fixed.SetBinContent(i, h_mc_fixed.GetBinContent(i) + h_clone.GetBinContent(i))
 
 
-h_mc_fixed_sys = h_mc_fixed.Clone()
-for i in range(1, h_mc_fixed.GetNbinsX() + 1):
-    h_mc_fixed.SetBinError(i, reco_err.GetBinError(i))
-    h_mc_fixed_sys.SetBinError(i, h_reco_sys.GetBinError(i))
+        if j != 0 and not DRAW_SUBTRACTION:
+            h_fixed.SetLineWidth(0)
 
-h_clone_data = histograms_bnb[RECO_ENERGY].Clone()
-h_fixed_data = ROOT.TH1F("h_fixed_data", labels["reco_energy"], len(bins) - 1, bins2)
+        h_fixed.SetLineColor(1)
+        h_fixed.SetFillColor(h_clone.GetFillColor())
+        h_fixed.SetFillStyle(h_clone.GetFillStyle())
 
-for i in range(1, h_clone_data.GetNbinsX() + 1):
-    h_fixed_data.SetBinContent(i, h_clone_data.GetBinContent(i))
-    h_fixed_data.SetBinError(i, h_clone_data.GetBinError(i))
-    # h_fixed_data.GetXaxis().SetBinLabel(i, "")
-
-h_fixed_data.SetLineColor(ROOT.kBlack)
-h_fixed_data.SetMarkerStyle(20)
-c_fixed = ROOT.TCanvas("c_true", "", 900, 44, 700, 645)
-
-# c_fixed.SetTopMargin(0.245)
-# c_fixed.SetBottomMargin(0.105)
-draw_top()
-h_true_e.Draw("hist")
-h_true_e.GetYaxis().SetTitleOffset(0.95)
-h_mc_fixed.SetLineWidth(2)
-h_mc_fixed.SetLineColor(1)
-h_mc_fixed.Draw("e2 same")
-h_mc_fixed_sys.SetLineColor(1)
-h_mc_fixed_sys.Draw("e1 same")
-h_mc_fixed_clone = h_mc_fixed.Clone()
-h_mc_fixed_clone.Draw("hist same")
-
-h_mc_fixed.SetFillColor(ROOT.kBlack)
-h_mc_fixed.SetFillStyle(3002)
-h_true_e.SetMaximum(max(h_true_e.GetMaximum(), h_fixed_data.GetMaximum()) * 1.3)
-h_true_e.SetMinimum(0.001)
-
-if DRAW_DATA:
-    h_fixed_data.Draw("e1p same")
-    # reco_chi2.Draw()
-    p_datamc = ROOT.TPaveText(0.563, 0.58947, 0.882, 0.703, "NDC")
-    p_datamc.SetFillStyle(0)
-    p_datamc.SetShadowColor(0)
-    p_datamc.SetBorderSize(0)
-    p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
-    # p_datamc.Draw()
-
-legends[RECO_ENERGY].Draw()
-
-c_fixed.cd()
-draw_ratio(h_fixed_data, h_mc_fixed, h_mc_fixed_sys)
+        h_true_e.Add(h_fixed)
 
 
-p_15 = ROOT.TPaveText(0.77,0.17,0.84,0.282, "NDC")
-p_15.AddText("1.5")
-p_15.SetFillStyle(0)
-p_15.SetShadowColor(0)
-p_15.SetBorderSize(0)
-p_15.SetTextFont(42)
-p_15.Draw()
+    h_mc_fixed_sys = h_mc_fixed.Clone()
+    for i in range(1, h_mc_fixed.GetNbinsX() + 1):
+        h_mc_fixed.SetBinError(i, reco_err.GetBinError(i))
+        h_mc_fixed_sys.SetBinError(i, h_reco_sys.GetBinError(i))
 
-p_white = ROOT.TPaveText(0.83,0.17,0.87,0.27, "NDC")
-p_white.AddText("  ")
-p_white.SetFillColor(ROOT.kWhite)
-p_white.SetShadowColor(0)
-p_white.SetBorderSize(0)
-p_white.SetTextFont(42)
-p_white.SetTextSize(14)
-p_white.Draw()
+    h_clone_data = histograms_bnb[RECO_ENERGY].Clone()
+    h_fixed_data = ROOT.TH1F("h_fixed_data", labels["reco_energy"], len(bins) - 1, bins2)
 
+    for i in range(1, h_clone_data.GetNbinsX() + 1):
+        h_fixed_data.SetBinContent(i, h_clone_data.GetBinContent(i))
+        h_fixed_data.SetBinError(i, h_clone_data.GetBinError(i))
+        # h_fixed_data.GetXaxis().SetBinLabel(i, "")
 
-p_3 = ROOT.TPaveText(0.865,0.17,0.935,0.282, "NDC")
-p_3.AddText("3")
-p_3.SetFillStyle(0)
-p_3.SetShadowColor(0)
-p_3.SetBorderSize(0)
-p_3.SetTextFont(42)
-p_3.Draw()
-# h_true_e.GetXaxis().ChangeLabel(2,  -1, -1, -1, -1, -1, "aaaaa")
-# ax = ROOT.TGaxis(0, 0, 1.7, 0, 0, 1.7, 515, "")
-# for i, i_bin in enumerate(bins):
-#     ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
-#                    "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
-# ax.SetLabelFont(42)
-# ax.SetLabelSize(0.04)
-# ax.Draw()
-# pt3.Draw()
-c_fixed.Update()
-c_fixed.SaveAs("plots/h_fixed_energy.pdf")
-# *******************************
-# END FIXED BIN WIDTH PLOT
-# *******************************
+    h_fixed_data.SetLineColor(ROOT.kBlack)
+    h_fixed_data.SetMarkerStyle(20)
+    c_fixed = ROOT.TCanvas("c_true", "", 900, 44, 700, 645)
+
+    # c_fixed.SetTopMargin(0.245)
+    # c_fixed.SetBottomMargin(0.105)
+    if DRAW_DATA and not (bdt or manual):
+        draw_top()
+    else:
+        c_fixed.SetTopMargin(0.23)
+
+    h_true_e.Draw("hist")
+    h_true_e.GetYaxis().SetTitleOffset(0.95)
+    h_mc_fixed.SetLineWidth(2)
+    h_mc_fixed.SetLineColor(1)
+    h_mc_fixed.Draw("e2 same")
+    h_mc_fixed_sys.SetLineColor(1)
+    h_mc_fixed_sys.Draw("e1 same")
+    h_mc_fixed_clone = h_mc_fixed.Clone()
+    h_mc_fixed_clone.Draw("hist same")
+
+    h_mc_fixed.SetFillColor(ROOT.kBlack)
+    h_mc_fixed.SetFillStyle(3002)
+    h_true_e.SetMaximum(max(h_true_e.GetMaximum(), h_fixed_data.GetMaximum()) * 1.3)
+    h_true_e.SetMinimum(0.001)
+
+    if DRAW_DATA:
+        h_fixed_data.Draw("e1p same")
+        # reco_chi2.Draw()
+        p_datamc = ROOT.TPaveText(0.563, 0.58947, 0.882, 0.703, "NDC")
+        p_datamc.SetFillStyle(0)
+        p_datamc.SetShadowColor(0)
+        p_datamc.SetBorderSize(0)
+        p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
+        # p_datamc.Draw()
+
+    legends[RECO_ENERGY].Draw()
+
+    c_fixed.cd()
+    if DRAW_DATA and not (bdt or manual):
+        draw_ratio(h_fixed_data, h_mc_fixed, h_mc_fixed_sys)
+
+    if DRAW_DATA and not (bdt or manual):
+        p_15 = ROOT.TPaveText(0.77,0.17,0.84,0.282, "NDC")
+    else:
+        p_15 = ROOT.TPaveText(0.78, 0.026, 0.83, 0.129, "NDC")
+
+    p_15.AddText("1.5")
+    p_15.SetFillStyle(0)
+    p_15.SetShadowColor(0)
+    p_15.SetBorderSize(0)
+    p_15.SetTextFont(42)
+    p_15.Draw()
+
+    if DRAW_DATA and not (bdt or manual):
+        p_white = ROOT.TPaveText(0.83,0.17,0.87,0.27, "NDC")
+    else:
+        p_white = ROOT.TPaveText(0.83,0.06,0.88,0.091, "NDC")
+
+    p_white.AddText("  ")
+    p_white.SetFillColor(ROOT.kWhite)
+    p_white.SetShadowColor(0)
+    p_white.SetBorderSize(0)
+    p_white.SetTextFont(42)
+    p_white.SetTextSize(14)
+    p_white.Draw()
+
+    if DRAW_DATA and not (bdt or manual):
+        p_3 = ROOT.TPaveText(0.865,0.17,0.935,0.282, "NDC")
+    else:
+        p_3 = ROOT.TPaveText(0.8624642, 0.05645161, 0.9326648, 0.1032258, "NDC")
+
+    p_3.AddText("3")
+    p_3.SetFillStyle(0)
+    p_3.SetShadowColor(0)
+    p_3.SetBorderSize(0)
+    p_3.SetTextFont(42)
+    p_3.Draw()
+    # h_true_e.GetXaxis().ChangeLabel(2,  -1, -1, -1, -1, -1, "aaaaa")
+    # ax = ROOT.TGaxis(0, 0, 1.7, 0, 0, 1.7, 515, "")
+    # for i, i_bin in enumerate(bins):
+    #     ax.ChangeLabel(i + 1, -1, -1, -1, -1, -1,
+    #                    "{0}".format(str(round(i_bin, 3) if i_bin % 1 else int(i_bin))))
+    # ax.SetLabelFont(42)
+    # ax.SetLabelSize(0.04)
+    # ax.Draw()
+    # pt3.Draw()
+    c_fixed.Update()
+    c_fixed.SaveAs("plots/h_fixed_energy.pdf")
+    # *******************************
+    # END FIXED BIN WIDTH PLOT
+    # *******************************
 
 if DRAW_LEE and DRAW_POT and False:
     c_pot = ROOT.TCanvas("c_pot")
@@ -717,7 +728,6 @@ if DRAW_NORMALIZED:
 
 
         h_signal = histograms_lee[i]
-        print(h_signal.GetName())
         if h_signal.Integral() <= 0:
             continue
         h_signal.SetLineColor(ROOT.TColor.GetColor("#1e7a2e"))
