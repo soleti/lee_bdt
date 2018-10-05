@@ -2,7 +2,7 @@
 
 import sys
 import ROOT
-from bdt_common import variables, spectators, manual, bdt, bins, binning
+from bdt_common import variables, spectators, MANUAL, BDT, bins, binning
 
 if len(sys.argv) > 1:
     bdt_type = sys.argv[1]
@@ -120,6 +120,8 @@ method_bdt = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "BDT%s" % bdt_
                                                 "BaggedSampleFraction=0.5",
                                                 "SeparationType=GiniIndex",
                                                 "nCuts=20"]))
+
+# method_svm = factory.BookMethod(dataloader, ROOT.TMVA.Types.kBDT, "SVM%s" % bdt_type)
 
 var_list = [var[0] for var in variables]
 range_min = ["CutRangeMin[%i]=%.2f" % (var_list.index(var), binning[var][1]) for var in var_list]

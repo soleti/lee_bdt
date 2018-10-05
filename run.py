@@ -3,21 +3,17 @@
 import ROOT
 import collections
 from bdt_common import bdt_cut_cosmic, bdt_cut_neutrino, binning, labels, variables, spectators, fill_histos_data
-from bdt_common import manual_cuts, bdt, manual, bins, colors, inv_interactions, interactions, bins2, load_variables
+from bdt_common import manual_cuts, bins, colors, inv_interactions, interactions, bins2, load_variables
 from bdt_common import pre_cuts, rectangular_cut, fix_binning, total_data_bnb_pot, description2, bdt_cut, bdt_nc_cut, bdt_numu_cut
-from bdt_common import bdt_types, apply_cuts
+from bdt_common import bdt_types, apply_cuts, load_bdt
 from array import array
 import math
 import collections
 import sys
 import os.path
 
-
-ROOT.gStyle.SetPalette(ROOT.kCMYK)
-print("BDT: ", bdt, "Manual: ", manual)
-
-DRAW_SYS = True
-
+DRAW_SYS = False
+DRAW_PLOTS = True
 pdg_colors = {
     2147483648: "#ffffff",
     22: '#e6194b',
@@ -74,7 +70,11 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
         "!Silent",
         "Color"]))
 
-    load_variables(chain, reader)
+    bdt_ntuple = ROOT.TNtuple(
+        "bdt_ntuple", "bdt_ntuple", "single"+":".join(bdt_types) + ":category")
+
+    variables_dict = load_variables(chain)
+    load_bdt(reader)
 
     correction_factor = 1
     h_energy_sig = ROOT.TH1F("h_energy_sig_%s" % option, ";E_{#nu_{e}};N. Entries / 0.05 GeV", len(bins) - 1, bins)
@@ -98,13 +98,15 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
         for bdt_name in bdt_types:
             bdts[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
-        if pre_cuts(chain):
+        if pre_cuts(variables_dict):
             for bdt_name in bdt_types:
                 h_bdt_types[bdt_name][category].Fill(bdts[bdt_name], chain.event_weight)
         else:
             continue
 
-        if apply_cuts(bdts):
+        bdt_ntuple.Fill(array("f", list(bdts.values())+[chain.category]))
+
+        if apply_cuts(bdts, variables_dict):
             if option == "nue":
                 if category == 2:
                     passed_events += chain.event_weight
@@ -152,20 +154,10 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
                         histo_dict[name][category].Fill(v, chain.event_weight)
 
 
-    if manual or bdt:
-        f_energy_binned_selected = ROOT.TFile("plots/h_energy_%s_after.root" % option, "RECREATE")
-        h_energy_sig.Write()
-        h_energy_bkg.Write()
-        h_reco_sig.Write()
-        h_reco_bkg.Write()
-        f_energy_binned_selected.Close()
-    else:
-        f_energy_binned_selected = ROOT.TFile("plots/h_energy_%s.root" % option, "RECREATE")
-        h_energy_sig.Write()
-        h_energy_bkg.Write()
-        h_reco_sig.Write()
-        h_reco_bkg.Write()
-        f_energy_binned_selected.Close()
+    f = ROOT.TFile("plots/bdt_ntuple_%s.root" % option,
+                    "RECREATE")
+    bdt_ntuple.Write()
+    f.Close()
 
     return passed_events
 
@@ -238,8 +230,8 @@ for bdt_type in bdt_types:
     h_bdt_types[bdt_type] = h_bdts
 
 print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue"))
-print("LEE events", fill_histos_data("lee", bdt, manual))
-print("Data events", fill_histos_data("bnb", bdt, manual))
+print("LEE events", fill_histos_data("lee"))
+print("Data events", fill_histos_data("bnb"))
 print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc"))
 print("EXT events", fill_histos(bnbext_chain, histo_dict, h_bdt_types, "bnbext"))
 
@@ -293,117 +285,118 @@ for h in stacked_histos:
     h.Write()
     f.Close()
 
-# OBJECTS = []
+if DRAW_PLOTS:
+    OBJECTS = []
 
-# for v in h_pdgs:
-#     if h_pdgs[v] and ("track" in v or "shower" in v):
-#         h_stack = ROOT.THStack("h_stack_%s" % v, labels[v])
-#         OBJECTS.append(h_stack)
-#         h_tot_mc = ROOT.TH1F("h_tot_mc_%s" % v,
-#                              labels[v],
-#                              binning[v][0],
-#                              binning[v][1],
-#                              binning[v][2])
-#         h_tot_mc.SetTitle("Stat. uncertainty")
+    for v in h_pdgs:
+        if h_pdgs[v] and ("track" in v or "shower" in v):
+            h_stack = ROOT.THStack("h_stack_%s" % v, labels[v])
+            OBJECTS.append(h_stack)
+            h_tot_mc = ROOT.TH1F("h_tot_mc_%s" % v,
+                                labels[v],
+                                binning[v][0],
+                                binning[v][1],
+                                binning[v][2])
+            h_tot_mc.SetTitle("Stat. uncertainty")
 
-#         l_pdg = ROOT.TLegend(0.09025788,0.8105263,0.9040115,0.9852632)
-#         l_pdg.SetNColumns(3)
-#         l_pdg.SetTextSize(16)
-#         l_pdg.SetTextFont(63)
-#         l_pdg.SetHeader("MicroBooNE Preliminary %.1e POT" % total_data_bnb_pot)
-#         l_pdg.SetTextFont(43)
-#         for pdg in h_pdgs[v]:
-#             h_pdgs[v][pdg].SetLineWidth(0)
-#             h_pdgs[v][pdg].SetMarkerStyle(0)
-#             h_pdgs[v][pdg].SetMarkerSize(0)
-#             h_pdgs[v][pdg].SetFillColor(ROOT.TColor.GetColor(pdg_colors[pdg]))
-#             if pdg != 2147483648:
-#                 h_stack.Add(h_pdgs[v][pdg])
-#                 h_tot_mc.Add(h_pdgs[v][pdg])
+            l_pdg = ROOT.TLegend(0.09025788,0.8105263,0.9040115,0.9852632)
+            l_pdg.SetNColumns(3)
+            l_pdg.SetTextSize(16)
+            l_pdg.SetTextFont(63)
+            l_pdg.SetHeader("MicroBooNE Preliminary %.1e POT" % total_data_bnb_pot)
+            l_pdg.SetTextFont(43)
+            for pdg in h_pdgs[v]:
+                h_pdgs[v][pdg].SetLineWidth(0)
+                h_pdgs[v][pdg].SetMarkerStyle(0)
+                h_pdgs[v][pdg].SetMarkerSize(0)
+                h_pdgs[v][pdg].SetFillColor(ROOT.TColor.GetColor(pdg_colors[pdg]))
+                if pdg != 2147483648:
+                    h_stack.Add(h_pdgs[v][pdg])
+                    h_tot_mc.Add(h_pdgs[v][pdg])
 
-#         for pdg in h_pdgs[v]:
-#             integral = h_pdgs[v][pdg].Integral()
-#             if integral > 0 and pdg != 2147483648:
-#                 l_pdg.AddEntry(h_pdgs[v][pdg],
-#                                "%s: %.1f%%" % (inv_pdgs[pdg], (integral / h_tot_mc.Integral()) * 100),
-#                                "f")
+            for pdg in h_pdgs[v]:
+                integral = h_pdgs[v][pdg].Integral()
+                if integral > 0 and pdg != 2147483648:
+                    l_pdg.AddEntry(h_pdgs[v][pdg],
+                                "%s: %.1f%%" % (inv_pdgs[pdg], (integral / h_tot_mc.Integral()) * 100),
+                                "f")
 
-#         h_tot_mc_clone = h_tot_mc.Clone()
-#         h_tot_mc.SetFillStyle(3002)
-#         h_tot_mc.SetFillColor(1)
-#         c = ROOT.TCanvas("c_%s" % v)
-#         c.SetTopMargin(0.1978947)
-#         c.Range(-0.4035779,-33.09252,6.713775,294.3855)
+            h_tot_mc_clone = h_tot_mc.Clone()
+            h_tot_mc.SetFillStyle(3002)
+            h_tot_mc.SetFillColor(1)
+            c = ROOT.TCanvas("c_%s" % v)
+            c.SetTopMargin(0.1978947)
+            c.Range(-0.4035779,-33.09252,6.713775,294.3855)
 
-#         h_stack.Draw("hist")
+            h_stack.Draw("hist")
 
-#         if DRAW_SYS:
-#             h_mc_err_sys = h_tot_mc.Clone()
-#             fname_flux = "plots/sys/h_%s_flux_sys.root" % v
-#             fname_genie = "plots/sys/h_%s_genie_sys.root" % v
-#             OBJECTS.append(h_mc_err_sys)
-#             if DRAW_SYS and os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
-#                 f_flux = ROOT.TFile(fname_flux)
-#                 h_flux = f_flux.Get("h_%s_cv" % v)
-#                 f_genie = ROOT.TFile(fname_genie)
-#                 h_genie = f_genie.Get("h_%s_cv" % v)
+            if DRAW_SYS:
+                h_mc_err_sys = h_tot_mc.Clone()
+                fname_flux = "plots/sys/h_%s_flux_sys.root" % v
+                fname_genie = "plots/sys/h_%s_genie_sys.root" % v
+                OBJECTS.append(h_mc_err_sys)
+                if DRAW_SYS and os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
+                    f_flux = ROOT.TFile(fname_flux)
+                    h_flux = f_flux.Get("h_%s_cv" % v)
+                    f_genie = ROOT.TFile(fname_genie)
+                    h_genie = f_genie.Get("h_%s_cv" % v)
 
-#                 OBJECTS.append(h_flux)
-#                 OBJECTS.append(h_genie)
+                    OBJECTS.append(h_flux)
+                    OBJECTS.append(h_genie)
 
-#                 for k in range(1, h_mc_err_sys.GetNbinsX() + 1):
-#                     stat_err = h_mc_err_sys.GetBinError(k)
-#                     flux_err = h_flux.GetBinError(k)
-#                     genie_err = h_genie.GetBinError(k)
-#                     h_mc_err_sys.SetBinError(
-#                         k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
-#                 f_genie.Close()
-#                 f_flux.Close()
+                    for k in range(1, h_mc_err_sys.GetNbinsX() + 1):
+                        stat_err = h_mc_err_sys.GetBinError(k)
+                        flux_err = h_flux.GetBinError(k)
+                        genie_err = h_genie.GetBinError(k)
+                        h_mc_err_sys.SetBinError(
+                            k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
+                    f_genie.Close()
+                    f_flux.Close()
 
-#             h_mc_err_sys.SetLineColor(1)
-#             h_mc_err_sys.Draw("e1p same")
-#             OBJECTS.append(h_mc_err_sys)
+                h_mc_err_sys.SetLineColor(1)
+                h_mc_err_sys.Draw("e1p same")
+                OBJECTS.append(h_mc_err_sys)
 
-#         f = ROOT.TFile("plots/h_%s_bnb.root" % v)
-#         h = f.Get("h_%s" % v)
-#         h.SetLineColor(1)
-#         h.SetTitle("Data beam-on - beam-off")
-#         h.SetMarkerStyle(20)
-#         h_tot_mc.SetLineColor(1)
-#         h_tot_mc.SetLineWidth(2)
-#         h.Add(h_pdgs[v][2147483648], -1)
-#         h.Draw("e1p same")
-#         l_pdg.AddEntry(h, "Data (beam-on - beam-off)", "lep")
+            f = ROOT.TFile("plots/h_%s_bnb.root" % v)
+            h = f.Get("h_%s" % v)
+            h.SetLineColor(1)
+            h.SetTitle("Data beam-on - beam-off")
+            h.SetMarkerStyle(20)
+            h_tot_mc.SetLineColor(1)
+            h_tot_mc.SetLineWidth(2)
+            h.Add(h_pdgs[v][2147483648], -1)
+            h.Draw("e1p same")
+            l_pdg.AddEntry(h, "Data (beam-on - beam-off)", "lep")
 
-#         OBJECTS.append(f)
-#         OBJECTS.append(h_tot_mc)
-#         h_tot_mc.Draw("e2 same")
-#         h_tot_mc_clone.SetLineWidth(2)
-#         h_tot_mc_clone.SetLineColor(1)
-#         h_tot_mc_clone.Draw("hist same")
-#         l_pdg.Draw()
-#         if DRAW_SYS:
-#             chi2 = h.Chi2Test(h_mc_err_sys, "WW")
-#             ks = h.KolmogorovTest(h_mc_err_sys)
-#         else:
-#             chi2 = h.Chi2Test(h_tot_mc, "WW")
-#             ks = h.KolmogorovTest(h_tot_mc)
+            OBJECTS.append(f)
+            OBJECTS.append(h_tot_mc)
+            h_tot_mc.Draw("e2 same")
+            h_tot_mc_clone.SetLineWidth(2)
+            h_tot_mc_clone.SetLineColor(1)
+            h_tot_mc_clone.Draw("hist same")
+            l_pdg.Draw()
+            if DRAW_SYS:
+                chi2 = h.Chi2Test(h_mc_err_sys, "WW")
+                ks = h.KolmogorovTest(h_mc_err_sys)
+            else:
+                chi2 = h.Chi2Test(h_tot_mc, "WW")
+                ks = h.KolmogorovTest(h_tot_mc)
 
-#         p_test = ROOT.TPaveText(0.677, 0.642, 0.871, 0.751, "NDC")
-#         p_test.AddText("#chi^{2} prob. = %.2f" % chi2)
-#         p_test.AddText("K-S prob. = %.2f" % ks)
-#         p_test.SetFillStyle(0)
-#         p_test.SetBorderSize(0)
-#         p_test.SetTextAlign(11)
-#         p_test.Draw()
+            p_test = ROOT.TPaveText(0.677, 0.642, 0.871, 0.751, "NDC")
+            p_test.AddText("#chi^{2} prob. = %.2f" % chi2)
+            p_test.AddText("K-S prob. = %.2f" % ks)
+            p_test.SetFillStyle(0)
+            p_test.SetBorderSize(0)
+            p_test.SetTextAlign(11)
+            p_test.Draw()
 
-#         OBJECTS.append(p_test)
-#         OBJECTS.append(h_tot_mc_clone)
-#         h_stack.SetMaximum(max(h_tot_mc.GetMaximum(), h.GetMaximum()) * 1.2)
-#         h_stack.GetYaxis().SetTitleOffset(0.9)
-#         c.Update()
-#         c.SaveAs("plots/pdg/%s_pdg.pdf" % h_stack.GetName())
-#         OBJECTS.append(c)
-#         OBJECTS.append(l_pdg)
+            OBJECTS.append(p_test)
+            OBJECTS.append(h_tot_mc_clone)
+            h_stack.SetMaximum(max(h_tot_mc.GetMaximum(), h.GetMaximum()) * 1.2)
+            h_stack.GetYaxis().SetTitleOffset(0.9)
+            c.Update()
+            c.SaveAs("plots/pdg/%s_pdg.pdf" % h_stack.GetName())
+            OBJECTS.append(c)
+            OBJECTS.append(l_pdg)
 
-# input()
+input()

@@ -15,28 +15,6 @@ import sys
 
 STORE_SYS = False
 
-TMVA.Tools.Instance()
-reader_dqdx = TMVA.Reader(":".join([
-    "!V",
-    "!Silent",
-    "Color"]))
-dqdx = array("f", [0])
-length = array("f", [0])
-reader_dqdx.AddVariable("dqdx", dqdx)
-reader_dqdx.AddVariable("len", length)
-reader_dqdx.BookMVA("dqdx BDT",
-                    "dataset/weights/TMVAClassification_dqdx BDT.weights.xml")
-
-reader_dedx = TMVA.Reader(":".join([
-    "!V",
-    "!Silent",
-    "Color"]))
-dedx = array("f", [0])
-nhits = array("f", [0])
-reader_dedx.AddVariable("dedx", dedx)
-reader_dedx.AddVariable("nhits", nhits)
-reader_dedx.BookMVA("dedx BDT",
-                    "dataset/weights/TMVAClassification_dedx BDT.weights.xml")
 
 reader_reclass = TMVA.Reader(":".join([
     "!V",
@@ -59,63 +37,6 @@ reader_reclass.AddVariable("n_hits", n_hits)
 reader_reclass.BookMVA("shower_ntuple BDT",
                        "dataset/weights/TMVAClassification_shower_ntuple BDT.weights.xml")
 
-def min_dedx(root_chain):
-    min_score = 1
-
-    for i_sh in range(root_chain.n_showers):
-        shower_dedx = root_chain.shower_dEdx[i_sh][2]
-
-        shower_hits = root_chain.shower_nhits[i_sh][2]
-        score = dedx_hits(shower_dedx, shower_hits)
-        if score < min_score:
-            min_score = score
-
-    return min_score
-
-
-def max_dqdx(root_chain):
-    max_score = 0
-
-    for i_tr in range(root_chain.n_tracks):
-        track_dqdx = root_chain.track_dQdx[i_tr][2]
-        if root_chain.category == 0 or root_chain.category == 6:
-            track_dqdx *= 1.2
-
-        track_length = root_chain.track_len[i_tr]
-        score = dqdx_length(track_dqdx, track_length)
-        if score > max_score:
-            max_score = score
-
-    return max_score
-
-
-def min_dqdx(root_chain):
-    min_score = 1
-
-    for i_tr in range(root_chain.n_tracks):
-        track_dqdx = root_chain.track_dQdx[i_tr][2]
-        if root_chain.category == 0 or root_chain.category == 6:
-            track_dqdx *= 1.2
-
-        track_length = root_chain.track_len[i_tr]
-        score = dqdx_length(track_dqdx, track_length)
-        if score < min_score:
-            min_score = score
-
-    return min_score
-
-
-def dqdx_length(v_dqdx, v_length):
-
-    if v_dqdx < 0:
-        return -1
-
-    dqdx[0] = v_dqdx
-    length[0] = v_length
-
-    BDT_response = reader_dqdx.EvaluateMVA("dqdx BDT")
-    return BDT_response
-
 
 def shower_score(v_angle, v_pca, v_res, v_open_angle, v_n_hits, v_ratio):
     if v_angle > 0 and v_pca > 0 and v_res > 0 and v_open_angle > 0 and v_n_hits > 0 and v_ratio > 0:
@@ -130,14 +51,6 @@ def shower_score(v_angle, v_pca, v_res, v_open_angle, v_n_hits, v_ratio):
     else:
         return -1
 
-def dedx_hits(v_dedx, v_hits):
-    if v_dedx < 0:
-        return -1
-
-    dedx[0] = v_dedx
-    nhits[0] = v_hits
-    BDT_response = reader_dedx.EvaluateMVA("dedx BDT")
-    return BDT_response
 
 def pi0_mass(root_chain):
     if root_chain.n_showers < 2:
@@ -189,9 +102,11 @@ def pi0_mass(root_chain):
     return pi0_mass
 
 
-def choose_track(root_chain):
+def choose_track(root_chain, particleid=True):
     min_score = 9999999
     chosen_track = 0
+    if not particleid:
+        return chosen_track, min_score
 
     for i_tr in range(root_chain.n_tracks):
         track_pid_chipr = root_chain.track_pid_chipr[i_tr]
@@ -228,7 +143,7 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     no_tracks = False
     hit_index = 2
     shower_id = choose_shower(root_chain, hit_index)
-    track_id, track_score = choose_track(root_chain)
+    track_id, track_score = choose_track(root_chain, particleid)
 
     if STORE_SYS and option == "bnb":
 

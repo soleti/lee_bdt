@@ -13,17 +13,18 @@ ELECTRON_THRESHOLD = 0.020
 MAX_N_TRACKS = 15
 MAX_N_SHOWERS = 15
 N_UNI = 100
-bdt, manual = True, False
+BDT, MANUAL = True, False
+
 # Number to be obtained from Zarko's POT counting tool
-total_data_bnb_goodruns_remap = 4.341e+19
-total_data_bnb_pot = total_data_bnb_goodruns_remap
+total_data_bnb_pot = 4.341e+19
+
 bdt_nc_cut = 0.205
 bdt_numu_cut = 0.175
 bdt_cut_cosmic = 0.15
 bdt_cut_neutrino = 0.16
 rectangular_cut = 0.03
 bdt_cut = 0.1
-
+bdt_types = ["", "cosmic", "numu", "nc", "neutrino"]
 # bins = array("f", [0, 0.200, 0.300, 0.450, 0.550,
 #                    0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 3.000])
 
@@ -40,7 +41,25 @@ bins2 = array("f", [0, 0.200, 0.350, 0.5, 0.65, 0.8,
 bins2 = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.8,
                   0.950, 1.200, 1.500, 1.700])
 
-bdt_types = ["", "cosmic", "neutrino", "nc", "numu"]
+svm_loaded = False
+
+def load_svm():
+    if not svm_loaded:
+        reader_svm = ROOT.TMVA.Reader(":".join([
+            "!V",
+            "!Silent",
+            "Color"]))
+
+        bdt_numu = array("f", [0])
+        bdt_nc = array("f", [0])
+        bdt_cosmic = array("f", [0])
+        reader_svm.AddVariable("cosmic", bdt_cosmic)
+        reader_svm.AddVariable("numu", bdt_numu)
+        reader_svm.AddVariable("nc", bdt_nc)
+
+        reader_svm.BookMVA("SVM", "dataset/weights/TMVAClassification_SVM.weights.xml")
+        svm_loaded = True
+
 
 def fixed_width_histo_2d(h):
     h_clone = h.Clone()
@@ -215,40 +234,20 @@ colors = [ROOT.TColor.GetColor("#000000"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#ffffff"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#1e7a2e")]
 
-# bins = array("f", [0.2, 0.25, 0.3, 0.35,
-#                    0.4, 0.45, 0.5, 0.6, 0.8, 1])
+def pre_cuts(var_dict):
+    tr_id = int(var_dict["track_id"][0])
+    numu = int(var_dict["numu_score"][0]) == 0
+    hits = var_dict["track_hits"][0] > 5 and \
+           var_dict["shower_hits"][0] > 5 and \
+           var_dict["total_hits_y"][0] > 0 and \
+           var_dict["total_hits_u"][0] > 0 and \
+           var_dict["total_hits_v"][0] > 0
+    shower_track_energy = var_dict["total_shower_energy_cali"][0] > 0.1 and \
+                          var_dict["total_track_energy_length"][0] > 0 and \
+                          var_dict["shower_energy"][0] > 0.01
+    track_pid = var_dict["track_pidchipr"][tr_id] < 80
 
-# bins = array("f", [0.2, 0.4, 0.5, 0.65, 0.8, 1])
-
-# bins = array("f", [0, 0.200, 0.300, 0.375, 0.475, 0.550, 0.675, 0.800, 0.950, 1.100,  1.300, 1.500, 3.000])
-
-def pre_cuts(chain):
-    # shower_dedx = chain.shower_dedx < 3.5
-    # shower_distance = chain.shower_distance < 5
-    # track_distance = chain.track_distance < 5
-    # reco_energy = bins[0] < chain.reco_energy < bins[-1]
-    # hits = chain.track_hits > 5 and chain.shower_hits > 40
-    # track_start = [chain.track_start_x, chain.track_start_y, chain.track_start_z]
-    # track_end = [chain.track_end_x, chain.track_end_y, chain.track_end_z]
-    # shower_start = [chain.shower_start_x, chain.shower_start_y, chain.shower_start_z]
-    # fiducial = is_fiducial(track_start) and is_fiducial(track_end) and is_fiducial(shower_start)
-    numu = chain.numu_score == 0
-    n_showers = chain.n_showers == 2
-    sh_id = int(chain.shower_id)
-    tr_id = int(chain.track_id)
-
-    shower_track_energy = chain.total_shower_energy_cali > 0.1 and chain.total_track_energy_length > 0 and chain.shower_energy[sh_id] > 0.01
-    hits = chain.track_hits > 6 and chain.shower_hits > 5 and chain.total_hits_y > 0 and chain.total_hits_u > 0 and chain.total_hits_v > 0
-    shower_angle = chain.track_shower_angle[0] > -0.98
-    # pre_bdt = 1 < chain.shower_dedx < 3 and chain.shower_distance < 5 and chain.shower_track_d < 5 and chain.track_distance < 5 and chain.shower_distance < 5
-    # reco_energy = 0.55 < chain.reco_energy < 0.675
-    shower_dedx = chain.shower_dqdx[sh_id] < 80000
-    track_pid = chain.track_pidchipr[tr_id] < 80
-    res_mu = chain.track_res_mean[tr_id] < 1.5
-    shower_distance = chain.shower_distance[sh_id] < 10.5
-    track_distance = chain.track_distance[tr_id] < 5
-    corrected_energy = 0.2 < chain.reco_energy < 0.35
-    return numu and hits and shower_track_energy  and track_pid # and shower_dedx# and shower_distance# and chain.track_shower_angle > -0.95# and (not 100 < chain.track_start_z < 150)
+    return numu and hits and shower_track_energy# and track_pid
 
 def is_active(point):
     ok_y = y_start < point[1] < y_end
@@ -263,13 +262,7 @@ def is_fiducial(point):
     return ok_y and ok_x and ok_z
 
 
-def load_variables(chain, reader):
-    for name, var in variables:
-        chain.SetBranchAddress(name, var)
-
-    for name, var in spectators:
-        chain.SetBranchAddress(name, var)
-
+def load_bdt(reader):
     for name, var in variables:
         reader.AddVariable(name, var)
 
@@ -280,22 +273,34 @@ def load_variables(chain, reader):
         reader.BookMVA("BDT%s" % type,
                        "dataset/weights/TMVAClassification_BDT%s.weights.xml" % type)
 
+
+def load_variables(chain):
+    for name, var in variables:
+        chain.SetBranchAddress(name, var)
+
+    for name, var in spectators:
+        chain.SetBranchAddress(name, var)
+
+    return dict(variables + spectators)
+
 def bdt_cut(bdt_dict):
+    # SVM_response = reader_svm.EvaluateMVA("SVM")
+    # return SVM_response > 0.85
     return bdt_dict["nc"] > bdt_nc_cut and bdt_dict["numu"] > bdt_numu_cut and bdt_dict["cosmic"] > bdt_cut_cosmic
 
-def apply_cuts(bdt_dict):
-    if bdt:
+def apply_cuts(bdt_dict, var_dict):
+    if BDT:
         apply_bdt = bdt_cut(bdt_dict)
     else:
         apply_bdt = True
 
-    if manual:
-        apply_manual = manual_cuts(chain)
+    if MANUAL:
+        apply_manual = manual_cuts(var_dict)
     else:
         apply_manual = True
     return apply_bdt and apply_manual
 
-def fill_histos_data(tree_name, bdt, manual):
+def fill_histos_data(tree_name):
     f_data = ROOT.TFile("root_files/%s_file.root" % tree_name)
     t_data = f_data.Get("%s_tree" % tree_name)
 
@@ -305,9 +310,8 @@ def fill_histos_data(tree_name, bdt, manual):
         "!Silent",
         "Color"]))
 
-    load_variables(t_data, reader)
-
-    variables_dict = dict(variables + spectators)
+    variables_dict = load_variables(t_data)
+    load_bdt(reader)
 
     histograms = []
 
@@ -329,6 +333,11 @@ def fill_histos_data(tree_name, bdt, manual):
 
     passed_events = 0
     entries = int(t_data.GetEntries() / 1)
+
+
+    bdt_ntuple = ROOT.TNtuple(
+        "bdt_ntuple", "bdt_ntuple", "single"+":".join(bdt_types) + ":category")
+
     for i in range(entries):
         t_data.GetEntry(i)
         bdt_values = {}
@@ -338,13 +347,13 @@ def fill_histos_data(tree_name, bdt, manual):
 
         # likelihood_response = reader.EvaluateMVA("Likelihood method")
         # cuts_response = reader.EvaluateMVA("Cuts method", rectangular_cut)
-        if pre_cuts(t_data):
+        if pre_cuts(variables_dict):
             for bdt_name in bdt_types:
                 h_bdts[bdt_name].Fill(bdt_values[bdt_name], t_data.event_weight)
 
-            h_2d.Fill(bdt_values["numu"], bdt_values["nc"])
+            bdt_ntuple.Fill(array("f", list(bdt_values.values())+[t_data.category]))
 
-            if apply_cuts(bdt_values):
+            if apply_cuts(bdt_values, variables_dict):
                 passed_events += t_data.event_weight
 
                 all = variables + spectators
@@ -354,10 +363,16 @@ def fill_histos_data(tree_name, bdt, manual):
                         if v > -999:
                             histo_dict[name].Fill(v, t_data.event_weight)
 
+    f_ntuple = ROOT.TFile("plots/bdt_ntuple_%s.root" % tree_name,
+                          "RECREATE")
+    bdt_ntuple.Write()
+    f_ntuple.Close()
+
     f_bdt = ROOT.TFile("plots/h_bdt_%s.root" % tree_name, "RECREATE")
     for h in h_bdts:
         h_bdts[h].Write()
     f_bdt.Close()
+
 
     for h in histograms:
         f = ROOT.TFile("plots/%s_%s.root" % (h.GetName(), tree_name),
@@ -374,74 +389,82 @@ def find_interaction(dictionary, interaction):
             return name
 
 
-def manual_cuts(chain):
-    tr_id = int(chain.track_id)
-    sh_id = int(chain.shower_id)
+def manual_cuts(var_dict):
+    ratio = var_dict["hits_ratio"][0] > 0.55
 
-    track_proton_chi2 = True
-    track_distance = True
-    for i_tr in range(int(chain.n_tracks)):
-        track_distance = track_distance and chain.track_distance[tr_id] < 10
-        track_proton_chi2 = track_proton_chi2 and chain.track_pidchipr[tr_id] < 80
-
-    track_shower_angle = -0.9 < chain.track_shower_angle[tr_id]
-    shower_open_angle = 1 < chain.shower_open_angle[sh_id] < 19
-
-    shower_dedx = True
-    shower_distance = True
-    for i_sh in range(int(chain.n_showers)):
-        shower_dedx = shower_dedx and chain.shower_dqdx[sh_id] < 80000
-        shower_distance = shower_distance and chain.shower_distance[sh_id] < 10
-
-    total_hits_y = chain.total_hits_y > 100
-    shower_energy = chain.total_shower_energy_cali > 0.1
-    track_length = chain.track_length[tr_id] < 80
-    track_res = chain.track_res_std[tr_id] < 2
-    corrected_energy = 0.300 < (chain.total_shower_energy_cali + 0.02) / \
-                       0.78 + chain.total_track_energy_length < 0.425
-
-    ratio = chain.hits_ratio > 0.55
-
-    if chain.no_tracks == 1:
-        shower_distance = chain.shower_distance[sh_id] < 2
-        track_distance = chain.track_distance[tr_id] < 2
-
-    lee_cuts = [track_distance, ratio, shower_dedx]
-
-
-    ######## SINGLE BDT VALUES ##########
-    collabmeeting_cuts = [ratio, track_length, track_distance, track_proton_chi2, shower_distance, shower_dedx]
-
-    # collabmeeting_cuts = [total_hits_y, shower_energy, ratio, track_res, shower_dedx, track_proton_chi2,
-    #                       track_shower_angle, shower_open_angle, track_length, track_distance, shower_distance]
-
-    # collabmeeting_cuts = [shower_dedx_bdt, track_res, ratio, shower_distance, numu_exclude, shower_open_angle,
-    #                     track_length, track_distance, dqdx, total_hits_y,
-    #                     track_shower_angle, shower_energy, shower_dedx]
-
-    # shower_dedx_inverted = 3.2 < chain.shower_dedx < 6
-    # inverted_cuts = [shower_dedx_inverted, shower_open_angle, total_hits_y, track_length, track_distance,
-    #                  track_shower_angle, shower_energy, dqdx]
-
-
-    # shower_dedx_harder = 1.5 < chain.shower_dedx < 2.6
-    # bdt_harder = chain.dqdx_bdt > 0.1
-    # energy_harder = chain.shower_energy > 0.1
-    # harder_cuts = collabmeeting_cuts + [energy_harder, shower_dedx_harder, bdt_harder, chain.no_tracks == 0]
-
-    # track_length2 = chain.track_length > 20
-
-    # numu_cuts = [shower_dedx, chain.shower_dedx < 3, shower_open_angle, total_hits_y, track_length2,
-    #              not numu_exclude, chain.numu_score != 2, track_shower_angle, shower_energy, not dqdx]
-
-    # passed_numu = len(numu_cuts) == sum(numu_cuts)
-    # passed_inverted = len(inverted_cuts) == sum(inverted_cuts)
-    # passed_harder = len(harder_cuts) == sum(harder_cuts)
+    collabmeeting_cuts = [ratio]
 
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
-    passed_lee = len(lee_cuts) == sum(lee_cuts)
-
     return passed_collab
+
+# def manual_cuts(chain):
+#     tr_id = int(chain.track_id)
+#     sh_id = int(chain.shower_id)
+
+#     track_proton_chi2 = True
+#     track_distance = True
+#     for i_tr in range(int(chain.n_tracks)):
+#         track_distance = track_distance and chain.track_distance[tr_id] < 10
+#         track_proton_chi2 = track_proton_chi2 and chain.track_pidchipr[tr_id] < 80
+
+#     track_shower_angle = -0.9 < chain.track_shower_angle[tr_id]
+#     shower_open_angle = 1 < chain.shower_open_angle[sh_id] < 19
+
+#     shower_dedx = True
+#     shower_distance = True
+#     for i_sh in range(int(chain.n_showers)):
+#         shower_dedx = shower_dedx and chain.shower_dqdx[sh_id] < 80000
+#         shower_distance = shower_distance and chain.shower_distance[sh_id] < 10
+
+#     total_hits_y = chain.total_hits_y > 100
+#     shower_energy = chain.total_shower_energy_cali > 0.1
+#     track_length = chain.track_length[tr_id] < 80
+#     track_res = chain.track_res_std[tr_id] < 2
+#     corrected_energy = 0.300 < (chain.total_shower_energy_cali + 0.02) / \
+#                        0.78 + chain.total_track_energy_length < 0.425
+
+#     ratio = chain.hits_ratio > 0.55
+
+#     if chain.no_tracks == 1:
+#         shower_distance = chain.shower_distance[sh_id] < 2
+#         track_distance = chain.track_distance[tr_id] < 2
+
+#     lee_cuts = [track_distance, ratio, shower_dedx]
+
+
+#     ######## SINGLE BDT VALUES ##########
+#     collabmeeting_cuts = [ratio, track_length, track_distance, track_proton_chi2, shower_distance, shower_dedx]
+
+#     # collabmeeting_cuts = [total_hits_y, shower_energy, ratio, track_res, shower_dedx, track_proton_chi2,
+#     #                       track_shower_angle, shower_open_angle, track_length, track_distance, shower_distance]
+
+#     # collabmeeting_cuts = [shower_dedx_bdt, track_res, ratio, shower_distance, numu_exclude, shower_open_angle,
+#     #                     track_length, track_distance, dqdx, total_hits_y,
+#     #                     track_shower_angle, shower_energy, shower_dedx]
+
+#     # shower_dedx_inverted = 3.2 < chain.shower_dedx < 6
+#     # inverted_cuts = [shower_dedx_inverted, shower_open_angle, total_hits_y, track_length, track_distance,
+#     #                  track_shower_angle, shower_energy, dqdx]
+
+
+#     # shower_dedx_harder = 1.5 < chain.shower_dedx < 2.6
+#     # bdt_harder = chain.dqdx_bdt > 0.1
+#     # energy_harder = chain.shower_energy > 0.1
+#     # harder_cuts = collabmeeting_cuts + [energy_harder, shower_dedx_harder, bdt_harder, chain.no_tracks == 0]
+
+#     # track_length2 = chain.track_length > 20
+
+#     # numu_cuts = [shower_dedx, chain.shower_dedx < 3, shower_open_angle, total_hits_y, track_length2,
+#     #              not numu_exclude, chain.numu_score != 2, track_shower_angle, shower_energy, not dqdx]
+
+#     # passed_numu = len(numu_cuts) == sum(numu_cuts)
+#     # passed_inverted = len(inverted_cuts) == sum(inverted_cuts)
+#     # passed_harder = len(harder_cuts) == sum(harder_cuts)
+
+#     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
+#     passed_lee = len(lee_cuts) == sum(lee_cuts)
+
+#     return passed_collab
 
 def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
@@ -567,7 +590,7 @@ pi0_mass = array("f", [0])
 genie_weights = array("f", N_UNI * [1.])
 flux_weights = array("f", N_UNI * [1.])
 
-shower_angle = array("f", [0])
+shower_angle = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 track_angle = array("f", [0])
 shower_pdg = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 track_pdg = array("f", MAX_N_TRACKS * [-sys.float_info.max])
@@ -646,10 +669,7 @@ no_tracks = array("f", [0])
 shower_length = array("f", [0])
 nu_E = array("f", [0])
 E_dep = array("f", [0])
-
 true_nu_is_fidvol = array("f", [0])
-dqdx_bdt = array("f", [0])
-dqdx_bdt_max = array("f", [0])
 
 shower_dedx_bdt = array("f", [0])
 
@@ -705,8 +725,6 @@ spectators = [
     ("shower_dedx_u", shower_dedx_u),
     ("shower_dedx_v", shower_dedx_v),
     # ("track_angle", track_angle),
-    ("dqdx_bdt", dqdx_bdt),
-    ("dqdx_bdt_max", dqdx_bdt_max),
     ("shower_angle", shower_angle),
     ("shower_id", b_shower_id),
     ("track_id", b_track_id),
@@ -744,8 +762,6 @@ binning = {
     "genie_weights": [50, 0, 1],
     "flux_weights": [50, 0, 1],
 
-    "dqdx_bdt": [20, -0.5, 0.5],
-    "dqdx_bdt_max": [50, -1, 1],
     "shower_dedx_bdt": [50, -1, 1],
     "shower_angle": [20, 0, 180],
     "track_angle": [20, 0, 180],
@@ -833,7 +849,7 @@ binning = {
     "total_track_energy_length": [12, 0, 1.2]
 }
 
-if manual:
+if MANUAL or BDT:
     binning["shower_theta"] = [9, 0, 180]
     binning["shower_phi"] = [9, -180, 180]
     binning["shower_start_y"] = [10, y_start, y_end]
@@ -846,8 +862,6 @@ labels = {
     "track_id": "track_id",
     "track_pdg": "track pdg",
     "shower_pdg": "shower pdg",
-    "dqdx_bdt": ";Proton BDT;N. Entries / %.2f" % bin_size("dqdx_bdt"),
-    "dqdx_bdt_max": ";dQ/dx BDT;",
     "shower_dedx_bdt": ";dE/dx BDT;",
     "shower_track_d": ";shower track d;",
     "shower_angle": ";shower_angle;",

@@ -6,7 +6,7 @@ import ROOT
 from glob import glob
 from bdt_common import x_start, x_end, y_start, y_end, z_start, z_end
 from bdt_common import printProgressBar, bins, bins2, distance, is_fiducial, is_active
-from bdt_common import N_UNI, variables, spectators
+from bdt_common import N_UNI, variables, spectators, pre_cuts, load_bdt, bdt_types, apply_cuts
 from fill import fill_kin_branches
 from array import array
 from proton_energy import length2energy
@@ -63,7 +63,13 @@ for u in range(N_UNI):
                                         bins2))
 
 
-variables = dict(variables + spectators)
+var_dict = dict(variables + spectators)
+ROOT.TMVA.Tools.Instance()
+reader = ROOT.TMVA.Reader(":".join([
+    "!V",
+    "!Silent",
+    "Color"]))
+load_bdt(reader)
 
 for i_evt in range(entries):
     printProgressBar(i_evt, entries, prefix="Progress:",
@@ -152,6 +158,7 @@ for i_evt in range(entries):
         if not selected:
             continue
 
+
         track_fidvol = True
 
         for i_tr in range(chain_nue.n_tracks):
@@ -210,16 +217,15 @@ for i_evt in range(entries):
                 weight = chain_nue.bnbweight
             h_selected[u].Fill(chain_nue.nu_E, weight)
 
-        fill_kin_branches(chain_nue, 1, variables, "nue", False)
-        hits = (variables["track_hits"][0] > 5 and
-                variables["shower_hits"][0] > 5 and
-                variables["total_hits_y"][0] > 0 and
-                variables["total_hits_u"][0] > 0 and
-                variables["total_hits_v"][0] > 0)
-        sh_id = int(variables["shower_id"][0])
-        shower_track_energy = (variables["total_shower_energy"][0] > 0.01 and
-                               variables["total_track_energy_length"][0] > 0 and
-                               variables["shower_energy"][sh_id] > 0.01)
+
+        fill_kin_branches(chain_nue, 1, var_dict, "nue", False)
+
+        if not pre_cuts(var_dict):
+            continue
+
+        bdt_values = {}
+        for bdt_name in bdt_types:
+            bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
         for u in range(N_UNI):
             weight = chain_nue.genie_weights[0][u] * chain_nue.bnbweight
@@ -228,17 +234,10 @@ for i_evt in range(entries):
             if u == 0:
                 weight = chain_nue.bnbweight
 
-            if not shower_track_energy:
-                continue
-            if not hits:
-                continue
-
             h_selected_precuts[u].Fill(chain_nue.nu_E, weight)
 
-            if chain_nue.numu_passed == 1:
-                continue
-
-            h_selected_numu[u].Fill(chain_nue.nu_E, weight)
+            if apply_cuts(bdt_values, var_dict):
+                h_selected_numu[u].Fill(chain_nue.nu_E, weight)
 
 
 h_eff_2d = ROOT.TH2F("h_eff_2d",
@@ -284,12 +283,12 @@ if __name__ == "__main__":
     eff_e_numu = ROOT.TEfficiency(h_selected_numu[0], h_tot[0])
     eff_e_numu.SetMarkerStyle(21)
     eff_e_numu.SetMarkerColor(ROOT.kBlue + 1)
-    # eff_e_numu.Draw("P SAME")
+    eff_e_numu.Draw("P SAME")
 
     eff_e_precuts = ROOT.TEfficiency(h_selected_precuts[0], h_tot[0])
     eff_e_precuts.SetMarkerStyle(22)
     eff_e_precuts.SetMarkerColor(ROOT.kGreen + 1)
-    # eff_e_precuts.Draw("P SAME")
+    eff_e_precuts.Draw("P SAME")
     c_e.Update()
 
     input()

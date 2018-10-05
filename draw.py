@@ -10,7 +10,7 @@ import os.path
 import sys
 
 from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, labels
-from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, bdt, manual
+from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, BDT, MANUAL
 
 ROOT.gStyle.SetOptStat(0)
 
@@ -230,44 +230,6 @@ if DRAW_LEE:
                                   .format(histograms_lee[RECO_ENERGY].Integral() * POST_SCALING),
                                   "f")
 
-# c_energy = ROOT.TCanvas("c_energy")
-# OBJECTS.append(c_energy)
-# signal_spectrum = histograms_mc[RECO_ENERGY].GetHists()[0].Clone()
-# signal_spectrum_nuecc = histograms_mc[RECO_ENERGY].GetHists()[1].Clone()
-# spectrum_stack = ROOT.THStack("spectrum_stack", ";E_{deposited} [GeV]; N. Entries / 0.05 GeV")
-
-# signal_spectrum.Scale(POST_SCALING)
-# signal_spectrum_nuecc.Scale(POST_SCALING)
-# legend_spectrum = ROOT.TLegend(0.6733, 0.92, 0.913, 0.9747, "", "brNDC")
-
-# # signal_spectrum.Add(signal_spectrum_nuecc)
-# legend_spectrum.AddEntry(
-#     signal_spectrum, "Beam intrinsic #nu_{e}: %.1f" % signal_spectrum.Integral(), "f")
-# signal_spectrum_integral = signal_spectrum.Integral()
-# fix_binning(signal_spectrum)
-# fix_binning(signal_spectrum_nuecc)
-
-# spectrum_stack.Add(signal_spectrum_nuecc)
-# spectrum_stack.Add(signal_spectrum)
-
-# spectrum_stack.Draw("hist")
-# #signal_spectrum.Draw("hist")
-# legend_spectrum.Draw()
-
-# pt = ROOT.TPaveText(0.098, 0.905, 0.576, 0.989, "ndc")
-# pt.AddText("MicroBooNE Preliminary %.1e POT" % total_pot)
-# f_spectrum = ROOT.TFile("plots/f_spectrum.root", "RECREATE")
-# signal_spectrum.Write()
-# f_spectrum.Close()
-# pt.SetFillColor(0)
-# pt.SetBorderSize(0)
-# pt.SetShadowColor(0)
-# pt.Draw()
-# OBJECTS.append(signal_spectrum)
-# OBJECTS.append(spectrum_stack)
-# OBJECTS.append(pt)
-# c_energy.Update()
-
 sigma = array("f", [])
 sigma5 = array("f", [])
 sigma20 = array("f", [])
@@ -284,6 +246,8 @@ else:
     to_plot = range(len(VARIABLES))
 
 for i in to_plot:
+    if ("track" in VARIABLES[i][0] or "shower" in VARIABLES[i][0]) and not "total" in VARIABLES[i][0] and not "n_" in VARIABLES[i][0]:
+        continue
     if histograms_mc[i].GetHists()[0].Integral() > -10:
 
         c = ROOT.TCanvas("c%i" % i, "", 900, 44, 700, 645)
@@ -355,7 +319,7 @@ for i in to_plot:
             h_mc_err.Add(histograms_lee[i])
             histograms_mc[i].Add(histograms_lee[i])
 
-        if DRAW_DATA and not (bdt or manual):
+        if DRAW_DATA and not (BDT or MANUAL):
             draw_top()
         else:
             c.SetTopMargin(0.2274194)
@@ -517,7 +481,7 @@ for i in to_plot:
         if DRAW_DATA and h_mc_err_sys.Integral() > 0:
             if i == RECO_ENERGY:
                 print("Data/(MC+EXT) ratio: ", ratio)
-            if not (bdt or manual):
+            if not (BDT or MANUAL):
                 draw_ratio(histograms_bnb[i], h_mc_err, h_mc_err_sys)
         c.Update()
         c.SaveAs("plots/%s.pdf" % histograms_bnb[i].GetName())
@@ -574,7 +538,7 @@ if not plot or plot == "reco_energy":
 
     # c_fixed.SetTopMargin(0.245)
     # c_fixed.SetBottomMargin(0.105)
-    if DRAW_DATA and not (bdt or manual):
+    if DRAW_DATA and not (BDT or MANUAL):
         draw_top()
     else:
         c_fixed.SetTopMargin(0.23)
@@ -607,13 +571,17 @@ if not plot or plot == "reco_energy":
     legends[RECO_ENERGY].Draw()
 
     c_fixed.cd()
-    if DRAW_DATA and not (bdt or manual):
-        draw_ratio(h_fixed_data, h_mc_fixed, h_mc_fixed_sys)
 
-    if DRAW_DATA and not (bdt or manual):
+    if DRAW_DATA and not (BDT or MANUAL):
+        draw_ratio(h_fixed_data, h_mc_fixed, h_mc_fixed_sys)
         p_15 = ROOT.TPaveText(0.77,0.17,0.84,0.282, "NDC")
+        p_white = ROOT.TPaveText(0.83,0.17,0.87,0.27, "NDC")
+        p_3 = ROOT.TPaveText(0.865,0.17,0.935,0.282, "NDC")
+
     else:
         p_15 = ROOT.TPaveText(0.78, 0.026, 0.83, 0.129, "NDC")
+        p_white = ROOT.TPaveText(0.83,0.06,0.88,0.091, "NDC")
+        p_3 = ROOT.TPaveText(0.8624642, 0.05645161, 0.9326648, 0.1032258, "NDC")
 
     p_15.AddText("1.5")
     p_15.SetFillStyle(0)
@@ -622,11 +590,6 @@ if not plot or plot == "reco_energy":
     p_15.SetTextFont(42)
     p_15.Draw()
 
-    if DRAW_DATA and not (bdt or manual):
-        p_white = ROOT.TPaveText(0.83,0.17,0.87,0.27, "NDC")
-    else:
-        p_white = ROOT.TPaveText(0.83,0.06,0.88,0.091, "NDC")
-
     p_white.AddText("  ")
     p_white.SetFillColor(ROOT.kWhite)
     p_white.SetShadowColor(0)
@@ -634,11 +597,6 @@ if not plot or plot == "reco_energy":
     p_white.SetTextFont(42)
     p_white.SetTextSize(14)
     p_white.Draw()
-
-    if DRAW_DATA and not (bdt or manual):
-        p_3 = ROOT.TPaveText(0.865,0.17,0.935,0.282, "NDC")
-    else:
-        p_3 = ROOT.TPaveText(0.8624642, 0.05645161, 0.9326648, 0.1032258, "NDC")
 
     p_3.AddText("3")
     p_3.SetFillStyle(0)
