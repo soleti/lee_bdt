@@ -78,7 +78,7 @@ bgCut = ROOT.TCut("(category == 3 || category == 4 || category == 7 || category 
 
 
 dataloader.AddBackgroundTree(t_nue)
-dataloader.AddSignalTree(t_lee)
+# dataloader.AddSignalTree(t_lee)
 dataloader.AddSignalTree(t_nue)
 dataloader.AddBackgroundTree(t)
 dataloader.AddBackgroundTree(t_cosmic)

@@ -4,12 +4,19 @@ import ROOT
 from operator import mul
 import functools
 import math
-from bdt_common import manual_cuts, bdt, bdt_cut, manual, pre_cuts, variables, spectators, labels, binning, N_UNI, bins, fix_binning, fixed_width_histo, fixed_width_histo_2d
+from bdt_common import pre_cuts, variables, spectators, labels, binning, N_UNI, bins, fix_binning, fixed_width_histo, fixed_width_histo_2d
+from bdt_common import bdt_types, load_bdt, load_variables, apply_cuts, printProgressBar
+import sys
+
+if len(sys.argv) > 2:
+    SYS_VARIABLES = sys.argv[2:]
+else:
+    SYS_VARIABLES = ["reco_energy"]
+
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
-SYS_VARIABLES = ["reco_energy"]
-MODE = "genie"
+MODE = sys.argv[1]
 
 if MODE == "flux":
     ROOT.gStyle.SetPalette(ROOT.kMint)
@@ -18,80 +25,58 @@ else:
 
 
 chain = ROOT.TChain("mc_tree")
-chain.Add("root_files/mc_file.root")
+chain.Add("root_files/mc_file_sys.root")
+chain.Add("root_files/nue_file_sys.root")
 
 total_entries = int(chain.GetEntries() / 1)
-vars = dict(variables + spectators)
-print(total_entries)
+
 h_sys = {}
 h_2d = {}
 h_cv = {}
 h_covariance = {}
 h_frac = {}
 h_corr = {}
+
+vars = load_variables(chain)
+
 for n, b in vars.items():
     h_uni = []
 
     for u in range(N_UNI):
-        if n == "reco_energy":
+        if n == "reco_eneargy":
             h_uni.append(ROOT.TH1F("h_%s_%i" % (n, u), labels[n], len(bins) - 1, bins))
         else:
             h_uni.append(ROOT.TH1F("h_%s_%i" % (n, u), labels[n], binning[n][0], binning[n][1], binning[n][2]))
 
     h_sys[n] = h_uni
-    if n == "reco_energy":
+    if n == "reco_eneragy":
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], len(bins) - 1, bins)
     else:
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], binning[n][0], binning[n][1], binning[n][2])
+
 ROOT.TMVA.Tools.Instance()
 reader = ROOT.TMVA.Reader(":".join([
     "!V",
     "!Silent",
     "Color"]))
-for name, var in variables:
-    reader.AddVariable(name, var)
-
-for name, var in spectators:
-    reader.AddSpectator(name, var)
-
-reader.BookMVA("BDTCosmic",
-                "dataset/weights/TMVAClassification_BDTCosmic.weights.xml")
-
-reader.BookMVA("BDTNeutrino",
-                "dataset/weights/TMVAClassification_BDTNeutrino.weights.xml")
-
-for name, var in variables:
-    chain.SetBranchAddress(name, var)
-
-for name, var in spectators:
-    chain.SetBranchAddress(name, var)
+load_bdt(reader)
 
 
 for ievt in range(total_entries):
     chain.GetEntry(ievt)
 
+    printProgressBar(ievt, total_entries, prefix="Progress:",
+                     suffix="Complete", length=20)
 
-
-    BDT_cosmic = reader.EvaluateMVA("BDTCosmic")
-    BDT_neutrino = reader.EvaluateMVA("BDTNeutrino")
-    if ievt % 100 == 0:
-        print(ievt)
-
-    if not pre_cuts(chain):
+    if not pre_cuts(vars):
         continue
 
-    if bdt:
-        apply_bdt = BDT_cosmic > bdt_cut and BDT_neutrino > bdt_cut
-    else:
-        apply_bdt = True
+    bdt_values = {}
 
+    for bdt_name in bdt_types:
+        bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
-    if manual:
-        apply_manual = manual_cuts(chain)
-    else:
-        apply_manual = True
-
-    if apply_manual and apply_bdt:
+    if apply_cuts(bdt_values, vars):
         for name, var in vars.items():
             if name not in SYS_VARIABLES:
                 continue
@@ -106,7 +91,6 @@ for ievt in range(total_entries):
                             weight = chain.flux_weights[u]
                         if weight > 100:
                             weight = 1
-
                         h_sys[name][u].Fill(v, chain.event_weight * weight)
 
 
@@ -202,12 +186,6 @@ for n in h_sys:
 
             diff = (h_cv[n].GetBinContent(bin) - h_sys[n][u].GetBinContent(bin))
 
-            # if n == "reco_energy":
-            #     bin_width = h_sys[n][u].GetBinWidth(bin)
-            #     diff = (h_cv[n].GetBinContent(bin) / (bin_width / 0.05) -
-            #             h_sys[n][u].GetBinContent(bin) / (bin_width / 0.05))
-            #     value /= bin_width / 0.05
-
             h_2d[n].Fill(center, value)
             sys_err[n][bin] += diff**2
 
@@ -224,8 +202,9 @@ for v in SYS_VARIABLES:
                 e_ij += diff_i * diff_j
 
             e_ij /= N_UNI
-            f_ij = e_ij/(h_cv[v].GetBinContent(i)*h_cv[v].GetBinContent(j))
-            h_frac[v].SetBinContent(i, j, f_ij)
+            if h_cv[v].GetBinContent(i)*h_cv[v].GetBinContent(j):
+                f_ij = e_ij/(h_cv[v].GetBinContent(i)*h_cv[v].GetBinContent(j))
+                h_frac[v].SetBinContent(i, j, f_ij)
             h_covariance[v].SetBinContent(i, j, e_ij)
 
 for v in SYS_VARIABLES:
@@ -234,7 +213,8 @@ for v in SYS_VARIABLES:
         for j in range(1, h_cv[v].GetNbinsX() + 1):
             e_jj = h_covariance[v].GetBinContent(j, j)
             e_ij = h_covariance[v].GetBinContent(i, j)
-            h_corr[v].SetBinContent(i, j, e_ij / math.sqrt(e_ii*e_jj))
+            if e_ii*e_jj:
+                h_corr[v].SetBinContent(i, j, e_ij / math.sqrt(e_ii*e_jj))
 
 OBJECTS = []
 
@@ -252,6 +232,9 @@ for v in SYS_VARIABLES:
         h_cv[v].SetBinError(bin, math.sqrt(sys_err[v][bin] / N_UNI))
 
     if v == "reco_energy":
+        f_cov = ROOT.TFile("plots/sys/h_cov_reco_energy_%s.root" % MODE, "RECREATE")
+        h_covariance[v].Write()
+        f_cov.Close()
         h_covariance[v] = fixed_width_histo_2d(h_covariance[v])
         h_frac[v] = fixed_width_histo_2d(h_frac[v])
         h_corr[v] = fixed_width_histo_2d(h_corr[v])
@@ -268,7 +251,7 @@ for v in SYS_VARIABLES:
     h_cv[v].GetYaxis().SetRangeUser(0.001, h_cv[v].GetMaximum() * 1.5)
     pt.Draw()
 
-    f_cv = ROOT.TFile( "plots/sys/h_%s_%s_sys.root" % (v, MODE), "RECREATE")
+    f_cv = ROOT.TFile("plots/sys/h_%s_%s_sys.root" % (v, MODE), "RECREATE")
     h_cv[v].Write()
     f_cv.Close()
 

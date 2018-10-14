@@ -4,6 +4,8 @@ import math
 import ROOT
 from scipy.stats import poisson
 import sys
+import collections
+import os
 
 ELECTRON_MASS = 0.51e-3
 PROTON_MASS = 0.938
@@ -18,9 +20,9 @@ BDT, MANUAL = True, False
 # Number to be obtained from Zarko's POT counting tool
 total_data_bnb_pot = 4.341e+19
 
-bdt_nc_cut = 0.205
-bdt_numu_cut = 0.175
-bdt_cut_cosmic = 0.15
+bdt_nc_cut = 0.19
+bdt_numu_cut = 0.185
+bdt_cut_cosmic = 0.13
 bdt_cut_neutrino = 0.16
 rectangular_cut = 0.03
 bdt_cut = 0.1
@@ -43,6 +45,90 @@ bins2 = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.8,
 
 svm_loaded = False
 
+pdg_colors = {
+    2147483648: "#ffffff",
+    22: '#e6194b',
+    11: '#f58231',
+    2112: '#ffe119',
+    13: '#bfef45',
+    211: '#3cb44b',
+    2212: '#42d4f4',
+    999999: '#4363db',
+    99999: '#a9a9a9'
+}
+
+pdgs = [
+    ("Data off-beam", 2147483648),
+    ("#gamma", 22),
+    ("e^{#pm}", 11),
+    ("n", 2112),
+    ("#mu^{#pm}", 13),
+    ("#pi^{#pm}", 211),
+    ("p", 2212),
+    ("Overlay cosmic", 999999),
+    ("Other", 99999),
+]
+
+
+pdgs = collections.OrderedDict(pdgs)
+
+inv_pdgs = {v: k for k, v in pdgs.items()}
+
+def draw_top(OBJECTS=[]):
+    pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
+    pad_top.SetBottomMargin(0)
+    pad_top.Range(-22.21825, -2.003018, 202.5403, 2073.676)
+    pad_top.SetTopMargin(0.2411347)
+    pad_top.Draw()
+    pad_top.cd()
+    OBJECTS.append(pad_top)
+
+def draw_ratio(num, den, den_sys=None, OBJECTS=[]):
+    pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)
+    pad_bottom.Range(-22.5, -0.6346511, 202.5, 1.99)
+
+    pad_bottom.SetFrameBorderMode(0)
+    pad_bottom.SetFrameBorderMode(0)
+    pad_bottom.SetBorderMode(0)
+    pad_bottom.SetTopMargin(0)
+    pad_bottom.SetBottomMargin(0.275614)
+    pad_bottom.Draw()
+    pad_bottom.cd()
+    OBJECTS.append(pad_bottom)
+    h_ratio = num.Clone()
+    h_ratio_sys = den.Clone()
+
+    OBJECTS.append(h_ratio)
+    OBJECTS.append(h_ratio_sys)
+
+    h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
+    h_ratio.Divide(den)
+    if den_sys:
+        h_ratio_sys.Divide(den_sys)
+
+    h_ratio.GetXaxis().SetLabelFont(42)
+    h_ratio.GetXaxis().SetLabelSize(0.1)
+    h_ratio.GetXaxis().SetTitleSize(0.13)
+    h_ratio.GetXaxis().SetTitleOffset(0.91)
+    h_ratio.GetYaxis().SetTitle("Ratio")
+    h_ratio.GetYaxis().SetNdivisions(509)
+    h_ratio.GetYaxis().SetLabelFont(42)
+    h_ratio.GetYaxis().SetLabelSize(0.1)
+    h_ratio.GetYaxis().SetTitleSize(0.14)
+    h_ratio.GetYaxis().SetTitleOffset(0.3)
+
+    h_ratio.Draw("e1")
+    if den_sys:
+        h_ratio_sys.Draw("e2 same")
+    h_ratio_sys.SetMarkerSize(0)
+
+    line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
+                      h_ratio.GetXaxis().GetXmax(), 1)
+    line.SetLineWidth(2)
+    line.SetLineStyle(2)
+    line.Draw()
+    OBJECTS.append(line)
+
 def load_svm():
     if not svm_loaded:
         reader_svm = ROOT.TMVA.Reader(":".join([
@@ -63,7 +149,7 @@ def load_svm():
 
 def fixed_width_histo_2d(h):
     h_clone = h.Clone()
-    h_fixed = ROOT.TH2F(h.GetName(),
+    h_fixed = ROOT.TH2F(h.GetName()+"_fixed",
                         labels["reco_energy"],
                         len(bins) - 1, bins2,
                         len(bins) - 1, bins2)
@@ -72,12 +158,13 @@ def fixed_width_histo_2d(h):
         for j in range(1, h_clone.GetNbinsY() + 1):
             h_fixed.SetBinContent(i, j, h_clone.GetBinContent(i, j))
             h_fixed.SetBinError(i, j, h_clone.GetBinError(i, j))
+    h_fixed.GetYaxis().SetTitle(h_fixed.GetXaxis().GetTitle())
 
     return h_fixed
 
 def fixed_width_histo(h):
     h_clone = h.Clone()
-    h_fixed = ROOT.TH1F(h.GetName(), labels["reco_energy"], len(bins) - 1, bins2)
+    h_fixed = ROOT.TH1F(h.GetName()+"_fixed", labels["reco_energy"], len(bins) - 1, bins2)
 
     for i in range(1, h_clone.GetNbinsX() + 1):
         h_fixed.SetBinContent(i, h_clone.GetBinContent(i))
@@ -237,12 +324,12 @@ colors = [ROOT.TColor.GetColor("#000000"), ROOT.TColor.GetColor("#e7623d"),
 def pre_cuts(var_dict):
     tr_id = int(var_dict["track_id"][0])
     numu = int(var_dict["numu_score"][0]) == 0
-    hits = var_dict["track_hits"][0] > 5 and \
+    hits = var_dict["track_hits"][0] > 6 and \
            var_dict["shower_hits"][0] > 5 and \
            var_dict["total_hits_y"][0] > 0 and \
            var_dict["total_hits_u"][0] > 0 and \
            var_dict["total_hits_v"][0] > 0
-    shower_track_energy = var_dict["total_shower_energy_cali"][0] > 0.1 and \
+    shower_track_energy = var_dict["total_shower_energy_cali"][0] > 0.09 and \
                           var_dict["total_track_energy_length"][0] > 0 and \
                           var_dict["shower_energy"][0] > 0.01
     track_pid = var_dict["track_pidchipr"][tr_id] < 80
@@ -286,7 +373,7 @@ def load_variables(chain):
 def bdt_cut(bdt_dict):
     # SVM_response = reader_svm.EvaluateMVA("SVM")
     # return SVM_response > 0.85
-    return bdt_dict["nc"] > bdt_nc_cut and bdt_dict["numu"] > bdt_numu_cut and bdt_dict["cosmic"] > bdt_cut_cosmic
+    return bdt_dict["nc"] > bdt_nc_cut and bdt_dict["numu"]  > bdt_numu_cut and bdt_dict["cosmic"] > bdt_cut_cosmic
 
 def apply_cuts(bdt_dict, var_dict):
     if BDT:
@@ -466,7 +553,7 @@ def manual_cuts(var_dict):
 
 #     return passed_collab
 
-def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
+def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
     #(2D Matrix - (statistical uncertainty)^2 in a the diagonal of the matrix)^-1
     #(number of events signal in Energy bins in a 1D matrix)^Transpose
@@ -481,12 +568,33 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, sys=0):
     for x in range(nbins):
         emtx[x][x] = bkg_array[x]
 
+    if systematics:
+        fname_flux = "plots/sys/h_cov_reco_energy_flux.root"
+        fname_genie = "plots/sys/h_cov_reco_energy_genie.root"
+
+        if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
+            f_flux = ROOT.TFile(fname_flux)
+            h_flux = f_flux.Get("h_cov_reco_energy")
+            fill_cov_matrix(emtx, h_flux)
+            f_flux.Close()
+            f_genie = ROOT.TFile(fname_genie)
+            h_genie = f_genie.Get("h_cov_reco_energy")
+            fill_cov_matrix(emtx, h_genie)
+            f_genie.Close()
+        else:
+            print("GENIE and FLUX covariance matrices not avaiable")
+
     emtxinv = np.linalg.inv(emtx)
 
     chisq = float(sig_array.dot(emtxinv).dot(sig_array.T))
 
     #print "Sqrt of that (==sigma?) is ",np.sqrt(chisq)
     return np.sqrt(chisq)
+
+def fill_cov_matrix(matrix, histo):
+    for x_bin in range(2, histo.GetNbinsX()+1):
+        for y_bin in range(2, histo.GetNbinsY()+1):
+            matrix[x_bin - 2][y_bin - 2] += histo.GetBinContent(x_bin, y_bin)
 
 total_pot = total_data_bnb_pot
 
@@ -725,7 +833,6 @@ spectators = [
     ("shower_dedx_u", shower_dedx_u),
     ("shower_dedx_v", shower_dedx_v),
     # ("track_angle", track_angle),
-    ("shower_angle", shower_angle),
     ("shower_id", b_shower_id),
     ("track_id", b_track_id),
     ("n_showers", n_showers),
@@ -735,6 +842,7 @@ spectators = [
 ]
 
 variables = [
+    ("shower_angle", shower_angle),
     ("track_dqdx", track_dqdx),
     ("shower_dqdx", shower_dqdx),
     ("track_pidchipr", track_pidchipr),

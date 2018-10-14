@@ -15,7 +15,6 @@ import sys
 
 STORE_SYS = False
 
-
 reader_reclass = TMVA.Reader(":".join([
     "!V",
     "!Silent",
@@ -145,15 +144,17 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     shower_id = choose_shower(root_chain, hit_index)
     track_id, track_score = choose_track(root_chain, particleid)
 
-    if STORE_SYS and option == "bnb":
+    if STORE_SYS and (option == "bnb" or option == "nue"):
 
-        flux_weights = [1]*len(root_chain.flux_weights[0])
-        for fl in root_chain.flux_weights:
-            flux_weights = [a*b for a, b in zip(flux_weights, fl)]
+        if (len(root_chain.flux_weights) > 0 and len(root_chain.genie_weights) > 0):
 
-        for u in range(N_UNI):
-            variables["genie_weights"][u] = root_chain.genie_weights[0][u]
-            variables["flux_weights"][u] = flux_weights[u]
+            flux_weights = [1]*len(root_chain.flux_weights[0])
+            for fl in root_chain.flux_weights:
+                flux_weights = [a*b for a, b in zip(flux_weights, fl)]
+
+            for u in range(N_UNI):
+                variables["genie_weights"][u] = root_chain.genie_weights[0][u]
+                variables["flux_weights"][u] = flux_weights[u]
 
     variables["E_dep"][0] = 0
 
@@ -619,6 +620,7 @@ def fill_tree(chain, weight, tree, option=""):
                 option = "nue"
 
         fill_kin_branches(chain, event_weight, variables, option)
+
         tree.Fill()
 
     return total_events
@@ -631,11 +633,11 @@ if __name__ == "__main__":
 
     samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue_showers/*.root"),
-                  glob("data_files/mc_bnb_showers/*.root"),
+    tree_files = [glob("data_files/mc_nue_sys/*.root"),
+                  glob("data_files/mc_bnb_showers/*/*.root"),
                   glob("data_files/data_bnb_showers/*/*.root"),
                   glob("data_files/data_ext_showers/*/*.root"),
-                  glob("data_files/mc_nue_showers/*.root"), ]
+                  glob("data_files/mc_nue_sys/*.root"), ]
 
     chains = []
     chains_pot = []
