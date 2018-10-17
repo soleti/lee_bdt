@@ -42,7 +42,9 @@ ELECTRON_THRESHOLD = 0.020
 h_tot = []
 h_selected = []
 h_selected_numu = []
+h_selected_cuts = []
 h_selected_precuts = []
+h_selected_bdt = []
 
 for u in range(N_UNI):
     h_tot.append(ROOT.TH1F("h_tot_%i" % u,
@@ -61,8 +63,14 @@ for u in range(N_UNI):
                                         ";#nu_{e} energy [GeV];Efficiency",
                                         len(bins) - 1,
                                         bins2))
-
-
+    h_selected_cuts.append(ROOT.TH1F("h_selected_cuts_%i" % u,
+                                     ";#nu_{e} energy [GeV];Efficiency",
+                                     len(bins) - 1,
+                                     bins2))
+    h_selected_bdt.append(ROOT.TH1F("h_selected_bdt_%i" % u,
+                                    ";#nu_{e} energy [GeV];Efficiency",
+                                    len(bins) - 1,
+                                    bins2))
 var_dict = dict(variables + spectators)
 ROOT.TMVA.Tools.Instance()
 reader = ROOT.TMVA.Reader(":".join([
@@ -150,9 +158,6 @@ for i_evt in range(entries):
 
             h_tot[u].Fill(chain_nue.nu_E, weight)
 
-        if not chain_nue.passed:
-            continue
-
         contaminated = chain_nue.cosmic_fraction > 0.5 and chain_nue.category == 7
         selected = chain_nue.category == 2 or contaminated
         if not selected:
@@ -217,8 +222,18 @@ for i_evt in range(entries):
                 weight = chain_nue.bnbweight
             h_selected[u].Fill(chain_nue.nu_E, weight)
 
+        fill_kin_branches(chain_nue, 1, var_dict, "nue", True)
 
-        fill_kin_branches(chain_nue, 1, var_dict, "nue", False)
+        if not int(var_dict["numu_score"][0]) == 0:
+            continue
+
+        for u in range(N_UNI):
+            weight = chain_nue.genie_weights[0][u] * chain_nue.bnbweight
+            if weight > 100:
+                weight = chain_nue.bnbweight
+            if u == 0:
+                weight = chain_nue.bnbweight
+            h_selected_numu[u].Fill(chain_nue.nu_E, weight)
 
         if not pre_cuts(var_dict):
             continue
@@ -236,9 +251,10 @@ for i_evt in range(entries):
 
             h_selected_precuts[u].Fill(chain_nue.nu_E, weight)
 
-            if apply_cuts(bdt_values, var_dict):
-                h_selected_numu[u].Fill(chain_nue.nu_E, weight)
-
+            if apply_cuts(bdt_values, var_dict, bdt=False, manual=True):
+                h_selected_cuts[u].Fill(chain_nue.nu_E, weight)
+            if apply_cuts(bdt_values, var_dict, bdt=True, manual=False):
+                h_selected_bdt[u].Fill(chain_nue.nu_E, weight)
 
 h_eff_2d = ROOT.TH2F("h_eff_2d",
                      ";#nu_{e} energy [GeV];Efficiency",
@@ -272,23 +288,47 @@ for u in range(1, N_UNI):
 
 if __name__ == "__main__":
     c_e = ROOT.TCanvas("c_e")
-    h_eff_2d.Draw("colz")
+    # h_eff_2d.Draw("colz")
     h_eff_2d.GetZaxis().SetRangeUser(0, 50)
     eff_e = ROOT.TEfficiency(h_selected[0], h_tot[0])
     eff_e.SetMarkerStyle(0)
     eff_e.SetLineColor(ROOT.kRed + 1)
     eff_e.SetLineWidth(2)
-    eff_e.Draw("P SAME")
+    eff_e.Draw("AP")
+    # eff_e.GetPaintedGraph().GetYaxis().SetRangeUser(0.001, 1)
 
     eff_e_numu = ROOT.TEfficiency(h_selected_numu[0], h_tot[0])
-    eff_e_numu.SetMarkerStyle(21)
-    eff_e_numu.SetMarkerColor(ROOT.kBlue + 1)
+    eff_e_numu.SetMarkerStyle(0)
+    eff_e_numu.SetLineColor(ROOT.kBlue + 1)
+    eff_e_numu.SetLineWidth(2)
     eff_e_numu.Draw("P SAME")
 
     eff_e_precuts = ROOT.TEfficiency(h_selected_precuts[0], h_tot[0])
-    eff_e_precuts.SetMarkerStyle(22)
-    eff_e_precuts.SetMarkerColor(ROOT.kGreen + 1)
+    eff_e_precuts.SetMarkerStyle(0)
+    eff_e_precuts.SetLineColor(ROOT.kGreen + 1)
+    eff_e_precuts.SetLineWidth(2)
     eff_e_precuts.Draw("P SAME")
+
+    eff_e_cuts = ROOT.TEfficiency(h_selected_cuts[0], h_tot[0])
+    eff_e_cuts.SetMarkerStyle(0)
+    eff_e_cuts.SetLineColor(ROOT.kOrange + 1)
+    eff_e_cuts.SetLineWidth(2)
+    eff_e_cuts.Draw("P SAME")
+
+    eff_e_bdt = ROOT.TEfficiency(h_selected_bdt[0], h_tot[0])
+    eff_e_bdt.SetMarkerStyle(0)
+    eff_e_bdt.SetLineColor(ROOT.kMagenta + 1)
+    eff_e_bdt.SetLineWidth(2)
+    eff_e_bdt.Draw("P SAME")
+
+    leg = ROOT.TLegend(0.4,0.64,0.83,0.84)
+    leg.AddEntry(eff_e, "Topology and flash requirements: %.1f %%" % (h_selected[0].Integral()/h_tot[0].Integral()*100), "le")
+    leg.AddEntry(eff_e_numu, "#nu_{#mu} rejection: %.1f %%" % (h_selected_numu[0].Integral()/h_tot[0].Integral()*100), "le")
+    leg.AddEntry(eff_e_precuts, "Quality precuts: %.1f %%" % (h_selected_precuts[0].Integral()/h_tot[0].Integral()*100), "le")
+    leg.AddEntry(eff_e_cuts, "Rectangular cuts: %.1f %%" % (h_selected_cuts[0].Integral()/h_tot[0].Integral()*100), "le")
+    leg.AddEntry(eff_e_bdt, "BDT: %.1f %%" % (h_selected_bdt[0].Integral()/h_tot[0].Integral()*100), "le")
+
+    leg.Draw()
     c_e.Update()
 
     input()

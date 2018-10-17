@@ -34,7 +34,7 @@ legend.SetTextSize(16)
 legend.SetTextFont(63)
 legend.SetHeader("MicroBooNE Preliminary %.1e POT" % total_pot)
 legend.SetTextFont(43)
-for j in range(h_bdt_mc.GetNhists()):
+for j in range(h_bdt_mc.GetNhists()-1):
     if h_bdt_mc.GetHists()[j].Integral():
         legend.AddEntry(h_bdt_mc.GetHists()[j],
                         "%s: %.1f events" %

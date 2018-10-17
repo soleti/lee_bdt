@@ -13,6 +13,7 @@ from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, B
 from bdt_common import draw_ratio, draw_top
 
 ROOT.gStyle.SetOptStat(0)
+ROOT.gStyle.SetNumberContours(99)
 
 if len(sys.argv) > 1:
     plot = sys.argv[1]
@@ -20,7 +21,7 @@ else:
     plot = ""
 
 SYS_ERR = 0.1
-
+DRAW_NORMALIZED = True
 DRAW_POT = True
 DRAW_SUBTRACTION = False
 DRAW_LEE = True
@@ -107,6 +108,7 @@ for i, h in enumerate(histograms_mc):
                                 "{}: {:.1f} entries".format(d, n_events), "f")
 
     if DRAW_LEE:
+        histograms_lee[i].Scale(1.5)
         histograms_lee[i].SetLineWidth(0)
         histograms_lee[i].SetFillColor(ROOT.kGreen - 10)
         if i != RECO_ENERGY:
@@ -214,20 +216,37 @@ for i in to_plot:
 
         if DRAW_LEE:
 
-            # histograms_lee[i].Scale(2)
+            # histograms_lee[i].Scale(1.5)
             if i == RECO_ENERGY:
                 if DRAW_POT:
                     sig = []
                     bkg = []
-
+                    nu_e = []
                     for i_bin in range(1, histograms_lee[i].GetNbinsX()+1):
                         sig.append(histograms_lee[i].GetBinContent(i_bin))
                         bkg.append(h_mc_err_nobinning.GetBinContent(i_bin))
-
+                        nu_e.append(h_sig.GetBinContent(i_bin))
                     sig = np.array(sig)
                     bkg = np.array(bkg)
+                    nu_e = np.array(nu_e)
 
                     print("Significance: ", sigma_calc_matrix(sig[1:], bkg[1:], 30.4, True))
+                    h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
+                    for eff in range(10, 50):
+                        for red in range(10, 50):
+                            bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
+                            sig_new = sig*eff/10
+                            if eff == 23 and red == 18:
+                                print("Sigma", sigma_calc_matrix(sig_new[1:], bkg_new[1:], 30.4, True))
+                            h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new[1:], bkg_new[1:], 30.4, True))
+
+                    OBJECTS.append(h_eff_red)
+                    c_eff_red = ROOT.TCanvas("c_eff_red")
+                    h_eff_red.Draw("colz")
+                    h_eff_red.GetZaxis().SetRangeUser(0.9,7)
+                    c_eff_red.Update()
+                    c_eff_red.SaveAs("plots/h_2d.pdf")
+                    OBJECTS.append(c_eff_red)
 
                 fix_binning(histograms_lee[i])
             # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
@@ -266,79 +285,6 @@ for i in to_plot:
 
         max_hist = histograms_bnb[i].GetMaximum() * 1.35
 
-        if VARIABLES[i][0] == "dedx":
-            l1 = ROOT.TLine(1, 0, 1, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l2 = ROOT.TLine(3.2, 0, 3.2, max_hist)
-            l2.SetLineStyle(2)
-            l2.SetLineWidth(3)
-            l1.Draw()
-            l2.Draw()
-            OBJECTS.append(l1)
-            OBJECTS.append(l2)
-
-        if VARIABLES[i][0] == "track_distance":
-            l1 = ROOT.TLine(5, 0, 5, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "shower_distance":
-            l1 = ROOT.TLine(5, 0, 5, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "shower_open_angle":
-            l1 = ROOT.TLine(1, 0, 1, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l2 = ROOT.TLine(20, 0, 20, max_hist)
-            l2.SetLineStyle(2)
-            l2.SetLineWidth(3)
-            l1.Draw()
-            l2.Draw()
-            OBJECTS.append(l1)
-            OBJECTS.append(l2)
-
-        if VARIABLES[i][0] == "track_shower_angle":
-            l1 = ROOT.TLine(-0.9, 0, -0.9, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "total_hits_y":
-            l1 = ROOT.TLine(50, 0, 50, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "shower_energy":
-            l1 = ROOT.TLine(0.050, 0, 0.050, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "track_length":
-            l1 = ROOT.TLine(80, 0, 80, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
-        if VARIABLES[i][0] == "dqdx_bdt":
-            l1 = ROOT.TLine(0.1, 0, 0.1, max_hist)
-            l1.SetLineStyle(2)
-            l1.SetLineWidth(3)
-            l1.Draw()
-            OBJECTS.append(l1)
-
         h_mc_err_clone = h_mc_err.Clone()
         h_mc_err_clone.SetLineWidth(2)
         h_mc_err_clone.SetFillStyle(0)
@@ -353,6 +299,13 @@ for i in to_plot:
         if DRAW_SYS:
             fname_flux = "plots/sys/h_%s_flux_sys.root" % VARIABLES[i][0]
             fname_genie = "plots/sys/h_%s_genie_sys.root" % VARIABLES[i][0]
+            if "_before" in VARIABLES[i][0]:
+                fname_flux = fname_flux.replace("_before", "")
+                fname_genie = fname_genie.replace("_before", "")
+            if VARIABLES[i][0] == "track_energy_length":
+                fname_flux = fname_flux.replace("track", "total_track")
+                fname_genie = fname_genie.replace("track", "total_track")
+
             OBJECTS.append(h_mc_err_sys)
             if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
                 f_flux = ROOT.TFile(fname_flux)
@@ -360,9 +313,13 @@ for i in to_plot:
                     fixed = "_fixed"
                 else:
                     fixed = ""
-                h_flux = f_flux.Get("h_%s_cv%s" % (VARIABLES[i][0], fixed))
+                var_name = VARIABLES[i][0].replace("_before", "")
+                if VARIABLES[i][0] == "track_energy_length":
+                    var_name = var_name.replace("track", "total_track")
+
+                h_flux = f_flux.Get("h_%s_cv%s" % (var_name, fixed))
                 f_genie = ROOT.TFile(fname_genie)
-                h_genie = f_genie.Get("h_%s_cv%s" % (VARIABLES[i][0], fixed))
+                h_genie = f_genie.Get("h_%s_cv%s" % (var_name, fixed))
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
 
@@ -382,21 +339,22 @@ for i in to_plot:
 
         OBJECTS.append(h_mc_err_sys)
 
+        if DRAW_DATA:
+            if i == RECO_ENERGY:
+                ratio = histograms_bnb[i].Integral() / (h_mc_err_nobinning.Integral())
+
+                fix_binning(histograms_bnb[i])
+
         p_chi2 = ROOT.TPaveText(0.679, 0.604, 0.872, 0.715, "NDC")
         p_chi2.AddText("#chi^{2} prob. = %.2f" %
-                       histograms_bnb[i].Chi2Test(h_mc_err_nobinning, "UW"))
-        ks = histograms_bnb[i].KolmogorovTest(h_mc_err_nobinning)
+                       histograms_bnb[i].Chi2Test(h_mc_err_sys, "UW"))
+        ks = histograms_bnb[i].KolmogorovTest(h_mc_err_sys)
         p_chi2.AddText("K-S prob. = %.2f" % ks)
         p_chi2.SetTextAlign(11)
         if i == RECO_ENERGY:
             reco_chi2 = p_chi2
             h_reco_sys = h_mc_err_sys
         if DRAW_DATA:
-
-            if i == RECO_ENERGY:
-                ratio = histograms_bnb[i].Integral() / (h_mc_err_nobinning.Integral())
-                fix_binning(histograms_bnb[i])
-
             histograms_bnb[i].Draw("e1p same")
             p_chi2.Draw("same")
             p_chi2.SetFillStyle(0)
@@ -612,10 +570,13 @@ if DRAW_LEE and DRAW_POT and False:
     c_pot.Update()
     c_pot.SaveAs("plots/pots.pdf")
 
-DRAW_NORMALIZED = False
 if DRAW_NORMALIZED:
 
-    for i in range(len(VARIABLES)):
+    if plot:
+        to_plot = range(VARIABLE, VARIABLE+1)
+    else:
+        to_plot = range(len(VARIABLES))
+    for i in to_plot:
         c_norm = ROOT.TCanvas("c%i_norm" % i, "", 900, 44, 700, 645)
 
 
@@ -654,7 +615,7 @@ if DRAW_NORMALIZED:
         h_signal.SetMinimum(0.00001)
 
         l_norm = ROOT.TLegend(0.59, 0.73, 0.86, 0.82)
-        l_norm.AddEntry(h_signal, "#nu_{e} CC0#pi-Np", "f")
+        l_norm.AddEntry(h_signal, "Low-energy excess", "f")
         l_norm.AddEntry(h_neutrino_bkg, "Neutrino background", "f")
         l_norm.AddEntry(h_cosmic_bkg, "Cosmic background", "f")
         h_signal.Draw("hist")
@@ -668,15 +629,17 @@ if DRAW_NORMALIZED:
     # dqdx = chain.dqdx_bdt_max > 0.1  # and chain.dqdx_bdt > 0.1
     # corrected_energy = 0.55 < chain.total_shower_energy / \
 
-        if VARIABLES[i][0] == "dedx":
-            l1 = ROOT.TLine(1, 0, 1, max_hist)
+        if VARIABLES[i][0] == "shower_dqdx":
+            l1 = ROOT.TLine(1/3.85e-5, 0, 1/3.85e-5, max_hist)
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
-            l2 = ROOT.TLine(3.2, 0, 3.2, max_hist)
+            l2 = ROOT.TLine(3.2/3.85e-5, 0, 3.2/3.85e-5, max_hist)
             l2.SetLineStyle(2)
             l2.SetLineWidth(3)
             l1.Draw()
             l2.Draw()
+            print("Integral ", h_signal.Integral(
+                h_signal.FindBin(1.001/3.85e-5), h_signal.FindBin(3.19/3.85e-5)))
             OBJECTS.append(l1)
             OBJECTS.append(l2)
 
@@ -685,6 +648,7 @@ if DRAW_NORMALIZED:
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(0, h_signal.FindBin(4.99)))
             OBJECTS.append(l1)
 
         if VARIABLES[i][0] == "shower_distance":
@@ -692,6 +656,8 @@ if DRAW_NORMALIZED:
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            h_signal.FindBin(5)
+            print("Integral ", h_signal.Integral(0, h_signal.FindBin(4.99)))
             OBJECTS.append(l1)
 
         if VARIABLES[i][0] == "shower_open_angle":
@@ -703,6 +669,7 @@ if DRAW_NORMALIZED:
             l2.SetLineWidth(3)
             l1.Draw()
             l2.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(1.01), h_signal.FindBin(18.9)))
             OBJECTS.append(l1)
             OBJECTS.append(l2)
 
@@ -711,13 +678,15 @@ if DRAW_NORMALIZED:
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(-0.89), h_signal.FindBin(0.999)))
             OBJECTS.append(l1)
 
         if VARIABLES[i][0] == "total_hits_y":
-            l1 = ROOT.TLine(50, 0, 50, max_hist)
+            l1 = ROOT.TLine(100, 0, 100, max_hist)
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(101), h_signal.FindBin(10000)))
             OBJECTS.append(l1)
 
         if VARIABLES[i][0] == "shower_energy":
@@ -725,6 +694,7 @@ if DRAW_NORMALIZED:
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(0.051), h_signal.FindBin(1)))
             OBJECTS.append(l1)
 
         if VARIABLES[i][0] == "track_length":
@@ -732,14 +702,25 @@ if DRAW_NORMALIZED:
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(0), h_signal.FindBin(79)))
             OBJECTS.append(l1)
 
-
-        if VARIABLES[i][0] == "dqdx_bdt":
-            l1 = ROOT.TLine(0.1, 0, 0.1, max_hist)
+        if VARIABLES[i][0] == "track_pidchipr":
+            l1 = ROOT.TLine(80, 0, 80, max_hist)
             l1.SetLineStyle(2)
             l1.SetLineWidth(3)
             l1.Draw()
+            print("Integral ", h_signal.Integral(h_signal.FindBin(0), h_signal.FindBin(79)))
+
+            OBJECTS.append(l1)
+        if VARIABLES[i][0] == "shower_pidchipi":
+            l1 = ROOT.TLine(12, 0, 12, max_hist)
+            l1.SetLineStyle(2)
+            l1.SetLineWidth(3)
+            l1.Draw()
+            print("Integral ", h_signal.Integral(
+                h_signal.FindBin(12.1), h_signal.FindBin(200)))
+
             OBJECTS.append(l1)
 
         pt = ROOT.TPaveText(0.136, 0.906, 0.501, 0.953, "ndc")

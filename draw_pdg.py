@@ -73,12 +73,18 @@ if __name__ == "__main__":
                 h_mc_err_sys = h_tot_mc.Clone()
                 fname_flux = "plots/sys/h_%s_flux_sys.root" % v
                 fname_genie = "plots/sys/h_%s_genie_sys.root" % v
+                if v == "track_energy_length":
+                    fname_flux = fname_flux.replace("track", "total_track")
+                    fname_genie = fname_genie.replace("track", "total_track")
                 OBJECTS.append(h_mc_err_sys)
                 if DRAW_SYS and os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
+                    var_name = v
+                    if v == "track_energy_length":
+                        var_name = v.replace("track", "total_track")
                     f_flux = ROOT.TFile(fname_flux)
-                    h_flux = f_flux.Get("h_%s_cv" % v)
+                    h_flux = f_flux.Get("h_%s_cv" % var_name)
                     f_genie = ROOT.TFile(fname_genie)
-                    h_genie = f_genie.Get("h_%s_cv" % v)
+                    h_genie = f_genie.Get("h_%s_cv" % var_name)
 
                     OBJECTS.append(h_flux)
                     OBJECTS.append(h_genie)

@@ -61,7 +61,12 @@ pre_cuts = "total_shower_energy_cali > 0.01 && \
             track_theta > -999 && \
             track_pidchipr > -999 && \
             track_distance > -999 && \
-            shower_distance > -999 && \
+            shower_pidchimu > -999 && \
+            shower_pidchipr > -999 && \
+            shower_pidchipi > -999 && \
+            track_likelihood > -999 && \
+            track_dqdx > -999 && \
+            shower_dqdx > -999 && \
             track_likelihood > -999 && \
             numu_score == 0 && \
             track_hits > 5 && \

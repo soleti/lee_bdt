@@ -25,8 +25,8 @@ else:
 
 
 chain = ROOT.TChain("mc_tree")
-chain.Add("root_files/mc_file_sys.root")
-chain.Add("root_files/nue_file_sys.root")
+chain.Add("root_files/mc_file.root")
+chain.Add("root_files/nue_file.root")
 
 total_entries = int(chain.GetEntries() / 1)
 

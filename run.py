@@ -65,8 +65,8 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
     entries = int(chain.GetEntries() / 1)
     for i in range(entries):
 
-        printProgressBar(i, entries, prefix="Progress:",
-                         suffix="Complete", length=20)
+        # printProgressBar(i, entries, prefix="Progress:",
+        #                  suffix="Complete", length=20)
 
         chain.GetEntry(i)
         category = int(chain.category)
@@ -89,9 +89,14 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
         if apply_cuts(bdts, variables_dict):
             if not chain.true_nu_is_fidvol and category != 0 and category != 6 and category != 1 and category != 7:
                 category = 5
+            # if category == 3:
+            #     print(int(chain.run), int(chain.subrun), int(chain.event),
+            #           chain.shower_pidchimu[int(chain.shower_id)])
+                    #   chain.shower_dedx[int(chain.shower_id)])
             if option == "nue":
                 if category == 2 and chain.reco_energy < 3:
                     passed_events += chain.event_weight
+
             else:
                 passed_events += chain.event_weight
             corr = 1
@@ -113,7 +118,7 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
             for name, var in all:
                 for i, v in enumerate(var):
                     if v > -999:
-                        if "track" in name:
+                        if "track" in name and name != "no_tracks":
                             pdg_code = int(var_dict["track_pdg"][i])
                             if option != "bnbext" and abs(pdg_code) == 2147483648:
                                 pdg_code = int(var_dict["shower_pdg"][0])
@@ -185,11 +190,11 @@ histo_dict = dict(zip(variables_dict.keys(), kinds))
 h_bdt_types = {}
 h_bdt_stacks = {}
 for bdt_type in bdt_types:
-    h_bdt_stack = ROOT.THStack("h_bdt_%s" % bdt_type, ";BDT response; N. Entries / 0.05")
+    h_bdt_stack = ROOT.THStack("h_bdt_%s" % bdt_type, ";BDT response; N. Entries / 0.04")
     h_bdts = []
 
     for i, c in enumerate(categories):
-        h = ROOT.TH1F("h_bdt_%s_%s" % (bdt_type, c), "BDT response; N. Entries / 0.05", 80, -1, 1)
+        h = ROOT.TH1F("h_bdt_%s_%s" % (bdt_type, c), "BDT response; N. Entries / 0.04", 50, -1, 1)
         h.SetLineColor(1)
         h.SetFillColor(colors[i])
         if i != 0:
@@ -208,8 +213,8 @@ for bdt_type in bdt_types:
     h_bdt_stacks[bdt_type] = h_bdt_stack
     h_bdt_types[bdt_type] = h_bdts
 
-print("LEE events", fill_histos_data("lee"))
 print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue"))
+print("LEE events", fill_histos_data("lee"))
 print("Data events", fill_histos_data("bnb"))
 print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc"))
 print("EXT events", fill_histos(bnbext_chain, histo_dict, h_bdt_types, "bnbext"))
