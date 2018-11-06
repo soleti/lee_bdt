@@ -15,18 +15,22 @@ ELECTRON_THRESHOLD = 0.020
 MAX_N_TRACKS = 15
 MAX_N_SHOWERS = 15
 N_UNI = 100
-BDT, MANUAL = True, False
+BDT, MANUAL = False, True
 
 # Number to be obtained from Zarko's POT counting tool
 total_data_bnb_pot = 4.341e+19
 
-# bdt_nc_cut = 0.185
-# bdt_numu_cut = 0.20
-# bdt_cut_cosmic = 0.10
 
 bdt_nc_cut = 0.165
 bdt_numu_cut = 0.105
 bdt_cut_cosmic = 0.09
+# bdt_nc_cut = 0.185
+# bdt_numu_cut = 0.20
+# bdt_cut_cosmic = 0.10
+
+# bdt_nc_cut = 0.175
+# bdt_numu_cut = 0.19
+# bdt_cut_cosmic = 0.116
 
 bdt_cut_neutrino = 0.16
 rectangular_cut = 0.03
@@ -79,6 +83,19 @@ pdgs = [
 pdgs = collections.OrderedDict(pdgs)
 
 inv_pdgs = {v: k for k, v in pdgs.items()}
+
+
+def set_axis(histogram, y_max=0):
+    h = histogram.GetHistogram()
+    h.SetTitleSize(0.06)
+    h.SetTitleOffset(0.75)
+    histogram.SetHistogram(h)
+    histogram.SetMinimum(0.01)
+    if y_max != 0:
+        histogram.SetMaximum(y_max)
+    else:
+        histogram.SetMaximum(histogram.GetMaximum() * 1.3)
+    return h
 
 def draw_top(OBJECTS=[]):
     pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
@@ -530,9 +547,10 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False)
     nbins = len(sig_array)
 
     emtx = np.zeros((nbins, nbins))
-
+    matrix = ROOT.TMatrixD(len(h_signal)*2, len(h_signal)*2)
     for x in range(nbins):
         emtx[x][x] = bkg_array[x]
+        matrix[x][x] = bkg_array[x]
 
     if systematics:
         fname_flux = "plots/sys/h_cov_reco_energy_flux.root"
@@ -541,26 +559,37 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False)
         if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
             f_flux = ROOT.TFile(fname_flux)
             h_flux = f_flux.Get("h_cov_reco_energy")
-            fill_cov_matrix(emtx, h_flux)
-            f_flux.Close()
+            fill_cov_matrix(emtx, h_flux, scale_factor)
+            fill_cov_matrix(matrix, h_flux, scale_factor)
             f_genie = ROOT.TFile(fname_genie)
             h_genie = f_genie.Get("h_cov_reco_energy")
-            fill_cov_matrix(emtx, h_genie)
+            fill_cov_matrix(emtx, h_genie, scale_factor)
+            fill_cov_matrix(matrix, h_genie, scale_factor)
+            f_flux.Close()
             f_genie.Close()
         else:
             print("GENIE and FLUX covariance matrices not avaiable")
 
-    emtxinv = np.linalg.inv(emtx)
 
+    emtxinv = np.linalg.inv(emtx)
     chisq = float(sig_array.dot(emtxinv).dot(sig_array.T))
 
     #print "Sqrt of that (==sigma?) is ",np.sqrt(chisq)
     return np.sqrt(chisq)
 
-def fill_cov_matrix(matrix, histo):
-    for x_bin in range(2, histo.GetNbinsX()+1):
-        for y_bin in range(2, histo.GetNbinsY()+1):
-            matrix[x_bin - 2][y_bin - 2] += histo.GetBinContent(x_bin, y_bin)
+
+def fill_cov_matrix(matrix, histo, scale_factor=1):
+    for x_bin in range(1, histo.GetNbinsX()+1):
+        for y_bin in range(1, histo.GetNbinsY()+1):
+            matrix[x_bin - 1][y_bin - 1] += histo.GetBinContent(x_bin, y_bin)*(scale_factor**2)
+
+def save_histo_sbnfit(histo, name, scale_factor=1):
+    h_tosave = ROOT.TH1D(name, "", len(bins) - 1, bins)
+    for i_bin in range(1, histo.GetNbinsX()+1):
+        h_tosave.SetBinContent(i_bin, histo.GetBinContent(i_bin)*scale_factor)
+    return h_tosave
+
+
 
 total_pot = total_data_bnb_pot
 
@@ -963,7 +992,7 @@ labels = {
     "shower_pdg": "shower pdg",
     "shower_dedx_bdt": ";dE/dx BDT;",
     "shower_track_d": ";shower track d;",
-    "shower_angle": ";shower_angle;",
+    "shower_angle": ";Secondary shower/main shower angle [#circ];",
     "track_angle": ";track_angle;",
     "pi0_mass": ";pi0 mass;",
     "true_nu_is_fidvol": ";true_nu_is_fidvol;",

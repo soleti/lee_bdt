@@ -26,7 +26,7 @@ else:
 
 chain = ROOT.TChain("mc_tree")
 chain.Add("root_files/mc_file.root")
-chain.Add("root_files/nue_file.root")
+chain.Add("root_files/nue_file_sys.root")
 
 total_entries = int(chain.GetEntries() / 1)
 
@@ -43,13 +43,13 @@ for n, b in vars.items():
     h_uni = []
 
     for u in range(N_UNI):
-        if n == "reco_eneargy":
+        if n == "reco_energy":
             h_uni.append(ROOT.TH1F("h_%s_%i" % (n, u), labels[n], len(bins) - 1, bins))
         else:
             h_uni.append(ROOT.TH1F("h_%s_%i" % (n, u), labels[n], binning[n][0], binning[n][1], binning[n][2]))
 
     h_sys[n] = h_uni
-    if n == "reco_eneragy":
+    if n == "reco_energy":
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], len(bins) - 1, bins)
     else:
         h_cv[n] = ROOT.TH1F("h_%s_cv" % n, labels[n], binning[n][0], binning[n][1], binning[n][2])
@@ -89,6 +89,8 @@ for ievt in range(total_entries):
                             weight = chain.genie_weights[u]
                         elif MODE == "flux":
                             weight = chain.flux_weights[u]
+                        else:
+                            weight = chain.flux_weights[u] * chain.genie_weights[u]
                         if weight > 100:
                             weight = 1
                         h_sys[name][u].Fill(v, chain.event_weight * weight)
@@ -169,7 +171,7 @@ for n in h_sys:
     sys_err[n] = [0] * (h_cv[n].GetNbinsX() + 1)
 
     if n == "reco_energy":
-        fix_binning(h_cv[n])
+        # fix_binning(h_cv[n])
         h_cv[n] = fixed_width_histo(h_cv[n])
 
     for u in range(N_UNI):
@@ -177,17 +179,17 @@ for n in h_sys:
             continue
 
         if n == "reco_energy":
-            fix_binning(h_sys[n][u])
+            # fix_binning(h_sys[n][u])
             h_sys[n][u] = fixed_width_histo(h_sys[n][u])
 
-        for bin in range(1, h_sys[n][u].GetNbinsX() + 1):
-            value = h_sys[n][u].GetBinContent(bin)
-            center = h_sys[n][u].GetBinCenter(bin)
+        for i_bin in range(1, h_sys[n][u].GetNbinsX() + 1):
+            value = h_sys[n][u].GetBinContent(i_bin)
+            center = h_sys[n][u].GetBinCenter(i_bin)
 
-            diff = (h_cv[n].GetBinContent(bin) - h_sys[n][u].GetBinContent(bin))
+            diff = (h_cv[n].GetBinContent(i_bin) - h_sys[n][u].GetBinContent(i_bin))
 
             h_2d[n].Fill(center, value)
-            sys_err[n][bin] += diff**2
+            sys_err[n][i_bin] += diff**2
 
 
 
@@ -228,8 +230,8 @@ OBJECTS.append(pt)
 
 for v in SYS_VARIABLES:
 
-    for bin in range(1, h_cv[v].GetNbinsX() + 1):
-        h_cv[v].SetBinError(bin, math.sqrt(sys_err[v][bin] / N_UNI))
+    for i_bin in range(1, h_cv[v].GetNbinsX() + 1):
+        h_cv[v].SetBinError(i_bin, math.sqrt(sys_err[v][i_bin] / N_UNI))
 
     if v == "reco_energy":
         f_cov = ROOT.TFile("plots/sys/h_cov_reco_energy_%s.root" % MODE, "RECREATE")
@@ -259,7 +261,7 @@ for v in SYS_VARIABLES:
     c.Update()
 
     c_cov = ROOT.TCanvas("c_cov_%s" % v)
-    ROOT.gStyle.SetPaintTextFormat(".1f")
+    ROOT.gStyle.SetPaintTextFormat(".3f")
     h_covariance[v].Draw("colz text")
     h_covariance[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()

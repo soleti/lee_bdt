@@ -5,7 +5,7 @@ import os
 import sys
 import math
 import pickle
-from bdt_common import labels, binning, total_data_bnb_pot, pdg_colors, pdgs, inv_pdgs, draw_top, draw_ratio
+from bdt_common import labels, binning, total_data_bnb_pot, pdg_colors, pdgs, inv_pdgs, draw_top, draw_ratio, set_axis
 
 if len(sys.argv) > 1:
     plot = sys.argv[1]
@@ -68,6 +68,7 @@ if __name__ == "__main__":
             draw_top(OBJECTS)
 
             h_stack.Draw("hist")
+            set_axis(h_stack)
 
             if DRAW_SYS:
                 h_mc_err_sys = h_tot_mc.Clone()

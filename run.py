@@ -89,14 +89,11 @@ def fill_histos(chain, histo_dict, h_bdt_types, option=""):
         if apply_cuts(bdts, variables_dict):
             if not chain.true_nu_is_fidvol and category != 0 and category != 6 and category != 1 and category != 7:
                 category = 5
-            # if category == 3:
-            #     print(int(chain.run), int(chain.subrun), int(chain.event),
-            #           chain.shower_pidchimu[int(chain.shower_id)])
-                    #   chain.shower_dedx[int(chain.shower_id)])
+            # if category == 4:
+            #     print(int(chain.run), int(chain.subrun), int(chain.event))
             if option == "nue":
                 if category == 2 and chain.reco_energy < 3:
                     passed_events += chain.event_weight
-
             else:
                 passed_events += chain.event_weight
             corr = 1
@@ -215,8 +212,8 @@ for bdt_type in bdt_types:
 
 print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue"))
 print("LEE events", fill_histos_data("lee"))
-print("Data events", fill_histos_data("bnb"))
 print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc"))
+print("Data events", fill_histos_data("bnb"))
 print("EXT events", fill_histos(bnbext_chain, histo_dict, h_bdt_types, "bnbext"))
 
 h_interactions = ROOT.THStack(

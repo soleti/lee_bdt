@@ -225,10 +225,15 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     variables["event_weight"][0] = weight
 
     if option == "nue":
-        if root_chain.cosmic_fraction > 0.5 and root_chain.category == 7:
+        if root_chain.cosmic_fraction < 0.5 and root_chain.category == 7:
             variables["category"][0] = 2
 
-    # variables["pt"][0] = pt_plot(root_chain, 2)
+    if option == "lee":
+        if root_chain.cosmic_fraction < 0.5 and root_chain.category == 7:
+            variables["category"][0] = 10
+
+
+    variables["pt"][0] = pt_plot(root_chain, 2)
     variables["event"][0] = root_chain.event
     variables["run"][0] = root_chain.run
     variables["subrun"][0] = root_chain.subrun
@@ -653,11 +658,11 @@ if __name__ == "__main__":
 
     samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue_sys/*.root"),
-                  glob("data_files/mc_bnb_showers/*/*.root"),
-                  glob("data_files/data_bnb_showers/*/*.root"),
-                  glob("data_files/data_ext_showers/*/*.root"),
-                  glob("data_files/mc_nue_sys/*8.root"), ]
+    tree_files = [glob("data_files/mc_nue/*.root"),
+                  glob("data_files/mc_bnb/*/*.root"),
+                  glob("data_files/data_bnb/*/*.root"),
+                  glob("data_files/data_ext/*/*.root"),
+                  glob("data_files/mc_nue/*8.root"), ]
 
     chains = []
     chains_pot = []

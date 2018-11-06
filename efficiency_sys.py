@@ -17,14 +17,12 @@ ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
 # glob("mc_nue_ubxsec/*.root")
-nue_cosmic = glob("data_files/mc_nue_sys/*.root")
+nue_cosmic = glob("data_files/mc_nue/*.root")
 chain_nue = ROOT.TChain("robertoana/pandoratree")
-chain_filter = ROOT.TChain("nueFilter/filtertree")
 chain_pot = ROOT.TChain("nueFilter/pot")
 
 for f in nue_cosmic:
     chain_nue.Add(f)
-    chain_filter.Add(f)
     chain_pot.Add(f)
 
 total_pot = 0
@@ -141,7 +139,6 @@ for i_evt in range(entries):
     # if not eNp: print(electrons, photons, protons, pions)
 
     if is_fiducial(true_neutrino_vertex) and eNp and chain_nue.ccnc == 0:
-        chain_filter.GetEntry(i_evt)
 
         flux_weights = [1]*len(chain_nue.flux_weights[0])
         for fl in chain_nue.flux_weights:

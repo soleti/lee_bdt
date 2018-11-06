@@ -10,7 +10,7 @@ import sys
 
 from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, labels
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, BDT, MANUAL
-from bdt_common import draw_ratio, draw_top
+from bdt_common import draw_ratio, draw_top, save_histo_sbnfit, set_axis
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
@@ -21,7 +21,7 @@ else:
     plot = ""
 
 SYS_ERR = 0.1
-DRAW_NORMALIZED = True
+DRAW_NORMALIZED = False
 DRAW_POT = True
 DRAW_SUBTRACTION = False
 DRAW_LEE = True
@@ -51,16 +51,6 @@ else:
     POST_SCALING = 1#6.6e20 / total_data_bnb_pot
 
 total_pot *= POST_SCALING
-
-
-def set_axis(histogram, y_max=0):
-    histogram.GetYaxis().SetTitleSize(0.06)
-    histogram.GetYaxis().SetTitleOffset(0.75)
-    histogram.SetMinimum(0.01)
-    if y_max != 0:
-        histogram.SetMaximum(y_max)
-    else:
-        histogram.SetMaximum(histogram.GetMaximum() * 1.3)
 
 legends = []
 l_errs = []
@@ -123,39 +113,23 @@ for h in histograms_mc:
     h.GetHists()[0].SetFillStyle(3004)
 
 
-# if DRAW_SUBTRACTION:
-#     for h_bnb, h_ext, leg in zip(histograms_bnb, histograms_bnbext, legends):
-#         for i in range(1, h_bnb.GetNbinsX() + 1):
-#             bnb = h_bnb.GetBinContent(i)
-#             ext = h_ext.GetBinContent(i)
+if DRAW_SUBTRACTION:
+    for h_bnb, h_ext, leg in zip(histograms_bnb, histograms_bnbext, legends):
+        for i in range(1, h_bnb.GetNbinsX() + 1):
+            bnb = h_bnb.GetBinContent(i)
+            ext = h_ext.GetBinContent(i)
 
-#             h_bnb.SetBinContent(i, bnb - ext)
-#             if bnb > 0:
-#                 err1 = h_bnb.GetBinError(i)
-#                 err2 = h_ext.GetBinError(i)
-#                 h_bnb.SetBinError(i, math.sqrt(err1**2 + err2**2))
+            h_bnb.SetBinContent(i, bnb - ext)
+            if bnb > 0:
+                err1 = h_bnb.GetBinError(i)
+                err2 = h_ext.GetBinError(i)
+                h_bnb.SetBinError(i, math.sqrt(err1**2 + err2**2))
 
-#         leg.AddEntry(
-#             h_bnb,
-#             "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING),
-#             "lep")
+        leg.AddEntry(
+            h_bnb,
+            "Data BNB - BNB EXT: {:.0f} events".format(h_bnb.Integral() * POST_SCALING),
+            "lep")
 
-
-h_lee = ROOT.TH1F("h_lee", "", len(bins) - 1, bins)
-
-scaling = [6.0920944819073988, 3.6447414342239273, 3.2123920194399913,
-           2.6504659907742409, 3.2558450032216988, 2.5826310533377432,
-           2, 1, 1, 1]
-
-h_lee.SetFillColor(ROOT.kGreen - 10)
-# h_lee.SetFillStyle(3001)
-h_lee.SetLineWidth(0)
-for i, scale in enumerate(scaling):
-    if scaling[i] - 1 > 0:
-        h_lee.SetBinContent(i + 1, histograms_mc[RECO_ENERGY].GetHists()[-1].
-                            GetBinContent(i + 1) * (scale - 1))
-
-# histograms_lee[RECO_ENERGY] = h_lee
 
 if DRAW_LEE:
     legends[RECO_ENERGY].AddEntry(histograms_lee[RECO_ENERGY],
@@ -215,39 +189,42 @@ for i in to_plot:
             print("Purity", h_sig.Integral()/h_mc_err_nobinning.Integral())
 
         if DRAW_LEE:
-
-            # histograms_lee[i].Scale(1.5)
             if i == RECO_ENERGY:
-                if DRAW_POT:
-                    sig = []
-                    bkg = []
-                    nu_e = []
-                    for i_bin in range(1, histograms_lee[i].GetNbinsX()+1):
-                        sig.append(histograms_lee[i].GetBinContent(i_bin))
-                        bkg.append(h_mc_err_nobinning.GetBinContent(i_bin))
-                        nu_e.append(h_sig.GetBinContent(i_bin))
-                    sig = np.array(sig)
-                    bkg = np.array(bkg)
-                    nu_e = np.array(nu_e)
+                sig = []
+                bkg = []
+                nu_e = []
+                for i_bin in range(1, histograms_lee[i].GetNbinsX()+1):
+                    sig.append(histograms_lee[i].GetBinContent(i_bin))
+                    bkg.append(h_mc_err_nobinning.GetBinContent(i_bin))
+                    nu_e.append(h_sig.GetBinContent(i_bin))
+                sig = np.array(sig)
+                bkg = np.array(bkg)
+                nu_e = np.array(nu_e)
+                print("Significance @ 4.4e19 POT stat: ", sigma_calc_matrix(sig, bkg, 1, False))
+                print("Significance @ 1.3e20 POT stat: ", sigma_calc_matrix(sig, bkg, 30.4, False))
+                print("Significance @ 1.3e20 POT sys: ", sigma_calc_matrix(sig, bkg, 30.4, True))
 
-                    print("Significance: ", sigma_calc_matrix(sig[1:], bkg[1:], 30.4, True))
-                    h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
-                    for eff in range(10, 50):
-                        for red in range(10, 50):
-                            bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
-                            sig_new = sig*eff/10
-                            if eff == 23 and red == 18:
-                                print("Sigma", sigma_calc_matrix(sig_new[1:], bkg_new[1:], 30.4, True))
-                            h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new[1:], bkg_new[1:], 30.4, True))
+                # h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
+                # for eff in range(10, 50):
+                #     for red in range(10, 50):
+                #         bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
+                #         sig_new = sig*eff/10
+                #         if eff == 23 and red == 18:
+                #             print("Sigma", sigma_calc_matrix(sig_new, bkg_new, 30.4, True))
+                #         h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, True))
+                # OBJECTS.append(h_eff_red)
 
-                    OBJECTS.append(h_eff_red)
-                    c_eff_red = ROOT.TCanvas("c_eff_red")
-                    h_eff_red.Draw("colz")
-                    h_eff_red.GetZaxis().SetRangeUser(0.9,7)
-                    c_eff_red.Update()
-                    c_eff_red.SaveAs("plots/h_2d.pdf")
-                    OBJECTS.append(c_eff_red)
+                # c_eff_red = ROOT.TCanvas("c_eff_red")
+                # h_eff_red.Draw("colz")
+                # h_eff_red.GetZaxis().SetRangeUser(0.9,7)
+                # c_eff_red.Update()
+                # c_eff_red.SaveAs("plots/h_2d.pdf")
+                # OBJECTS.append(c_eff_red)
 
+                f = ROOT.TFile("root_files/sbnfit.root", "RECREATE")
+                save_histo_sbnfit(histograms_lee[i], "nu_uBooNE_nue_leesignal", 30.4).Write()
+                save_histo_sbnfit(h_mc_err_nobinning, "nu_uBooNE_nue_intrinsic", 30.4).Write()
+                f.Close()
                 fix_binning(histograms_lee[i])
             # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
             # histograms_mc[i].RecursiveRemove(histograms_mc[i].GetHists()[0])
@@ -320,6 +297,9 @@ for i in to_plot:
                 h_flux = f_flux.Get("h_%s_cv%s" % (var_name, fixed))
                 f_genie = ROOT.TFile(fname_genie)
                 h_genie = f_genie.Get("h_%s_cv%s" % (var_name, fixed))
+                if i == RECO_ENERGY:
+                    fix_binning(h_flux)
+                    fix_binning(h_genie)
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
 
@@ -368,8 +348,8 @@ for i in to_plot:
         # histograms_mc[i].GetHists()[-1].Draw("hist")
 
         if DRAW_DATA and h_mc_err_sys.Integral() > 0:
-            if i == RECO_ENERGY:
-                print("Data/(MC+EXT) ratio: ", ratio)
+            # if i == RECO_ENERGY:
+            #     print("Data/(MC+EXT) ratio: ", ratio)
             if not (BDT or MANUAL):
                 draw_ratio(histograms_bnb[i], h_mc_err, h_mc_err_sys, OBJECTS)
         c.Update()
@@ -458,7 +438,7 @@ if not plot or plot == "reco_energy":
         p_datamc.SetFillStyle(0)
         p_datamc.SetShadowColor(0)
         p_datamc.SetBorderSize(0)
-        p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
+        # p_datamc.AddText("Data / (MC + EXT) = %.2f" % ratio)
         # p_datamc.Draw()
 
     legends[RECO_ENERGY].Draw()
@@ -578,7 +558,6 @@ if DRAW_NORMALIZED:
         to_plot = range(len(VARIABLES))
     for i in to_plot:
         c_norm = ROOT.TCanvas("c%i_norm" % i, "", 900, 44, 700, 645)
-
 
         h_signal = histograms_lee[i]
         if h_signal.Integral() <= 0:
