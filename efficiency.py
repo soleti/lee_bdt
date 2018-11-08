@@ -39,6 +39,29 @@ class Efficiency:
         return teff
 
 
+def stacked(eff, h_stack, colors):
+    h_cats = []
+    leg = ROOT.TLegend(0.1, 0.79, 0.9, 0.91)
+
+    for cat in eff.selected:
+        h_cat = eff.selected[cat].Clone()
+        e = eff.efficiency[cat]
+        h_cat.Divide(eff.tot)
+        if colors:
+            h_cat.SetFillColor(ROOT.TColor.GetColor(colors[cat]))
+        h_cat.SetLineColor(ROOT.TColor.GetColor("#555555"))
+        h_cat.SetLineWidth(1)
+        if cat == "passed":
+            h_cat.SetLineWidth(3)
+            h_cat.SetLineColor(ROOT.TColor.GetColor(1))
+            h_cat.SetFillColor(ROOT.TColor.GetColor(0))
+        h_cats.append(h_cat)
+        leg.AddEntry(h_cat, "%s: %.1f%%" % (h_cat.GetName(), e*100), "f")
+        h_stack.Add(h_cat)
+
+    return h_cats, leg
+
+
 def check_reco_fidvol(chain_nue):
     track_fidvol = True
 
@@ -124,44 +147,23 @@ def check_cc0pinp(chain_nue):
     return electrons == 1 and pions == 0 and protons >= 1 and photons == 0 and chain_nue.ccnc == 0
 
 
-def draw_eff(efficiencies, var, name, descriptions, colors):
-    c_eff = ROOT.TCanvas("c_eff_%s_%s" % (var, name))
-    c_eff.SetTopMargin(0.18)
+def lepton_angles(chain_filter):
+    theta, phi = -999, -999
 
-    leg = ROOT.TLegend(0.097, 0.844, 0.897, 0.958)
-    leg.SetNColumns(2)
-    plots = []
+    for i, pdg in enumerate(chain_filter.nu_daughters_pdg):
+        if pdg == 11:
+            px = chain_filter.nu_daughters_p[i][0]
+            py = chain_filter.nu_daughters_p[i][1]
+            pz = chain_filter.nu_daughters_p[i][2]
+            theta = math.degrees(math.acos(pz/math.sqrt(px**2+py**2+pz**2)))
+            phi = math.degrees(math.atan2(py,px))
+            break
 
-    for i, e in enumerate(efficiencies):
-        teff = efficiencies[e].tefficiency(name)
-        teff.SetLineColor(colors[i])
-        teff.SetMarkerStyle(0)
-        teff.SetLineWidth(2)
-        value = efficiencies[e].efficiency[name]*100
-        err = efficiencies[e].efficiency_err[name]*100
+    return theta, phi
 
-        plots.append(teff)
 
-        if i == 0:
-            teff.Draw("AP")
-        else:
-            teff.Draw("P SAME")
-        c_eff.Draw()
-
-        leg.AddEntry(teff,
-                     "%s: (%.1f #pm %.1f) %%" % (descriptions[i], value, err),
-                     "le")
-        teff.GetPaintedGraph().SetMinimum(0)
-        teff.GetPaintedGraph().SetMaximum(1)
-
-    c_eff.Draw()
-
-    leg.Draw()
-    ROOT.gPad.Update()
-    return c_eff, plots, leg
-
-def efficiency(files_path, name, effs=["nu_E"]):
-    nue_cosmic = glob(files_path+"/newfilter/*.root")
+def efficiency(files_path, eff_variables=[], scale=1):
+    nue_cosmic = glob(files_path+"/*.root")
     chain_nue = ROOT.TChain("robertoana/pandoratree")
     chain_filter = ROOT.TChain("nueFilter/filtertree")
     chain_pot = ROOT.TChain("nueFilter/pot")
@@ -172,7 +174,6 @@ def efficiency(files_path, name, effs=["nu_E"]):
         chain_nue.Add(f)
         chain_pot.Add(f)
 
-    scale = 10
     entries = int(chain_filter.GetEntries() / scale)
     pot_entries = int(chain_pot.GetEntries() / scale)
 
@@ -181,55 +182,34 @@ def efficiency(files_path, name, effs=["nu_E"]):
         chain_pot.GetEntry(i)
         total_pot += chain_pot.pot
 
-    print("Sample %s" % name)
     print("Entries", pot_entries)
-    print("Total pot", total_pot)
+    print("%.2e POT" % total_pot)
+
+    categories = ["passed", "quality cuts", "CC #nu_{#mu} selected", "not contained",
+                  "cosmic selected", "1 shower",  "no showers",  "no flash", "no data products"]
 
     h_tot = {}
+
+    for v in eff_variables:
+        h_tot[v] = ROOT.TH1F("h_tot_%s" % v,
+                             labels[v],
+                             binning[v][0],
+                             binning[v][1],
+                             binning[v][2])
+
     h_selected = {}
-    h_selected_numu = {}
-    h_selected_precuts = {}
-    h_selected_cuts = {}
-    h_selected_bdt = {}
-    h_selected_contained = {}
+    for v in eff_variables:
+        h_sel = {}
+        for c in categories:
+            h_sel[c] = ROOT.TH1F("%s" % c,
+                                 labels[v],
+                                 binning[v][0],
+                                 binning[v][1],
+                                 binning[v][2])
+        h_selected[v] = h_sel
 
-    for variable in effs:
-        h_tot[variable] = ROOT.TH1F("h_tot_%s_%s" % (variable, name),
-                                    ";%s;Efficiency" % labels[variable].split(";")[1],
-                                    binning[variable][0],
-                                    binning[variable][1],
-                                    binning[variable][2])
-        h_selected[variable] = ROOT.TH1F("h_selected_%s_%s" % (variable, name),
-                                         ";%s;Efficiency" % labels[variable].split(";")[1],
-                                         binning[variable][0],
-                                         binning[variable][1],
-                                         binning[variable][2])
-        h_selected_numu[variable] = ROOT.TH1F("h_selected_numu_%s_%s" % (variable, name),
-                                              ";%s;Efficiency" % labels[variable].split(";")[1],
-                                              binning[variable][0],
-                                              binning[variable][1],
-                                              binning[variable][2])
-        h_selected_precuts[variable] = ROOT.TH1F("h_selected_precuts_%s_%s" % (variable, name),
-                                                 ";#%s;Efficiency" % labels[variable].split(";")[1],
-                                                 binning[variable][0],
-                                                 binning[variable][1],
-                                                 binning[variable][2])
-        h_selected_contained[variable] = ROOT.TH1F("h_selected_contained_%s_%s" % (variable, name),
-                                                   ";#%s;Efficiency" % labels[variable].split(";")[1],
-                                                   binning[variable][0],
-                                                   binning[variable][1],
-                                                   binning[variable][2])
-        h_selected_cuts[variable] = ROOT.TH1F("h_selected_cuts_%s_%s" % (variable, name),
-                                              ";%s;Efficiency" % labels[variable].split(";")[1],
-                                              binning[variable][0],
-                                              binning[variable][1],
-                                              binning[variable][2])
-        h_selected_bdt[variable] = ROOT.TH1F("h_selected_bdt_%s_%s" % (variable, name),
-                                             ";%s;Efficiency" % labels[variable].split(";")[1],
-                                             binning[variable][0],
-                                             binning[variable][1],
-                                             binning[variable][2])
-
+    i_nue = -1
+    eff_vars = {}
     var_dict = dict(variables + spectators)
     ROOT.TMVA.Tools.Instance()
     reader = ROOT.TMVA.Reader(":".join([
@@ -238,12 +218,9 @@ def efficiency(files_path, name, effs=["nu_E"]):
         "Color"]))
     load_bdt(reader)
 
-    vars = {}
-
-    i_nue = -1
     for i_evt in range(entries):
         printProgressBar(i_evt, entries, prefix="Progress:",
-                        suffix="Complete", length=20)
+                         suffix="Complete", length=20)
         chain_filter.GetEntry(i_evt)
 
         eNp = check_cc0pinp(chain_filter)
@@ -251,9 +228,6 @@ def efficiency(files_path, name, effs=["nu_E"]):
         true_neutrino_vertex = [chain_filter.true_vx_sce,
                                 chain_filter.true_vy_sce,
                                 chain_filter.true_vz_sce]
-        true_neutrino_vertex_nosce = [chain_filter.true_vx,
-                                      chain_filter.true_vy,
-                                      chain_filter.true_vz]
 
         if chain_filter.passed:
             i_nue += 1
@@ -261,92 +235,68 @@ def efficiency(files_path, name, effs=["nu_E"]):
         if not (is_fiducial(true_neutrino_vertex) and eNp):
             continue
 
-        for i, pdg in enumerate(chain_filter.nu_daughters_pdg):
-            if pdg == 11:
-                px = chain_filter.nu_daughters_end_v[i][0] - chain_filter.nu_daughters_start_v[i][0]
-                py = chain_filter.nu_daughters_end_v[i][1] - chain_filter.nu_daughters_start_v[i][1]
-                pz = chain_filter.nu_daughters_end_v[i][2] - chain_filter.nu_daughters_start_v[i][2]
-                theta = math.degrees(math.acos(pz/math.sqrt(px**2+py**2+pz**2)))
-                phi = math.degrees(math.atan(py/px))
-                break
+        eff_vars["energy"] = chain_filter.nu_energy
+        eff_vars["theta"], eff_vars["phi"] = lepton_angles(chain_filter)
 
-        vars["nu_E"] = chain_filter.nu_energy
-        vars["theta"] = theta
-        vars["phi"] = phi
-
-        flux_weights = [1]#[1]*len(chain_nue.flux_weights[0])
+        flux_weights = [1]  # [1]*len(chain_nue.flux_weights[0])
         # for fl in chain_nue.flux_weights:
         #     flux_weights = [a*b for a, b in zip(flux_weights, fl)]
+        weight = chain_filter.bnbweight
+        for v in eff_variables:
+            h_tot[v].Fill(eff_vars[v], weight)
 
-        for v in effs:
-            weight = chain_filter.bnbweight
-            h_tot[v].Fill(vars[v], weight)
+            if not chain_filter.passed:
+                if chain_filter.selection_result == 2:
+                    h_selected[v]["no showers"].Fill(eff_vars[v], weight)
+                if chain_filter.selection_result == 4:
+                    h_selected[v]["no flash"].Fill(eff_vars[v], weight)
+                if chain_filter.selection_result == 5:
+                    h_selected[v]["no data products"].Fill(eff_vars[v], weight)
+                continue
 
-        if not chain_filter.passed:
-            continue
+            chain_nue.GetEntry(i_nue)
+            contaminated = chain_nue.cosmic_fraction < 0.5 and chain_nue.category == 7
+            selected = (chain_nue.category == 2 or contaminated) and chain_nue.passed == 1
+            if not selected:
+                h_selected[v]["cosmic selected"].Fill(eff_vars[v], weight)
+                continue
 
-        chain_nue.GetEntry(i_nue)
-        contaminated = chain_nue.cosmic_fraction < 0.5 and chain_nue.category == 7
-        selected = (chain_nue.category == 2 or contaminated) and chain_nue.passed == 1
-        if not selected:
-            continue
+            # If there are no tracks we require at least two showers
+            showers_2_tracks_0 = True
+            if chain_nue.n_tracks == 0 and chain_nue.n_showers == 1:
+                showers_2_tracks_0 = False
 
-        # If there are no tracks we require at least two showers
-        showers_2_tracks_0 = True
-        if chain_nue.n_tracks == 0 and chain_nue.n_showers == 1:
-            showers_2_tracks_0 = False
-        if not showers_2_tracks_0:
-            continue
+            if not showers_2_tracks_0:
+                h_selected[v]["1 shower"].Fill(eff_vars[v], weight)
+                continue
 
-        for v in effs:
-            weight = chain_nue.bnbweight
-            h_selected[v].Fill(vars[v], weight)
+            if chain_nue.numu_passed == 1:
+                h_selected[v]["CC #nu_{#mu} selected"].Fill(eff_vars[v], weight)
+                continue
 
-        fill_kin_branches(chain_nue, 1, var_dict, "nue", False)
+            if not check_reco_fidvol(chain_nue):
+                h_selected[v]["not contained"].Fill(eff_vars[v], weight)
+                continue
 
-        # if not int(var_dict["numu_score"][0]) == 0:
-        #     continue
+            fill_kin_branches(chain_nue, 1, var_dict, "nue", False)
 
-        for v in effs:
-            for u in range(N_UNI):
-                weight = chain_nue.bnbweight
-                h_selected_numu[v].Fill(vars[v], weight)
+            if not pre_cuts(var_dict):
+                h_selected[v]["quality cuts"].Fill(eff_vars[v], weight)
+                continue
 
-        if not check_reco_fidvol(chain_nue):
-            continue
+            h_selected[v]["passed"].Fill(eff_vars[v], weight)
 
-        for v in effs:
-            for u in range(N_UNI):
-                # * chain_nue.genie_weights[0][u] * chain_nue.bnbweight
-                weight = chain_nue.bnbweight
-                h_selected_contained[v].Fill(vars[v], weight)
+            # bdt_values = {}
+            # for bdt_name in BDT_TYPES:
+            #     bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
-        if not pre_cuts(var_dict):
-            continue
-
-        bdt_values = {}
-        for bdt_name in BDT_TYPES:
-            bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
-
-        for v in effs:
-            weight = chain_nue.bnbweight
-            h_selected_precuts[v].Fill(vars[v], weight)
-            if apply_cuts(bdt_values, var_dict, bdt=False, manual=True):
-                h_selected_cuts[v].Fill(vars[v], weight)
-            if apply_cuts(bdt_values, var_dict, bdt=True, manual=False):
-                h_selected_bdt[v].Fill(vars[v], weight)
+        #     if apply_cuts(bdt_values, var_dict, bdt=False, manual=True):
+        #         h_selected["cuts"].Fill(eff_vars[v], weight)
+        #     if apply_cuts(bdt_values, var_dict, bdt=True, manual=False):
+        #         h_selected["bdt"].Fill(eff_vars[v], weight)
 
     eff_objects = {}
-
-    for v in effs:
-        selected = {"topology": h_selected[v],
-                    "precuts": h_selected_precuts[v],
-                    "cuts": h_selected_cuts[v],
-                    "bdt": h_selected_bdt[v],
-                    "contained": h_selected_contained[v]}
-        eff_objects[v] = (Efficiency(h_tot[v], selected, variable, total_pot))
-
-
-    print()
-    print("Integral", h_tot["nu_E"].Integral())
+    for v in eff_variables:
+        eff_objects[v] = Efficiency(h_tot[v], h_selected[v], v, total_pot)
     return eff_objects
+
