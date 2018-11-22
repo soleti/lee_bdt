@@ -3,11 +3,13 @@
 from ROOT import TChain, TTree, TFile, TVector3, TMVA
 from glob import glob
 from array import array
+from tqdm import tqdm
 import math
-from bdt_common import total_pot, variables, spectators, choose_shower, printProgressBar
+from bdt_common import total_pot, variables, spectators, choose_shower
 from bdt_common import is_active, is_fiducial, distance
 from bdt_common import ELECTRON_MASS, PROTON_MASS, MAX_N_SHOWERS, MAX_N_TRACKS, N_UNI
 from bdt_common import PROTON_THRESHOLD, ELECTRON_THRESHOLD
+
 from proton_energy import length2energy
 import time
 import statistics
@@ -36,6 +38,60 @@ reader_reclass.AddVariable("n_hits", n_hits)
 reader_reclass.BookMVA("shower_ntuple BDT",
                        "dataset/weights/TMVAClassification_shower_ntuple BDT.weights.xml")
 
+
+def check_cc0pinp(chain_nue):
+    """Checks if the event is a contained electron neutrino
+    CC0π-Np interaction
+
+    Args:
+        chain_nue: ROOT TChain of the events
+
+    Returns:
+        True if the event is a contained CC0π-Np interaction
+    """
+    protons = 0
+    electrons = 0
+    photons = 0
+    pions = 0
+    electron_energy = 0
+    proton_energy = 0
+
+    for i, energy in enumerate(chain_nue.nu_daughters_E):
+        vertex = [chain_nue.nu_daughters_vx[i],
+                    chain_nue.nu_daughters_vy[i],
+                    chain_nue.nu_daughters_vz[i]]
+
+        end = [chain_nue.nu_daughters_endx[i],
+                chain_nue.nu_daughters_endy[i],
+                chain_nue.nu_daughters_endz[i]]
+
+        if chain_nue.nu_daughters_pdg[i] == 2212:
+            if energy - PROTON_MASS > PROTON_THRESHOLD and is_fiducial(vertex) and is_fiducial(end):
+                protons += 1
+                proton_energy += energy - PROTON_MASS
+
+        if chain_nue.nu_daughters_pdg[i] == 11:
+            if energy - ELECTRON_MASS > ELECTRON_THRESHOLD and is_fiducial(vertex):
+                electron_energy += energy - ELECTRON_MASS
+                electrons += 1
+
+        if chain_nue.nu_daughters_pdg[i] == 22:
+            if energy > ELECTRON_THRESHOLD and is_fiducial(vertex):
+                photons += 1
+
+        if chain_nue.nu_daughters_pdg[i] == 111:
+            if energy - 0.135 > ELECTRON_THRESHOLD and is_fiducial(vertex):
+                pions += 1
+
+        if abs(chain_nue.nu_daughters_pdg[i]) == 211:
+            if energy - 0.140 > PROTON_THRESHOLD and is_fiducial(vertex) and is_fiducial(end):
+                pions += 1
+
+    is_CC0piNp = electrons == 1 and pions == 0 and protons >= 1 and photons == 0
+    if is_CC0piNp:
+        return (proton_energy, electron_energy)
+
+    return False
 
 def shower_score(v_angle, v_pca, v_res, v_open_angle, v_n_hits, v_ratio):
     if v_angle > 0 and v_pca > 0 and v_res > 0 and v_open_angle > 0 and v_n_hits > 0 and v_ratio > 0:
@@ -228,6 +284,10 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
         if root_chain.cosmic_fraction < 0.5 and root_chain.category == 7:
             variables["category"][0] = 2
 
+    if option == "nue_cc":
+        if root_chain.cosmic_fraction < 0.5 and root_chain.category == 7 and root_chain.ccnc == 0:
+            variables["category"][0] = 8
+
     if option == "lee":
         if root_chain.cosmic_fraction < 0.5 and root_chain.category == 7:
             variables["category"][0] = 10
@@ -330,6 +390,12 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
                              ratio)
         shower_end = [s+d*length for s, d in zip(shower_v, v_sh)]
 
+        ll = -999
+        if check_conversion:
+            mip_likelihood = root_chain.track_bragg_mip[n_tr + i_sh]
+            p_likelihood = root_chain.track_bragg_p[n_tr + i_sh]
+            if p_likelihood > 1e-32:
+                ll = math.log(mip_likelihood/p_likelihood)
 
         if (i_sh == track_like_shower_id or score > 0) and i_sh != shower_id:
             variables["n_tracks"][0] += 1
@@ -511,8 +577,12 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     variables["total_shower_energy"][0] = total_shower_energy
     variables["total_shower_energy_cali"][0] = total_shower_energy_cali
     variables["total_track_energy_length"][0] = total_track_energy_length
-    variables["reco_energy"][0] = ((total_shower_energy_cali + 9.85322e-03) / 7.82554e-01) + total_track_energy_length
+    # print(root_chain.reconstructed_neutrino_energy, (total_shower_energy_cali + 3.33417e-02) / 7.70732e-01 + total_track_energy_length)
+    variables["reco_energy"][0] = ((total_shower_energy_cali + 3.33417e-02) / 7.70732e-01 + total_track_energy_length + 2.85112e-02)/9.80163e-01
     variables["numu_score"][0] = root_chain.numu_passed
+
+    if root_chain.ccnc == 1 and variables["category"][0] not in (0, 1, 5, 7):
+        variables["category"][0] = 4
 
 
 def pt_plot(root_chain, plane):
@@ -562,10 +632,9 @@ def pt_plot(root_chain, plane):
 def fill_tree(chain, weight, tree, option=""):
     total_events = 0
     total_entries = int(chain.GetEntries() / 1)
-
-    for ievt in range(total_entries):
+    print("Events", total_entries)
+    for ievt in tqdm(range(total_entries)):
         chain.GetEntry(ievt)
-        printProgressBar(ievt, total_entries, prefix="Progress:", suffix="Complete", length=20)
 
         if not chain.passed:
             continue
@@ -638,8 +707,8 @@ def fill_tree(chain, weight, tree, option=""):
 
         total_events += event_weight
 
-        if "nue" in option and chain.category == 2:
-            if 2212 not in chain.nu_daughters_pdg or abs(111) in chain.nu_daughters_pdg or abs(211) in chain.nu_daughters_pdg:
+        if "nue" in option and (chain.category == 2 or chain.category == 7 or chain.category == 8):
+            if not check_cc0pinp(chain):
                 option = "nue_cc"
             else:
                 option = "nue"
@@ -656,13 +725,14 @@ if __name__ == "__main__":
     # To be obtained with Zarko's POT tool
     data_ext_scaling_factor = 0.1327933846  # Sample with remapped PMTs
 
-    samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
+    samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue/*.root"),
+    tree_files = [glob("data_files/mc_nue_sbnfit/*.root"),
                   glob("data_files/mc_bnb/*/*.root"),
+                  glob("data_files/dirt/*.root"),
                   glob("data_files/data_bnb/*/*.root"),
                   glob("data_files/data_ext/*/*.root"),
-                  glob("data_files/mc_nue/*8.root"), ]
+                  glob("data_files/mc_nue/*.root"), ]
 
     chains = []
     chains_pot = []
@@ -694,6 +764,7 @@ if __name__ == "__main__":
 
     weights = [total_pot / pots_dict["nue"] * 1.028, # Position of the detector is slightly wrong
                total_pot / pots_dict["bnb"] * 1.028,
+               total_pot / pots_dict["dirt"] * 1.028 * 0.5,
                1,
                data_ext_scaling_factor,
                total_pot / pots_dict["lee"] * 1.028]
@@ -701,10 +772,12 @@ if __name__ == "__main__":
     print("Weights", weights)
     files = ["nue_file.root",
              "mc_file.root",
+             "dirt.root",
              "bnb_file.root",
              "bnbext_file.root",
              "lee_file.root"]
     tree_names = ["nue_tree",
+                  "mc_tree",
                   "mc_tree",
                   "bnb_tree",
                   "bnbext_tree",
@@ -727,7 +800,7 @@ if __name__ == "__main__":
             else:
                 t.Branch(n, b, n + "/%s" % b.typecode)
 
-    samples = ["nue", "bnb", "bnb_data", "ext_data", "lee"]
+    samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
     for i, s in enumerate(samples):
         start_time = time.time()

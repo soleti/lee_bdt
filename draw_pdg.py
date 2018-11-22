@@ -5,18 +5,31 @@ import os
 import sys
 import math
 import pickle
-from bdt_common import labels, binning, total_data_bnb_pot, pdg_colors, pdgs, inv_pdgs, draw_top, draw_ratio, set_axis
+from draw import draw_top, draw_ratio, set_axis
+from bdt_common import labels, binning, total_data_bnb_pot, pdg_colors, pdgs, inv_pdgs
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 2:
     plot = sys.argv[1]
+    mode = sys.argv[2]
 else:
     plot = ""
 
+if mode == "selection":
+    folder = ""
+elif mode == "bdt":
+    folder = "_bdt"
+elif mode == "cuts":
+    folder = "_cuts"
+elif mode == "numu":
+    folder = "_numu"
+elif mode == "nc":
+    folder = "_nc"
+
 ROOT.gStyle.SetOptStat(0)
 
-DRAW_SYS = True
+DRAW_SYS = False
 
-h_pdgs = pickle.load(open("plots/pdg_plots.p", "rb"))
+h_pdgs = pickle.load(open("plots%s/pdg_plots.p" % folder, "rb"))
 
 if __name__ == "__main__":
     OBJECTS = []
@@ -98,12 +111,12 @@ if __name__ == "__main__":
                             flux_err**2 + genie_err**2 + stat_err**2))
                     f_genie.Close()
                     f_flux.Close()
-
+                h_mc_err_sys.SetLineWidth(0)
                 h_mc_err_sys.SetLineColor(1)
                 h_mc_err_sys.Draw("e2 same")
                 OBJECTS.append(h_mc_err_sys)
 
-            f = ROOT.TFile("plots/h_%s_bnb.root" % v)
+            f = ROOT.TFile("plots%s/h_%s_bnb.root" % (folder, v))
             h = f.Get("h_%s" % v)
             h.SetLineColor(1)
             h.SetTitle("Data beam-on - beam-off")
@@ -113,7 +126,6 @@ if __name__ == "__main__":
             h.Add(h_pdgs[v][2147483648], -1)
             h.Draw("e1p same")
             l_pdg.AddEntry(h, "Data (beam-on - beam-off)", "lep")
-            h_mc_err_sys.SetLineWidth(0)
             if DRAW_SYS:
                 l_pdg.AddEntry(h_mc_err_sys, "Sys. uncertainty", "f")
 
@@ -126,10 +138,10 @@ if __name__ == "__main__":
             h_tot_mc_clone.Draw("hist same")
             l_pdg.Draw()
             if DRAW_SYS:
-                chi2 = h.Chi2Test(h_mc_err_sys, "WW")
+                chi2 = h.Chi2Test(h_mc_err_sys, "UW")
                 ks = h.KolmogorovTest(h_mc_err_sys)
             else:
-                chi2 = h.Chi2Test(h_tot_mc, "WW")
+                chi2 = h.Chi2Test(h_tot_mc, "UW")
                 ks = h.KolmogorovTest(h_tot_mc)
 
             p_test = ROOT.TPaveText(0.656, 0.587, 0.849, 0.695, "NDC")
@@ -146,7 +158,11 @@ if __name__ == "__main__":
                 max(h_tot_mc.GetMaximum(), h.GetMaximum()) * 1.2)
             h_stack.GetYaxis().SetTitleOffset(0.9)
             c.cd()
-            draw_ratio(h, h_tot_mc, h_mc_err_sys, OBJECTS)
+            if DRAW_SYS:
+                draw_ratio(h, h_tot_mc, h_mc_err_sys, OBJECTS)
+            else:
+                draw_ratio(h, h_tot_mc, h_tot_mc, OBJECTS)
+
             c.Update()
             c.SaveAs("plots/pdg/%s_pdg.pdf" % h_stack.GetName())
             OBJECTS.append(c)

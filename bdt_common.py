@@ -6,6 +6,7 @@ from scipy.stats import poisson
 import sys
 import collections
 import os
+from tqdm import tqdm
 
 ELECTRON_MASS = 0.51e-3
 PROTON_MASS = 0.938
@@ -15,8 +16,7 @@ ELECTRON_THRESHOLD = 0.020
 MAX_N_TRACKS = 15
 MAX_N_SHOWERS = 15
 N_UNI = 100
-BDT, MANUAL = False, True
-
+BDT, MANUAL = False, False
 # Number to be obtained from Zarko's POT counting tool
 total_data_bnb_pot = 4.341e+19
 
@@ -34,24 +34,29 @@ bdt_cut_cosmic = 0.09
 
 bdt_cut_neutrino = 0.16
 rectangular_cut = 0.03
-bdt_cut = 0.1
 bdt_types = ["", "cosmic", "numu", "nc", "neutrino"]
 
-# bins = np.array([0, 0.200, 0.300, 0.450, 0.550,
-#                       0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 3.000])
-# bins2 = np.array([0, 0.200, 0.300, 0.450, 0.550,
-#                        0.675, 0.800, 0.950, 1.100, 1.300, 1.500, 1.7])
+miniboone_bins = np.array([0, 0.200,  0.300,  0.375,  0.475,  0.550,  0.675,  0.800,  0.950,  1.100,  1.300,  1.500,  3.000])
+miniboone_bins_2 = np.array([0, 0.200,  0.300,  0.375,  0.475,  0.550,  0.675,  0.800,  0.950,  1.100,  1.300,  1.500,  1.8])
+
+energy_bins = np.array([0, 0.2, 0.4, 0.65, 1.1, 1.85, 3])
+energy_bins2 = np.array([0, 0.2, 0.4, 0.65, 1.1, 1.85, 2.2])
+
 # bins = array("f", [0, 0.200, 0.350, 0.5, 0.65, 0.8,
 #                    0.950, 1.200, 1.500, 3.000])
 
-bins = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.850,
-                 1.050, 1.300, 1.550, 3.000])
+# bins = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.850,
+#                  1.050, 1.300, 1.550, 3.000])
 
-# bins2 = array("f", [0, 0.200, 0.350, 0.5, 0.65, 0.8,
-#                    0.950, 1.200, 1.500, 1.700])
+# bins2 = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.850,
+#                   1.050, 1.300, 1.550, 1.700])
 
-bins2 = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.850,
-                  1.050, 1.300, 1.550, 1.700])
+bins = miniboone_bins
+bins2 = miniboone_bins_2
+
+# bins = np.array([0, 0.2, 0.4, 0.6, 0.9, 1.25, 1.9, 3])
+
+# bins2 = np.array([0, 0.2, 0.4, 0.6, 0.9, 1.25, 1.9, 2.5])
 
 svm_loaded = False
 
@@ -84,73 +89,6 @@ pdgs = collections.OrderedDict(pdgs)
 
 inv_pdgs = {v: k for k, v in pdgs.items()}
 
-
-def set_axis(histogram, y_max=0):
-    h = histogram.GetHistogram()
-    h.SetTitleSize(0.06)
-    h.SetTitleOffset(0.75)
-    histogram.SetHistogram(h)
-    histogram.SetMinimum(0.01)
-    if y_max != 0:
-        histogram.SetMaximum(y_max)
-    else:
-        histogram.SetMaximum(histogram.GetMaximum() * 1.3)
-    return h
-
-def draw_top(OBJECTS=[]):
-    pad_top = ROOT.TPad("pad_top", "", 0, 0.3, 1, 1)
-    pad_top.SetBottomMargin(0)
-    pad_top.Range(-22.21825, -2.003018, 202.5403, 2073.676)
-    pad_top.SetTopMargin(0.2411347)
-    pad_top.Draw()
-    pad_top.cd()
-    OBJECTS.append(pad_top)
-
-def draw_ratio(num, den, den_sys=None, OBJECTS=[]):
-    pad_bottom = ROOT.TPad("pad_bottom", "", 0, 0, 1, 0.3)
-    pad_bottom.Range(-22.5, -0.6346511, 202.5, 1.99)
-
-    pad_bottom.SetFrameBorderMode(0)
-    pad_bottom.SetFrameBorderMode(0)
-    pad_bottom.SetBorderMode(0)
-    pad_bottom.SetTopMargin(0)
-    pad_bottom.SetBottomMargin(0.275614)
-    pad_bottom.Draw()
-    pad_bottom.cd()
-    OBJECTS.append(pad_bottom)
-    h_ratio = num.Clone()
-    h_ratio_sys = den.Clone()
-
-    OBJECTS.append(h_ratio)
-    OBJECTS.append(h_ratio_sys)
-
-    h_ratio.GetYaxis().SetRangeUser(0.01, 1.99)
-    h_ratio.Divide(den)
-    if den_sys:
-        h_ratio_sys.Divide(den_sys)
-
-    h_ratio.GetXaxis().SetLabelFont(42)
-    h_ratio.GetXaxis().SetLabelSize(0.1)
-    h_ratio.GetXaxis().SetTitleSize(0.13)
-    h_ratio.GetXaxis().SetTitleOffset(0.91)
-    h_ratio.GetYaxis().SetTitle("Ratio")
-    h_ratio.GetYaxis().SetNdivisions(509)
-    h_ratio.GetYaxis().SetLabelFont(42)
-    h_ratio.GetYaxis().SetLabelSize(0.1)
-    h_ratio.GetYaxis().SetTitleSize(0.14)
-    h_ratio.GetYaxis().SetTitleOffset(0.3)
-
-    h_ratio.Draw("e1")
-    if den_sys:
-        h_ratio_sys.Draw("e2 same")
-    h_ratio_sys.SetMarkerSize(0)
-
-    line = ROOT.TLine(h_ratio.GetXaxis().GetXmin(), 1,
-                      h_ratio.GetXaxis().GetXmax(), 1)
-    line.SetLineWidth(2)
-    line.SetLineStyle(2)
-    line.Draw()
-    OBJECTS.append(line)
 
 def load_svm():
     if not svm_loaded:
@@ -265,7 +203,7 @@ def gauss_exp(var, par):
     """
     n = par[0]
     mu = par[1]
-    sigma = par[2]
+    sigma = max(0.001, par[2])
     k = par[3]
     x = var[0]
 
@@ -344,9 +282,12 @@ colors = [ROOT.TColor.GetColor("#000000"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#ffffff"), ROOT.TColor.GetColor("#e7623d"),
           ROOT.TColor.GetColor("#1e7a2e")]
 
-def pre_cuts(var_dict):
+def pre_cuts(var_dict, numu=False):
     tr_id = int(var_dict["track_id"][0])
-    numu = int(var_dict["numu_score"][0]) == 0
+    if numu:
+        numu = int(var_dict["numu_score"][0]) == 1
+    else:
+        numu = int(var_dict["numu_score"][0]) == 0
     hits = var_dict["track_hits"][0] > 6 and \
            var_dict["shower_hits"][0] > 5 and \
            var_dict["total_hits_y"][0] > 0 and \
@@ -356,8 +297,8 @@ def pre_cuts(var_dict):
                           var_dict["total_track_energy_length"][0] > 0 and \
                           var_dict["shower_energy"][0] > 0.01
     track_pid = var_dict["track_pidchipr"][tr_id] < 80
-    ene = 0.8 < var_dict["reco_energy"][0] < 0.950
-    return numu and hits and shower_track_energy # and track_pid
+    ene = 0.4 < var_dict["reco_energy"][0] < 0.6
+    return numu and hits and shower_track_energy
 
 def is_active(point):
     ok_y = y_start < point[1] < y_end
@@ -399,7 +340,7 @@ def bdt_cut(bdt_dict, bdt_values=[bdt_nc_cut, bdt_numu_cut, bdt_cut_cosmic]):
     # return SVM_response > 0.85
     return bdt_dict["nc"] > bdt_values[0] and bdt_dict["numu"] > bdt_values[1] and bdt_dict["cosmic"] > bdt_values[2]
 
-def apply_cuts(bdt_dict, var_dict, bdt=BDT, manual=MANUAL):
+def apply_cuts(bdt_dict, var_dict, bdt=BDT, manual=MANUAL, mode="nue"):
     if bdt:
         if int(var_dict["category"][0]) == 6:
             apply_bdt = bdt_cut(bdt_dict, [bdt_nc_cut, bdt_numu_cut, 0.109])
@@ -409,92 +350,11 @@ def apply_cuts(bdt_dict, var_dict, bdt=BDT, manual=MANUAL):
         apply_bdt = True
 
     if manual:
-        apply_manual = manual_cuts(var_dict)
+        apply_manual = manual_cuts(var_dict, mode)
     else:
         apply_manual = True
 
     return apply_bdt and apply_manual
-
-def fill_histos_data(tree_name):
-    f_data = ROOT.TFile("root_files/%s_file.root" % tree_name)
-    t_data = f_data.Get("%s_tree" % tree_name)
-
-    ROOT.TMVA.Tools.Instance()
-    reader = ROOT.TMVA.Reader(":".join([
-        "!V",
-        "!Silent",
-        "Color"]))
-
-    variables_dict = load_variables(t_data)
-    load_bdt(reader)
-
-    histograms = []
-
-    for i, n in enumerate(variables_dict.keys()):
-        if n != "reco_energy" and n != "nu_E":
-            h = ROOT.TH1F("h_%s" % n, labels[n],
-                          binning[n][0], binning[n][1], binning[n][2])
-        else:
-            h = ROOT.TH1F("h_%s" % n, labels[n], len(bins) - 1, bins)
-        histograms.append(h)
-
-    histo_dict = dict(zip(variables_dict.keys(), histograms))
-
-    h_bdts = {}
-    for bdt_name in bdt_types:
-        h_bdts[bdt_name] = ROOT.TH1F("h_bdt_%s_%s" % (bdt_name, tree_name),
-                                     "BDT %s response; N. Entries / 0.04" % bdt_name,
-                                     50, -1, 1)
-
-    passed_events = 0
-    entries = int(t_data.GetEntries() / 1)
-
-    # bdt_ntuple = ROOT.TNtuple(
-    #     "bdt_ntuple", "bdt_ntuple", "single"+":".join(bdt_types) + ":category")
-
-    for i in range(entries):
-        t_data.GetEntry(i)
-        bdt_values = {}
-
-        for bdt_name in bdt_types:
-            bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
-
-        # likelihood_response = reader.EvaluateMVA("Likelihood method")
-        # cuts_response = reader.EvaluateMVA("Cuts method", rectangular_cut)
-        if pre_cuts(variables_dict):
-            for bdt_name in bdt_types:
-                h_bdts[bdt_name].Fill(bdt_values[bdt_name], t_data.event_weight)
-
-            # bdt_ntuple.Fill(array("f", list(bdt_values.values())+[t_data.category]))
-
-            if apply_cuts(bdt_values, variables_dict):
-                passed_events += t_data.event_weight
-
-                all = variables + spectators
-
-                for name, var in all:
-                    for v in var:
-                        if v > -999:
-                            histo_dict[name].Fill(v, t_data.event_weight)
-
-    # f_ntuple = ROOT.TFile("plots/bdt_ntuple_%s.root" % tree_name,
-    #                       "RECREATE")
-    # bdt_ntuple.Write()
-    # f_ntuple.Close()
-
-    f_bdt = ROOT.TFile("plots/h_bdt_%s.root" % tree_name, "RECREATE")
-    for h in h_bdts:
-        h_bdts[h].Write()
-    f_bdt.Close()
-
-
-    for h in histograms:
-        f = ROOT.TFile("plots/%s_%s.root" % (h.GetName(), tree_name),
-                       "RECREATE")
-        h.Write()
-        f.Close()
-
-    return passed_events
 
 
 def find_interaction(dictionary, interaction):
@@ -503,7 +363,7 @@ def find_interaction(dictionary, interaction):
             return name
 
 
-def manual_cuts(var_dict):
+def manual_cuts(var_dict, mode="nue"):
     tr_id = int(var_dict["track_id"][0])
     sh_id = int(var_dict["shower_id"][0])
     if var_dict["no_tracks"][0] == 1:
@@ -511,19 +371,36 @@ def manual_cuts(var_dict):
         shower_distance = var_dict["shower_distance"][sh_id] < 2
         track_distance = var_dict["track_distance"][tr_id] < 2
     ratio = var_dict["hits_ratio"][0] > 0.55
+    ratio_photon = var_dict["hits_ratio"][0] > 0.7
     track_res = var_dict["track_res_std"][tr_id] < 2
-    shower_distance = var_dict["shower_distance"][sh_id] < 5
+    shower_dedx_photon = True
+    for i_sh in range(int(var_dict["n_showers"][0])):
+        shower_distance = var_dict["shower_distance"][i_sh] < 3.9
+        if var_dict["category"][0] == 6 and 0.5 < var_dict["reco_energy"][0] < 0.85:
+            shower_dedx_photon = shower_dedx_photon and 2.91/3.85e-5 < var_dict["shower_dqdx"][i_sh] < 5/3.85e-5
+        else:
+            shower_dedx_photon = shower_dedx_photon and 3.1/3.85e-5 < var_dict["shower_dqdx"][i_sh] < 5/3.85e-5
     track_distance = var_dict["track_distance"][tr_id] < 5
     shower_open_angle = 1 < var_dict["shower_open_angle"][sh_id] < 20
     track_length = var_dict["track_length"][tr_id] < 80
+    track_length_numu = var_dict["track_length"][tr_id] > 20
     total_hits_y = var_dict["total_hits_y"][0] > 100
+    total_hits_y_numu = var_dict["total_hits_y"][0] > 150
     shower_energy = var_dict["shower_energy"][sh_id] > 0.05
+    shower_hits = var_dict["shower_hits"][0] > 100
+    total_shower_energy = var_dict["total_shower_energy_cali"][0] > 0.1
+    total_shower_energy_numu = var_dict["total_shower_energy_cali"][0] > 0.05
     shower_dedx = 1/3.85e-5 < var_dict["shower_dqdx"][sh_id] < 3.2/3.85e-5
     track_shower_angle = -0.95 < var_dict["track_shower_angle"][tr_id]
+    track_hits = var_dict["track_hits"][0] > 100
     track_proton_chi2 = False
+    track_mu_chi2 = False
     for i_tr in range(int(var_dict["n_tracks"][0])):
         if 0 < var_dict["track_pidchipr"][i_tr] < 80:
             track_proton_chi2 = True
+        if var_dict["track_pidchipr"][i_tr] > 40 and var_dict["track_pidchipr"][i_tr] < 220:
+            track_mu_chi2 = True
+    track_proton_chi2_numu = track_mu_chi2
 
     shower_pi_chi2 = not (0 < var_dict["shower_pidchipi"][sh_id] < 12)
 
@@ -533,17 +410,37 @@ def manual_cuts(var_dict):
 
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
 
+    photon_cuts = [ratio, track_length, track_distance, total_hits_y, track_shower_angle,
+                   shower_energy, shower_dedx_photon, track_proton_chi2]
+
+    passed_photon = len(photon_cuts) == sum(photon_cuts)
+
+    numu_cuts = [shower_distance, track_length_numu, shower_energy,
+                 track_shower_angle,
+                 shower_dedx, track_proton_chi2_numu]
+
+    passed_numu = len(numu_cuts) == sum(numu_cuts)
+
+    if mode == "numu":
+        return passed_numu
+    elif mode == "nc":
+        return passed_photon
     return passed_collab
 
 
-def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False):
+def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False, mode="selection"):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
     #(2D Matrix - (statistical uncertainty)^2 in a the diagonal of the matrix)^-1
     #(number of events signal in Energy bins in a 1D matrix)^Transpose
 
     sig_array = h_signal * scale_factor
     bkg_array = h_background * scale_factor
-
+    if mode == "selection":
+        folder = ""
+    elif mode == "bdt":
+        folder = "_bdt"
+    elif mode == "cuts":
+        folder = "_cuts"
     nbins = len(sig_array)
 
     emtx = np.zeros((nbins, nbins))
@@ -553,8 +450,8 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False)
         matrix[x][x] = bkg_array[x]
 
     if systematics:
-        fname_flux = "plots/sys/h_cov_reco_energy_flux.root"
-        fname_genie = "plots/sys/h_cov_reco_energy_genie.root"
+        fname_flux = "plots%s/sys/h_cov_reco_energy_flux.root" % folder
+        fname_genie = "plots%s/sys/h_cov_reco_energy_genie.root" % folder
 
         if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
             f_flux = ROOT.TFile(fname_flux)
@@ -888,7 +785,7 @@ binning = {
     "true_nu_is_fidvol": [2, 0, 2],
     "total_hits_u": [1, 0, 1],
     "total_hits_v": [1, 0, 1],
-    "track_pidchipr": [40, 0, 300],
+    "track_pidchipr": [30, 0, 300],
     "track_pidchimu": [40, 0, 80],
 
     "shower_pidchipr": [40, 0, 300],
@@ -944,7 +841,7 @@ binning = {
     "shower_open_angle": [23, 0, 46],
     "shower_dedx": [20, 0.3, 6],
     "shower_dedx_cali": [20, 0, 6],
-    "shower_dqdx": [20, 0, 155000],
+    "shower_dqdx": [18, 0, 155000],
 
     "shower_dedx_u": [20, 0.3, 6],
     "shower_dedx_v": [20, 0.3, 6],
@@ -971,18 +868,18 @@ binning = {
     "E_dep": [30, 0, 3],
 
     "track_hits": [20, 0, 400],
-    "track_dqdx": [40, 0, 1200],
+    "track_dqdx": [20, 0, 1200],
     "total_track_energy_length": [12, 0, 1.2],
     "track_energy_length": [12, 0, 1.2]
 
 }
 
-if MANUAL or BDT:
-    binning["shower_theta"] = [9, 0, 180]
-    binning["shower_phi"] = [9, -180, 180]
-    binning["shower_start_y"] = [10, y_start, y_end]
-    binning["shower_start_z"] = [10, z_start, z_end]
-    binning["shower_start_x"] = [10, x_start, x_end]
+# if MANUAL or BDT:
+#     binning["shower_theta"] = [9, 0, 180]
+#     binning["shower_phi"] = [9, -180, 180]
+#     binning["shower_start_y"] = [10, y_start, y_end]
+#     binning["shower_start_z"] = [10, z_start, z_end]
+#     binning["shower_start_x"] = [10, x_start, x_end]
 
 
 labels = {

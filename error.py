@@ -4,29 +4,53 @@ import ROOT
 from operator import mul
 import functools
 import math
+from tqdm import tqdm
 from bdt_common import pre_cuts, variables, spectators, labels, binning, N_UNI, bins, fix_binning, fixed_width_histo, fixed_width_histo_2d
-from bdt_common import bdt_types, load_bdt, load_variables, apply_cuts, printProgressBar
+from bdt_common import bdt_types, load_bdt, load_variables, apply_cuts
+from bdt_common import BDT, MANUAL
 import sys
 
-if len(sys.argv) > 2:
-    SYS_VARIABLES = sys.argv[2:]
+if len(sys.argv) > 1:
+    mode = sys.argv[1]
+else:
+    mode = "nue"
+
+
+if MANUAL:
+    folder = "_cuts"
+elif BDT:
+    folder = "_bdt"
+else:
+    folder = ""
+
+if mode == "numu":
+    folder = "_numu"
+    BDT = False
+    MANUAL = True
+elif mode == "nc":
+    folder = "_nc"
+    BDT = False
+    MANUAL = True
+
+if len(sys.argv) > 3:
+    SYS_VARIABLES = sys.argv[3:]
 else:
     SYS_VARIABLES = ["reco_energy"]
 
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
-MODE = sys.argv[1]
+SYS_MODE = sys.argv[2]
 
-if MODE == "flux":
+if SYS_MODE == "flux":
     ROOT.gStyle.SetPalette(ROOT.kMint)
 else:
     ROOT.gStyle.SetPalette(ROOT.kLake)
 
 
 chain = ROOT.TChain("mc_tree")
-chain.Add("root_files/mc_file.root")
-chain.Add("root_files/nue_file_sys.root")
+chain.Add("root_files/mc_file.root/mc_tree")
+chain.Add("root_files/nue_file.root/nue_tree")
 
 total_entries = int(chain.GetEntries() / 1)
 
@@ -62,11 +86,8 @@ reader = ROOT.TMVA.Reader(":".join([
 load_bdt(reader)
 
 
-for ievt in range(total_entries):
+for ievt in tqdm(range(total_entries)):
     chain.GetEntry(ievt)
-
-    printProgressBar(ievt, total_entries, prefix="Progress:",
-                     suffix="Complete", length=20)
 
     if not pre_cuts(vars):
         continue
@@ -76,7 +97,7 @@ for ievt in range(total_entries):
     for bdt_name in bdt_types:
         bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
-    if apply_cuts(bdt_values, vars):
+    if apply_cuts(bdt_values, vars, BDT, MANUAL, mode):
         for name, var in vars.items():
             if name not in SYS_VARIABLES:
                 continue
@@ -85,13 +106,13 @@ for ievt in range(total_entries):
                     h_cv[name].Fill(v, chain.event_weight)
 
                     for u in range(N_UNI):
-                        if MODE == "genie":
+                        if SYS_MODE == "genie":
                             weight = chain.genie_weights[u]
-                        elif MODE == "flux":
+                        elif SYS_MODE == "flux":
                             weight = chain.flux_weights[u]
                         else:
                             weight = chain.flux_weights[u] * chain.genie_weights[u]
-                        if weight > 100:
+                        if weight > 2:
                             weight = 1
                         h_sys[name][u].Fill(v, chain.event_weight * weight)
 
@@ -102,7 +123,7 @@ for n, b in vars.items():
                             labels[n],
                             len(bins) - 1,
                             bins,
-                            N_UNI * 2, 0, h_sys[n][0].GetMaximum() * 2)
+                            int(N_UNI/2), 0, h_sys[n][0].GetMaximum() * 2)
     else:
         h_2d[n] = ROOT.TH2F("h_%s" % n,
                             labels[n],
@@ -138,13 +159,13 @@ for n, b in vars.items():
                               bins)
     else:
         h_frac[n] = ROOT.TH2F("h_frac_%s" % n,
-                            labels[n],
-                            binning[n][0],
-                            binning[n][1],
-                            binning[n][2],
-                            binning[n][0],
-                            binning[n][1],
-                            binning[n][2])
+                              labels[n],
+                              binning[n][0],
+                              binning[n][1],
+                              binning[n][2],
+                              binning[n][0],
+                              binning[n][1],
+                              binning[n][2])
     h_frac[n].GetYaxis().SetTitle(h_frac[n].GetXaxis().GetTitle())
 
     if n == "reco_energy":
@@ -234,7 +255,7 @@ for v in SYS_VARIABLES:
         h_cv[v].SetBinError(i_bin, math.sqrt(sys_err[v][i_bin] / N_UNI))
 
     if v == "reco_energy":
-        f_cov = ROOT.TFile("plots/sys/h_cov_reco_energy_%s.root" % MODE, "RECREATE")
+        f_cov = ROOT.TFile("plots%s/sys/h_cov_reco_energy_%s.root" % (folder, SYS_MODE), "RECREATE")
         h_covariance[v].Write()
         f_cov.Close()
         h_covariance[v] = fixed_width_histo_2d(h_covariance[v])
@@ -253,11 +274,11 @@ for v in SYS_VARIABLES:
     h_cv[v].GetYaxis().SetRangeUser(0.001, h_cv[v].GetMaximum() * 1.5)
     pt.Draw()
 
-    f_cv = ROOT.TFile("plots/sys/h_%s_%s_sys.root" % (v, MODE), "RECREATE")
+    f_cv = ROOT.TFile("plots%s/sys/h_%s_%s_sys.root" % (folder, v, SYS_MODE), "RECREATE")
     h_cv[v].Write()
     f_cv.Close()
 
-    c.SaveAs("plots/sys/h_%s_%s_err.pdf" % (v, MODE))
+    c.SaveAs("plots%s/sys/h_%s_%s_err.pdf" % (folder, v, SYS_MODE))
     c.Update()
 
     c_cov = ROOT.TCanvas("c_cov_%s" % v)
@@ -265,7 +286,7 @@ for v in SYS_VARIABLES:
     h_covariance[v].Draw("colz text")
     h_covariance[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
-    c_cov.SaveAs("plots/sys/h_%s_%s_cov.pdf" % (v, MODE))
+    c_cov.SaveAs("plots%s/sys/h_%s_%s_cov.pdf" % (folder, v, SYS_MODE))
     c_cov.Update()
 
     c_frac = ROOT.TCanvas("c_frac_%s" % v)
@@ -273,7 +294,7 @@ for v in SYS_VARIABLES:
     h_frac[v].Draw("colz text")
     h_frac[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
-    c_frac.SaveAs("plots/sys/h_%s_%s_frac.pdf" % (v, MODE))
+    c_frac.SaveAs("plots%s/sys/h_%s_%s_frac.pdf" % (folder, v, SYS_MODE))
     c_frac.Update()
 
     c_corr = ROOT.TCanvas("c_corr_%s" % v)
@@ -281,7 +302,7 @@ for v in SYS_VARIABLES:
     h_corr[v].Draw("colz text")
     h_corr[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
-    c_corr.SaveAs("plots/sys/h_%s_%s_corr.pdf" % (v, MODE))
+    c_corr.SaveAs("plots%s/sys/h_%s_%s_corr.pdf" % (folder, v, SYS_MODE))
     c_corr.Update()
 
     OBJECTS.append(c)

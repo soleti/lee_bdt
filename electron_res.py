@@ -1,9 +1,17 @@
 #!/usr/local/bin/python3
 
-import ROOT
 from glob import glob
-from bdt_common import is_fiducial, gauss_exp, printProgressBar
 from array import array
+from tqdm import tqdm_notebook
+
+import ROOT
+from bdt_common import is_fiducial, gauss_exp
+from settings import ELECTRON_MASS, ELECTRON_THRESHOLD
+from settings import PROTON_MASS, PROTON_THRESHOLD
+from settings import variables, spectators
+from settings import fill_kin_branches, pre_cuts
+from proton_energy import length2energy
+
 
 ROOT.gStyle.SetOptTitle(1)
 ROOT.gStyle.SetTitleFillColor(ROOT.kWhite)
@@ -12,74 +20,280 @@ ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
-ELECTRON_MASS = 0.00052
 
-nue_cosmic = glob("data_files/mc_nue_pid/*.root")
-c = ROOT.TChain("robertoana/pandoratree")
 
-for f in nue_cosmic:
-    c.Add(f)
+def calibration_graph_proton(h_reco, h_true):
+    a_reco_true = array("f", [])
 
-entries = c.GetEntries()
-n_bins = 10
-h_reco_electron = []
-h_true_electron = []
+    a_bins = array("f", [])
 
-h_res_electron = []
-h_res_electron_total = ROOT.TH1F("h_res_electron_total",
-                                 ";(e_{E_{reco}} - e_{E})/e_{E}[GeV]; N. Entries / 0.0125",
-                                 80, -0.5, 0.5)
+    x_errs_low = array("f", [])
+    x_errs_high = array("f", [])
+    y_errs_low = array("f", [])
+    y_errs_high = array("f", [])
 
-h_electron_reco_true = ROOT.TH2F("h_electron_reco_true",
-                                 ";E^{e} [GeV];E^{e}_{reco} [GeV]",
-                               50, 0, 1,
-                               50, 0, 1)
+    f_gaussexp = ROOT.TF1("f_gausexp", gauss_exp, 0, 2, 4)
+    f_gaussexp.SetParNames("n", "mu", "sigma", "k")
 
-for i in range(n_bins):
-    h_reco_electron.append(ROOT.TH1F("h_reco_electron%i" % i,
-                                   "%.2f GeV < e_{E} < %.2f GeV;Reco. e_{E} [GeV];N. Entries / 0.02 GeV"
-                                   % (0.1 * i , 0.1 * (i + 1)),
-                                   60, 0, 1.2))
-    h_true_electron.append(ROOT.TH1F("h_true_electron%i" % i,
-                                   "%.2f GeV < e_{E} < %.2f GeV;Reco. e_{E_{reco}} [GeV];N. Entries / 0.02 GeV"
-                                   % (0.1 * i, 0.1 * (i + 1)),
-                                   60, 0, 1.2))
-    h_res_electron.append(ROOT.TH1F("h_res_electron%i" % i,
-                                  "%.2f GeV < e_{E} < %.2f GeV;(e_{E_{reco}} - e_{E})/e_{E} [GeV]; N. Entries / 0.05"
-                                  % (0.1 * i, 0.1 * (i + 1)),
-                                  50, -0.8, 0.8))
+    f_gaussexp.SetParLimits(3, 0.001, 1)
+    f_gaussexp.SetParameter(3, 0.5)
 
-print("Entries", entries)
+    x_width = (h_true[-1].GetXaxis().GetXmax() - h_true[-1].GetXaxis().GetXmin())  / len(h_reco)
 
-ELECTRON_THRESHOLD = 0.020
-OFFSET = 0.8
-BIAS = 0.017
+    for i, i_bin in enumerate(h_reco):
+        f_gaussexp.SetParameter(2, h_reco[i].GetStdDev())
+        f_gaussexp.SetParLimits(2, h_reco[i].GetStdDev()-0.1, h_reco[0].GetStdDev()+0.1)
+        true_center = h_true[i].GetBinCenter(h_true[i].GetMaximumBin())
+        f_gaussexp.SetParLimits(1, true_center-0.05, true_center+0.01)
+        if i == 7:
+            f_gaussexp.SetParLimits(1, true_center-0.05, 0.42)
+        f_gaussexp.SetParameter(1, true_center)
+        maximum_x = i_bin.GetMean()
+        f_gaussexp.SetParameter(1, h_true[i].GetMean())
+        i_bin.Fit(f_gaussexp, "Q")
+        a_reco_true.append(f_gaussexp.GetParameter(1))
+        print(i, f_gaussexp.GetParameter(1))
+        hm_1 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, 0, maximum_x)
+        hm_2 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, maximum_x, 2)
+        y_errs_low.append(maximum_x - hm_1)
+        y_errs_high.append(hm_2 - maximum_x)
+        x_value = true_center
+        a_bins.append(x_value)
+        x_err_h = (i + 1) * x_width - x_value + PROTON_THRESHOLD
+        x_err_l = x_value - i * x_width - PROTON_THRESHOLD
+        x_errs_high.append(x_err_h)
+        x_errs_low.append(x_err_l)
 
-for i in range(int(entries / 1)):
-    printProgressBar(i, entries, prefix='Progress:', suffix='Complete', length=20)
-    c.GetEntry(i)
-    
-    e = 0
-    electron_energy = 0
+    g_reco_true = ROOT.TGraphAsymmErrors(len(h_reco),
+                                         a_bins,
+                                         a_reco_true,
+                                         x_errs_low, x_errs_high,
+                                         y_errs_low, y_errs_high)
+
+    return g_reco_true, a_bins, x_errs_low, x_errs_high
+
+
+def calibration_graph_neutrino(h_reco, h_true):
+    a_reco_true = array("f", [])
+
+    a_bins = array("f", [])
+
+    x_errs_low = array("f", [])
+    x_errs_high = array("f", [])
+    y_errs_low = array("f", [])
+    y_errs_high = array("f", [])
+
+    f_gaussexp = ROOT.TF1("f_gausexp", gauss_exp, 0, 2, 4)
+    f_gaussexp.SetParNames("n", "mu", "sigma", "k")
+    f_gaussexp.SetParameter(2, h_reco[0].GetStdDev())
+    f_gaussexp.SetParameter(3, 0.5)
+
+    f_gaussexp.SetParLimits(2, 0.01, 2)
+    f_gaussexp.SetParLimits(3, 0.001, 1)
+
+    x_width = (h_true[-1].GetXaxis().GetXmax() -
+               h_true[-1].GetXaxis().GetXmin()) / len(h_reco)
+    for i, i_bin in enumerate(h_reco):
+        if i == 2:
+            f_gaussexp.SetParLimits(1, 0, 0.55)
+        else:
+            f_gaussexp.SetParLimits(1, 0, 2)
+
+        if i > 0:
+            i_bin.Fit(f_gaussexp, "Q")
+        maximum = f_gaussexp.GetMaximum()
+        maximum_x = f_gaussexp.GetX(maximum)
+        hm_1 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, 0, maximum_x)
+        hm_2 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2,
+                               maximum_x, h_true[-1].GetXaxis().GetXmax())
+
+        a_reco_true.append(maximum_x)
+        y_errs_low.append(maximum_x - hm_1)
+        y_errs_high.append(hm_2 - maximum_x)
+        x_value = h_true[i].GetMean()
+        if i < 1:
+            x_value = -1
+        a_bins.append(x_value)
+        x_err_h = (i + 1) * x_width - x_value
+        x_err_l = x_value - i * x_width
+        x_errs_high.append(x_err_h)
+        x_errs_low.append(x_err_l)
+
+    g_reco_true = ROOT.TGraphAsymmErrors(len(h_reco),
+                                         a_bins,
+                                         a_reco_true,
+                                         x_errs_low, x_errs_high,
+                                         y_errs_low, y_errs_high)
+
+    return g_reco_true, a_bins, x_errs_low, x_errs_high
+
+
+def calibration_graph_deposited(h_reco, h_true):
+    a_reco_true = array("f", [])
+
+    a_bins = array("f", [])
+
+    x_errs_low = array("f", [])
+    x_errs_high = array("f", [])
+    y_errs_low = array("f", [])
+    y_errs_high = array("f", [])
+
+    f_gaussexp = ROOT.TF1("f_gausexp", gauss_exp, 0, 2, 4)
+    f_gaussexp.SetParNames("n", "mu", "sigma", "k")
+    f_gaussexp.SetParameter(2, h_reco[0].GetStdDev())
+    f_gaussexp.SetParameter(3, 0.5)
+
+    f_gaussexp.SetParLimits(2, 0.01, 2)
+    f_gaussexp.SetParLimits(3, 0.001, 1)
+
+    x_width = (h_true[-1].GetXaxis().GetXmax() -
+               h_true[-1].GetXaxis().GetXmin()) / len(h_reco)
+    for i, i_bin in enumerate(h_reco):
+        if i == 2:
+            f_gaussexp.SetParLimits(1, 0, 0.55)
+        else:
+            f_gaussexp.SetParLimits(1, 0, 2)
+
+        if i > 0:
+            i_bin.Fit(f_gaussexp, "Q")
+        maximum = f_gaussexp.GetMaximum()
+        maximum_x = f_gaussexp.GetX(maximum)
+        hm_1 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, 0, maximum_x)
+        hm_2 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2,
+                               maximum_x, h_true[-1].GetXaxis().GetXmax())
+
+        a_reco_true.append(maximum_x)
+        y_errs_low.append(maximum_x - hm_1)
+        y_errs_high.append(hm_2 - maximum_x)
+        x_value = h_true[i].GetMean()
+        if i < 1:
+            x_value = -1
+        a_bins.append(x_value)
+        x_err_h = (i + 1) * x_width - x_value
+        x_err_l = x_value - i * x_width
+        x_errs_high.append(x_err_h)
+        x_errs_low.append(x_err_l)
+
+    g_reco_true = ROOT.TGraphAsymmErrors(len(h_reco),
+                                         a_bins,
+                                         a_reco_true,
+                                         x_errs_low, x_errs_high,
+                                         y_errs_low, y_errs_high)
+
+    return g_reco_true, a_bins, x_errs_low, x_errs_high
+
+
+def calibration_graph(h_reco, h_true):
+    a_reco_true = array("f", [])
+
+    a_bins = array("f", [])
+
+    x_errs_low = array("f", [])
+    x_errs_high = array("f", [])
+    y_errs_low = array("f", [])
+    y_errs_high = array("f", [])
+
+    f_gaussexp = ROOT.TF1("f_gausexp", gauss_exp, 0, 2, 4)
+    f_gaussexp.SetParNames("n", "mu", "sigma", "k")
+    f_gaussexp.SetParameter(2, h_reco[0].GetStdDev())
+    f_gaussexp.SetParameter(3, 0.5)
+
+    f_gaussexp.SetParLimits(1, 0, 1.5)
+    f_gaussexp.SetParLimits(2, 0.01, 2)
+    f_gaussexp.SetParLimits(3, 0.001, 1)
+
+    x_width = (h_true[-1].GetXaxis().GetXmax() -
+               h_true[-1].GetXaxis().GetXmin()) / len(h_reco)
+
+    for i, i_bin in enumerate(h_reco):
+        i_bin.Fit(f_gaussexp, "Q")
+        maximum = f_gaussexp.GetMaximum()
+        maximum_x = f_gaussexp.GetX(maximum)
+        hm_1 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, 0, maximum_x)
+        hm_2 = f_gaussexp.GetX(f_gaussexp.GetMaximum()/2, maximum_x, 2)
+        a_reco_true.append(maximum_x)
+        y_errs_low.append(maximum_x - hm_1)
+        y_errs_high.append(hm_2 - maximum_x)
+        x_value = h_true[i].GetMean()
+        a_bins.append(x_value)
+        x_err_h = (i + 1) * x_width - x_value + ELECTRON_THRESHOLD
+        x_err_l = x_value - i * x_width - ELECTRON_THRESHOLD
+        x_errs_high.append(x_err_h)
+        x_errs_low.append(x_err_l)
+
+    g_reco_true = ROOT.TGraphAsymmErrors(len(h_reco),
+                                         a_bins,
+                                         a_reco_true,
+                                         x_errs_low, x_errs_high,
+                                         y_errs_low, y_errs_high)
+
+    return g_reco_true, a_bins, x_errs_low, x_errs_high
+
+
+def select_proton_event(c, var_dict):
+    p = 0
+    proton_energy = 0
     for i_pdg, energy in enumerate(c.nu_daughters_E):
-        
+
         p_start = [
             c.nu_daughters_vx[i_pdg],
             c.nu_daughters_vy[i_pdg],
             c.nu_daughters_vz[i_pdg],
         ]
-        
+
         p_end = [
             c.nu_daughters_endx[i_pdg],
             c.nu_daughters_endy[i_pdg],
             c.nu_daughters_endz[i_pdg],
         ]
 
+        if abs(c.nu_daughters_pdg[i_pdg]) == 2212:
+            if (energy - PROTON_MASS) > PROTON_THRESHOLD and is_fiducial(p_start) and is_fiducial(p_end):
+                proton_energy = energy - PROTON_MASS
+                p += 1
+
+    true_neutrino_vertex = [c.true_vx_sce,
+                            c.true_vy_sce,
+                            c.true_vz_sce]
+
+    if not c.passed or not p == 1 or not is_fiducial(true_neutrino_vertex):
+        return False
+
+    if not c.category == 2:
+        return False
+
+    # If there are no tracks we require at least two showers
+    showers_2_tracks_0 = True
+    if c.n_tracks == 0 and c.n_showers == 1:
+        showers_2_tracks_0 = False
+
+    if not showers_2_tracks_0:
+        return False
+
+    fill_kin_branches(c, 1, var_dict, "nue", False)
+
+    if not pre_cuts(var_dict):
+        return False
+
+    return proton_energy
+
+
+def select_electron_event(c, var_dict):
+    e = 0
+    electron_energy = 0
+    for i_pdg, energy in enumerate(c.nu_daughters_E):
+
+        p_start = [
+            c.nu_daughters_vx[i_pdg],
+            c.nu_daughters_vy[i_pdg],
+            c.nu_daughters_vz[i_pdg],
+        ]
+
         if abs(c.nu_daughters_pdg[i_pdg]) == 11:
-            if not (is_fiducial(p_start) and is_fiducial(p_end) and p_start[2] < 700 and p_start[2] > 300 and p_end[2] < 700 and p_end[2] > 300):
+            if not (is_fiducial(p_start)):
                 e = 0
                 break
-            if energy > ELECTRON_THRESHOLD:
+            if energy - ELECTRON_MASS > ELECTRON_THRESHOLD:
                 electron_energy = energy
                 e += 1
 
@@ -88,225 +302,385 @@ for i in range(int(entries / 1)):
                             c.true_vz_sce]
 
     if not c.passed or not e or not is_fiducial(true_neutrino_vertex):
-        continue
+        return False
 
-    reco_electron_energy = 0
-    bin = int(electron_energy / (1 / n_bins))
+    if not c.category == 2:
+        return False
 
-    # if c.n_showers > 1:
-    #     continue
+    # If there are no tracks we require at least two showers
+    showers_2_tracks_0 = True
+    if c.n_tracks == 0 and c.n_showers == 1:
+        showers_2_tracks_0 = False
 
-    for i_sh in range(c.n_showers):
-        if c.matched_showers[i_sh] == 11:
-            reco_electron_energy += c.shower_energy[i_sh][2] * c.shower_energy_cali[i_sh][2]
+    if not showers_2_tracks_0:
+        return False
 
-    if bin < n_bins and reco_electron_energy:
-        h_reco_electron[bin].Fill(reco_electron_energy)
-        h_true_electron[bin].Fill(electron_energy)
-        h_electron_reco_true.Fill(electron_energy, reco_electron_energy)
-        h_res_electron[bin].Fill((reco_electron_energy / OFFSET + BIAS - electron_energy) / electron_energy)
-        h_res_electron_total.Fill((reco_electron_energy / OFFSET + BIAS - electron_energy) / electron_energy)
+    fill_kin_branches(c, 1, var_dict, "nue", False)
+
+    if not pre_cuts(var_dict):
+        return False
+
+    return electron_energy
 
 
-if __name__ == "__main__":
+def electron_resolution(file_path, bias, offset, n_bins=10, max_energy=2, scale=1):
+    files = glob("%s/*.root" % file_path)
+    c = ROOT.TChain("robertoana/pandoratree")
 
-    # ****************************************************
-    # Reco vs true plot
-    # ****************************************************
+    for f in files:
+        c.Add(f)
 
-    c_electron_reco_true = ROOT.TCanvas("c_electron_reco_true")
-    a_electron_reco_true = array("f", [])
+    entries = int(c.GetEntries() / scale)
+    h_res_electron = []
 
-    a_bins = array("f", [])
-    
-    x_errs_low = array("f", [])
-    x_errs_high = array("f", [])
-    y_errs_low = array("f", [])
-    y_errs_high = array("f", [])
+    h_binning = ROOT.TH1F("h_binning", "", n_bins,
+                            ELECTRON_THRESHOLD, max_energy)
+    for i in range(n_bins):
+        h_res_electron.append(ROOT.TH1F("h_res_electron%i" % i,
+                                        "%.0f MeV < E^{e} < %.0f MeV;(E_{corr}^{e} - E^{e})/E^{e}; N. Entries / 0.05"
+                                        % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                        50, -1, 1))
 
-    for i, bin in enumerate(h_reco_electron):
-        # bin.GetMaximumBin() * 0.02 - 0.01
-        a_electron_reco_true.append(bin.GetMaximumBin() * 0.02 - 0.01)
-        y_errs_low.append(bin.GetStdDev() / 2)
-        y_errs_high.append(bin.GetStdDev() / 2)
-        x_value = h_true_electron[i].FindBin(h_true_electron[i].GetMean()) * 0.02 - 0.01
-        a_bins.append(x_value)
-        x_err_h = (i + 1) * 0.1 - x_value
-        x_err_l = x_value - i * 0.1
-        x_errs_high.append(x_err_h)
-        x_errs_low.append(x_err_l)
+    var_dict = dict(variables + spectators)
 
-    g_electron_reco_true = ROOT.TGraphAsymmErrors(
-        10, a_bins, a_electron_reco_true, x_errs_low, x_errs_high, y_errs_low, y_errs_high)
+    for i in tqdm_notebook(range(entries)):
+        c.GetEntry(i)
 
-    h_electron_reco_true.Draw("col")
-    h_electron_reco_true.SetMinimum(-0.001)
-    h_electron_reco_true.GetYaxis().SetTitleOffset(1.1)
-    h_electron_reco_true.GetXaxis().SetTitleOffset(1.1)
-        
-    g_electron_reco_true.SetMarkerStyle(20)
-    g_electron_reco_true.Draw("p same")
+        electron_energy = select_electron_event(c, var_dict)
+        if not electron_energy:
+            continue
 
-    f_line = ROOT.TF1("f_line", "[0]*x+[1]", 0, 1)
-    f_line.SetParNames("m", "q")
-    f_line.SetParameters(0.784, -0.017)
-    l_p_true_reco = ROOT.TLegend(0.11, 0.913, 0.900, 0.968)
-    l_p_true_reco.SetNColumns(2)
-    l_p_true_reco.AddEntry(g_electron_reco_true, "Most probable values", "lep")
-    g_electron_reco_true.Fit(f_line)
-    l_p_true_reco.AddEntry(f_line, "E_{reco}^{e} = %.2f E^{e} - %.2f GeV" % (f_line.GetParameter(0), -f_line.GetParameter(1)), "l")
-    f_line.SetLineColor(ROOT.kRed + 1)
-    f_line.Draw("same")
-    l_p_true_reco.Draw()
-    c_electron_reco_true.SetLeftMargin(0.12)
-    c_electron_reco_true.SetBottomMargin(0.13)
+        reco_electron_energy = 0
+        i_bin = int(electron_energy / (max_energy / n_bins))
 
-    c_electron_reco_true.Update()
-    c_electron_reco_true.SaveAs("plots/h_electron_slope.pdf")
+        for i_sh in range(c.n_showers):
+            if c.matched_showers[i_sh] == 11:
+                reco_electron_energy += c.shower_energy[i_sh][2] * \
+                    c.shower_energy_cali[i_sh][2]
 
-    # ****************************************************
-    # Reco, true per interval 
-    # ****************************************************
-    ROOT.gStyle.SetTitleSize(0.6)
-    c_electron_energy = ROOT.TCanvas("c_electron_energy", "", 1000, 700)
-    c_electron_energy.Divide(5, 2)
+        if i_bin < n_bins and reco_electron_energy:
+            corr_energy = (reco_electron_energy - offset) / bias
+            h_res_electron[i_bin].Fill((corr_energy - electron_energy) / electron_energy)
+
+    return h_res_electron
+
+
+def electron_calibration(file_path, n_bins=10, max_energy=2, scale=1):
+    files = glob("%s/*.root" % file_path)
+    c = ROOT.TChain("robertoana/pandoratree")
+
+    for f in files:
+        c.Add(f)
+
+    entries = int(c.GetEntries() / scale)
+    h_reco_true = ROOT.TH2F("h_reco_true",
+                            ";E^{e} [GeV];E^{e}_{reco} [GeV]",
+                            50, ELECTRON_THRESHOLD, max_energy,
+                            50, ELECTRON_THRESHOLD, max_energy)
+
+    h_reco = []
+    h_true = []
+    h_binning = ROOT.TH1F("h_binning", "", n_bins,
+                          ELECTRON_THRESHOLD, max_energy)
 
     for i in range(n_bins):
-        c_electron_energy.cd(i + 1)
-        h_true_electron[i].Draw()
-        h_reco_electron[i].Draw("same")
-        if i == 0:
-            l_true_reco = ROOT.TLegend(0.54, 0.76, 0.85, 0.83)
-            l_true_reco.AddEntry(h_reco_electron[i], "Reco. energy", "l")
-            l_true_reco.AddEntry(h_true_electron[i], "True energy", "l")
-            l_true_reco.Draw()
-        h_true_electron[i].SetLineColor(ROOT.kBlack)
-        h_reco_electron[i].GetXaxis().SetTitleSize(0.05)
-        h_reco_electron[i].GetXaxis().SetTitleOffset(1.05)
-        h_reco_electron[i].GetYaxis().SetTitleOffset(1.3)
-        ROOT.gPad.SetLeftMargin(0.15)
-        ROOT.gPad.SetBottomMargin(0.18)
+        h_reco.append(ROOT.TH1F("h_reco_electron%i" % i,
+                                "%.0f MeV < E^{e} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                60, ELECTRON_THRESHOLD, max_energy))
 
-    c_electron_energy.Update()
-    c_electron_energy.SaveAs("plots/h_electron_energy.pdf")
+        h_true.append(ROOT.TH1F("h_true_electron%i" % i,
+                                "%.0f MeV < E^{e} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                60, ELECTRON_THRESHOLD, max_energy))
 
-    # ROOT.gStyle.SetOptFit(1)
+    var_dict = dict(variables + spectators)
+
+    for i in tqdm_notebook(range(entries)):
+        c.GetEntry(i)
+
+        electron_energy = select_electron_event(c, var_dict)
+        if not electron_energy:
+            continue
+
+        reco_electron_energy = 0
+        i_bin = h_binning.FindBin(electron_energy)
+
+        for i_sh in range(c.n_showers):
+            if c.matched_showers[i_sh] == 11:
+                reco_electron_energy += c.shower_energy[i_sh][2] * \
+                    c.shower_energy_cali[i_sh][2]
+
+        if 0 < i_bin <= n_bins and reco_electron_energy:
+            h_reco[i_bin-1].Fill(reco_electron_energy)
+            h_true[i_bin-1].Fill(electron_energy)
+            h_reco_true.Fill(electron_energy, reco_electron_energy)
+
+    return h_reco_true, h_true, h_reco
 
 
-    # ****************************************************
-    # electron energy resolution per interval 
-    # ****************************************************
-    c_electron_res = ROOT.TCanvas("c_electron_res", "", 1200, 700)
-    c_electron_res.Divide(5, 2)
-    a_res = array("f", [])
-    a_res_err_h = array("f", [])
-    a_res_err_l = array("f", [])
-        
+def proton_calibration(file_path, n_bins=10, max_energy=1, scale=1):
+    files = glob("%s/*.root" % file_path)
+    c = ROOT.TChain("robertoana/pandoratree")
+
+    for f in files:
+        c.Add(f)
+
+    entries = int(c.GetEntries() / scale)
+    h_reco_true = ROOT.TH2F("h_reco_true",
+                            ";E^{p} [GeV];E^{p}_{reco} [GeV]",
+                            50, PROTON_THRESHOLD, max_energy,
+                            50, PROTON_THRESHOLD, max_energy)
+
+    h_reco = []
+    h_true = []
+
+    h_binning = ROOT.TH1F("h_binning", "", n_bins,
+                          PROTON_THRESHOLD, max_energy)
     for i in range(n_bins):
-        c_electron_res.cd(i + 1)
+        h_reco.append(ROOT.TH1F("h_reco_electron%i" % i,
+                                "%.0f MeV < E^{p} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, PROTON_THRESHOLD, max_energy))
 
-        h_res_electron[i].Draw()
-        h_res_electron[i].GetXaxis().SetTitleSize(0.05)
-        h_res_electron[i].GetXaxis().SetTitleOffset(1.05)
-        h_res_electron[i].GetYaxis().SetTitleOffset(1.3)
+        h_true.append(ROOT.TH1F("h_true_electron%i" % i,
+                                "%.0f MeV < E^{p} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, PROTON_THRESHOLD, max_energy))
 
-        f_gausexp = ROOT.TF1("f_gausexp", gauss_exp, -1, 1, 4)
+    var_dict = dict(variables + spectators)
 
-        f_gausexp.SetParLimits(1, -0.1, 0.1)
-        f_gausexp.SetParLimits(2, 0.001, 0.6)
-        f_gausexp.SetParLimits(3, 0.001, 1)
+    for i in tqdm_notebook(range(entries)):
+        c.GetEntry(i)
 
-        f_gausexp.SetParameters(h_res_electron[i].GetMaximum(),
-                                0,
-                                h_res_electron[i].GetRMS(),
-                                0.4)
-        f_gausexp.SetParNames("A", "#mu", "#sigma", "k")
+        proton_energy = select_proton_event(c, var_dict)
+        if not proton_energy:
+            continue
 
-        if i == 9:
-            f_gausexp.SetParLimits(2, 6.49288e-02, 8.09288e-02)
-            h_res_electron[i].Fit(f_gausexp,
-                                    "RQ",
-                                    "",
-                                    -0.35,
-                                    0.16)
-        elif i == 8:
-            f_gausexp.SetParLimits(2, 6.69288e-02, 8.09288e-02)
-            h_res_electron[i].Fit(f_gausexp,
-                                  "RQ",
-                                  "",
-                                  -1.6 * h_res_electron[i].GetRMS(),
-                                  1.1 * h_res_electron[i].GetRMS())
-        else:
-            h_res_electron[i].Fit(f_gausexp,
-                                  "RQ",
-                                  "",
-                                  -1.6 * h_res_electron[i].GetRMS(),
-                                  1.1 * h_res_electron[i].GetRMS())
+        reco_proton_energy = 0
+        i_bin = h_binning.FindBin(proton_energy)
 
-        a_res.append(f_gausexp.GetParameter(2) * 100)
-        a_res_err_h.append(f_gausexp.GetParError(2) * 100 / 2)
-        a_res_err_l.append(f_gausexp.GetParError(2) * 100 / 2)
+        for i_tr in range(c.n_tracks):
+            if c.matched_tracks[i_tr] == 2212:
+                reco_proton_energy += length2energy(c.track_len[i_tr])
 
-        ROOT.gPad.SetLeftMargin(0.13)
-        ROOT.gPad.SetBottomMargin(0.18)
-    c_electron_res.Update()
-    c_electron_res.SaveAs("plots/h_electron_res.pdf")
+        if 0 < i_bin <= n_bins and reco_proton_energy:
+            h_reco[i_bin-1].Fill(reco_proton_energy)
+            h_true[i_bin-1].Fill(proton_energy)
+            h_reco_true.Fill(proton_energy, reco_proton_energy)
 
-    # ****************************************************
-    # electron energy resolution vs true energy
-    # ****************************************************
-    ROOT.gStyle.SetOptTitle(0)
+    return h_reco_true, h_true, h_reco
 
-    c_e_res_e = ROOT.TCanvas("c_e_res_e")
-    a_bins.pop(0)
-    a_res.pop(0)
-    x_errs_low.pop(0)
-    x_errs_high.pop(0)
-    a_res_err_l.pop(0)
-    a_res_err_h.pop(0)
-    g_e_res_e = ROOT.TGraphAsymmErrors(9, a_bins, a_res, x_errs_low, x_errs_high, a_res_err_l, a_res_err_h)
-    g_e_res_e.Draw("ap")
-    g_e_res_e.GetYaxis().SetTitle("#sigma [%]")
-    g_e_res_e.GetXaxis().SetTitle("E_{e} [GeV]")
-    g_e_res_e.GetXaxis().SetTitleSize(0.05)
-    g_e_res_e.GetXaxis().SetTitleOffset(1)
-    g_e_res_e.GetYaxis().SetTitleOffset(0.9)
-    c_e_res_e.SetBottomMargin(0.13)
-    g_e_res_e.SetMarkerStyle(20)
-    f_res = ROOT.TF1("f_res", "sqrt(([0]/sqrt(x))**2+([1]/x)**2+[2]**2)", 0, 2)
-    f_res.SetParNames("a", "b", "c")
-    # f_res.SetParLimits(0, 0.1, 1)
-    f_res.SetParLimits(1, 0.1, 0.98)
-    f_res.SetParLimits(2, 0.1, 1.94)
 
-    g_e_res_e.Fit(f_res)
-    l_res = ROOT.TLegend(0.37, 0.68, 0.80, 0.86)
-    l_res.AddEntry(f_res, "(#frac{%.2f}{#sqrt{E / GeV}} #oplus #frac{%.2f}{E / GeV} #oplus %.2f) %%" %
-                   (f_res.GetParameter(0),
-                    f_res.GetParameter(1),
-                    f_res.GetParameter(2)), "l")
-    l_res.Draw()
-    c_e_res_e.Update()
-    f_e_res_e = ROOT.TFile("plots/g_e_res_e.root", "RECREATE")
-    g_e_res_e.Write()
-    f_e_res_e.Close()
-    c_e_res_e.SaveAs("plots/h_electron_res_e.pdf")
+def check_cc0pinp(chain_nue):
+    """Checks if the event is a contained electron neutrino
+    CC0π-Np interaction
 
-    c_res_total = ROOT.TCanvas("c_res_total")
-    h_res_electron_total.Draw("hist")
-    f_gausexp.SetParLimits(1, -0.2, 0.2)
-    f_gausexp.SetParLimits(2, 0.01, 0.15)
-    f_gausexp.SetParLimits(3, 0, 1)
-    h_res_electron_total.Fit(f_gausexp,
-                           "",
-                           "",
-                           -0.2,
-                           0.3)
-    f_gausexp.Draw("same")
-    c_res_total.SetBottomMargin(0.13)
-    h_res_electron_total.GetXaxis().SetTitleOffset(1.1)
-    c_res_total.SetLeftMargin(0.13)
+    Args:
+        chain_nue: ROOT TChain of the events
 
-    c_res_total.Update()
-    c_res_total.SaveAs("plots/h_electron_res_total.pdf")
-input()
+    Returns:
+        True if the event is a contained CC0π-Np interaction
+    """
+    protons = 0
+    electrons = 0
+    photons = 0
+    pions = 0
+    electron_energy = 0
+    proton_energy = 0
+
+    for i, energy in enumerate(chain_nue.nu_daughters_E):
+        if chain_nue.nu_daughters_pdg[i] == 2212:
+            p_vertex = [chain_nue.nu_daughters_vx[i],
+                        chain_nue.nu_daughters_vy[i],
+                        chain_nue.nu_daughters_vz[i]]
+
+            p_end = [chain_nue.nu_daughters_endx[i],
+                     chain_nue.nu_daughters_endy[i],
+                     chain_nue.nu_daughters_endz[i]]
+
+            if energy - PROTON_MASS > PROTON_THRESHOLD:
+                protons += 1
+                proton_energy += energy - PROTON_MASS
+            if not is_fiducial(p_vertex) or not is_fiducial(p_end):
+                protons = 0
+                break
+
+        if chain_nue.nu_daughters_pdg[i] == 11:
+            e_vertex = [chain_nue.nu_daughters_endx[i],
+                        chain_nue.nu_daughters_endy[i],
+                        chain_nue.nu_daughters_endz[i]]
+
+            if energy - ELECTRON_MASS > ELECTRON_THRESHOLD and is_fiducial(e_vertex):
+                electron_energy += energy
+                electrons += 1
+
+        if chain_nue.nu_daughters_pdg[i] == 22:
+            # if energy > 0.035:
+            photons += 1
+
+        if chain_nue.nu_daughters_pdg[i] == 111 or chain_nue.nu_daughters_pdg[i] == 211:
+            # if energy > 0.06:
+            pions += 1
+
+    if electrons == 1 and pions == 0 and protons >= 1 and photons == 0 and chain_nue.ccnc == 0:
+        return electron_energy + proton_energy
+
+    return False
+
+
+def neutrino_calibration(file_path, n_bins=10, max_energy=2, scale=1,
+                         proton_calib=(1, 0), electron_calib=(0.77, 0.02), neutrino_calib=(0.9, 0)):
+    files = glob("%s/*.root" % file_path)
+    c = ROOT.TChain("robertoana/pandoratree")
+
+    for f in files:
+        c.Add(f)
+
+    entries = int(c.GetEntries() / scale)
+    h_reco_true = ROOT.TH2F("h_reco_true",
+                            ";E^{#nu_{e}} [GeV];E^{#nu_{e}}_{reco} [GeV]",
+                            200, 0, max_energy*5,
+                            200, 0, max_energy*5)
+    h_reco_true_corr = ROOT.TH2F("h_reco_true_corr",
+                                 ";E^{#nu_{e}} [GeV];E^{#nu_{e}}_{reco} [GeV]",
+                                 200, 0, max_energy*5,
+                                 200, 0, max_energy*5)
+
+    h_reco = []
+    h_true = []
+    h_reco_corr = []
+
+    h_binning = ROOT.TH1F("h_binning", "", n_bins,
+                          0, max_energy)
+    for i in range(n_bins):
+        h_reco.append(ROOT.TH1F("h_reco_neutrino%i" % i,
+                                "%.0f MeV < E^{#nu_{e}} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, 0, max_energy))
+        h_reco_corr.append(ROOT.TH1F("h_reco_corr_neutrino%i" % i,
+                                     "%.0f MeV < E^{#nu_{e}} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                     % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                     30, 0, max_energy))
+        h_true.append(ROOT.TH1F("h_true_neutrinon%i" % i,
+                                "%.0f MeV < E^{#nu_{e}} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, 0, max_energy))
+
+    var_dict = dict(variables + spectators)
+
+    for i in tqdm_notebook(range(entries)):
+        c.GetEntry(i)
+
+        eNp_interaction = check_cc0pinp(c)
+
+        if not eNp_interaction:
+            continue
+
+        fill_kin_branches(c, 1, var_dict, "nue", False)
+        if not pre_cuts(var_dict):
+            continue
+
+        neutrino_energy = c.nu_E
+        reco_neutrino_energy = 0
+        i_bin = h_binning.FindBin(neutrino_energy)
+
+        for i_tr in range(c.n_tracks):
+            if c.matched_tracks[i_tr] == 2212:
+                reco_neutrino_energy += (length2energy(c.track_len[i_tr]) - proton_calib[1]) / proton_calib[0]
+
+        for i_sh in range(c.n_showers):
+            if c.matched_showers[i_sh] == 11:
+                reco_neutrino_energy += (c.shower_energy[i_sh][2] * c.shower_energy_cali[i_sh][2] - electron_calib[1]) / electron_calib[0]
+
+        if reco_neutrino_energy > 0.02:
+            reco_corr = (reco_neutrino_energy - neutrino_calib[1]) / neutrino_calib[0]
+            if 0 < i_bin <= n_bins:
+                h_reco[i_bin-1].Fill(reco_neutrino_energy)
+                h_true[i_bin-1].Fill(neutrino_energy)
+                h_reco_corr[i_bin-1].Fill(reco_corr)
+
+            h_reco_true_corr.Fill(neutrino_energy, reco_corr)
+            h_reco_true.Fill(neutrino_energy, reco_neutrino_energy)
+
+    return h_reco_true, h_true, h_reco, h_reco_true_corr, h_reco_corr
+
+
+def deposited_calibration(file_path, n_bins=10, max_energy=2, scale=1,
+                         proton_calib=(1, 0), electron_calib=(0.77, 0.02), calib=(0.97, 0)):
+    files = glob("%s/*.root" % file_path)
+    c = ROOT.TChain("robertoana/pandoratree")
+
+    for f in files:
+        c.Add(f)
+
+    entries = int(c.GetEntries() / scale)
+    h_reco_true = ROOT.TH2F("h_reco_true",
+                            ";E_{deposited} [GeV];E_{reco} [GeV]",
+                            300, 0, 3,
+                            300, 0, 3)
+    h_reco_true_corr = ROOT.TH2F("h_reco_true_corr",
+                                 ";E_{deposited} [GeV];E_{reco} [GeV]",
+                                 300, 0, 3,
+                                 300, 0, 3)
+
+    h_reco = []
+    h_true = []
+    h_reco_corr = []
+
+    h_binning = ROOT.TH1F("h_binning", "", n_bins,
+                          0, max_energy)
+    for i in range(n_bins):
+        h_reco.append(ROOT.TH1F("h_reco_neutrino%i" % i,
+                                "%.0f MeV < E_{deposited} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, 0, max_energy))
+        h_reco_corr.append(ROOT.TH1F("h_reco_corr_neutrino%i" % i,
+                                     "%.0f MeV < E_{deposited} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                     % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                     30, 0, max_energy))
+        h_true.append(ROOT.TH1F("h_true_neutrinon%i" % i,
+                                "%.0f MeV < E_{deposited} < %.0f MeV;Energy[GeV];N. Entries / 0.02 GeV"
+                                % (h_binning.GetBinLowEdge(i + 1) * 1000, h_binning.GetBinLowEdge(i + 2) * 1000),
+                                30, 0, max_energy))
+
+    var_dict = dict(variables + spectators)
+
+    for i in tqdm_notebook(range(entries)):
+        c.GetEntry(i)
+
+        eNp_interaction = check_cc0pinp(c)
+
+        if not eNp_interaction:
+            continue
+
+        fill_kin_branches(c, 1, var_dict, "nue", False)
+        if not pre_cuts(var_dict):
+            continue
+
+        neutrino_energy = eNp_interaction
+        reco_neutrino_energy = 0
+        i_bin = h_binning.FindBin(neutrino_energy)
+
+        for i_tr in range(c.n_tracks):
+            if c.matched_tracks[i_tr] == 2212:
+                reco_neutrino_energy += (length2energy(
+                    c.track_len[i_tr]) - proton_calib[1]) / proton_calib[0]
+
+        for i_sh in range(c.n_showers):
+            if c.matched_showers[i_sh] == 11:
+                reco_neutrino_energy += (
+                    c.shower_energy[i_sh][2] * c.shower_energy_cali[i_sh][2] - electron_calib[1]) / electron_calib[0]
+
+        if reco_neutrino_energy > 0.02:
+            reco_corr = (reco_neutrino_energy -
+                         calib[1]) / calib[0]
+            if 0 < i_bin <= n_bins:
+                h_reco[i_bin-1].Fill(reco_neutrino_energy)
+                h_true[i_bin-1].Fill(neutrino_energy)
+                h_reco_corr[i_bin-1].Fill(reco_corr)
+
+            h_reco_true_corr.Fill(neutrino_energy, reco_corr)
+            h_reco_true.Fill(neutrino_energy, reco_neutrino_energy)
+
+    return h_reco_true, h_true, h_reco, h_reco_true_corr, h_reco_corr
