@@ -13,6 +13,8 @@ from bdt_common import pre_cuts, fix_binning
 from bdt_common import bdt_types, apply_cuts, load_bdt
 from bdt_common import pdgs, BDT, MANUAL
 
+SYSTEMATIC = False
+
 if len(sys.argv) > 1:
     mode = sys.argv[1]
 
@@ -167,11 +169,8 @@ def fill_histos(chain, histo_dict, h_bdt_types, option="", mode="nue"):
             clone.Fill()
 
             print(int(chain.run), int(chain.subrun), int(chain.event), int(category), chain.reco_energy, file=f)
-            if option == "nue":
-                if category == 2:
-                    passed_events += chain.event_weight
-            else:
-                passed_events += chain.event_weight
+
+            passed_events += chain.event_weight
 
             all_vars = variables + spectators
             var_dict = dict(all_vars)
@@ -229,7 +228,7 @@ if __name__ == "__main__":
     bnbext_chain = ROOT.TChain("bnbext_tree")
 
     mc_chain.Add("root_files/mc_file.root")
-    mc_chain.Add("root_files/dirt.root")
+    # mc_chain.Add("root_files/dirt.root")
 
     nue_chain.Add("root_files/nue_file.root")
     bnbext_chain.Add("root_files/bnbext_file.root")
@@ -246,7 +245,7 @@ if __name__ == "__main__":
         h_stack = ROOT.THStack("h_" + n, labels[n])
 
         for c in categories:
-            if n != "reco_energy" and n != "nu_E":
+            if n != "reco_energy":
                 h = ROOT.TH1F("h_%s_%s" % (n, c), labels[n],
                             binning[n][0], binning[n][1], binning[n][2])
             else:
@@ -322,6 +321,7 @@ if __name__ == "__main__":
             folder = "_numu"
         elif mode == "nc":
             folder = "_nc"
+        print("plots%s/%s_mc.root" % (folder, h.GetName()))
         f = ROOT.TFile("plots%s/%s_mc.root" % (folder, h.GetName()), "RECREATE")
         h.Write()
         f.Close()

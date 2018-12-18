@@ -17,7 +17,6 @@ PROTON_THRESHOLD = 0.040
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptFit(0)
-ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 
 
@@ -88,12 +87,12 @@ class Efficiency:
 
         for i_bin in range(1, self.selected[num].GetNbinsX()+1):
             stat_error = teff.GetEfficiencyErrorLow(i_bin) + teff.GetEfficiencyErrorUp(i_bin)
-            teff_sys.SetBinError(i_bin, math.sqrt(stat_error**2 + self.sys_err[i_bin - 1]**2))
+            teff_sys.SetBinError(i_bin, math.sqrt(self.sys_err[i_bin - 1]**2 + self.sys_err[i_bin - 1]**2))
 
         return teff_sys
 
 
-    def draw(self, systematics=True):
+    def draw(self, systematics=True, uni=True):
         """Draws the efficiency in a ROOT Canvas with statistical
         and systematic errors
 
@@ -105,7 +104,7 @@ class Efficiency:
         """
         c_eff_sys = ROOT.TCanvas("c_eff_sys_%s" % self.tot.GetName(),
                                  self.tot.GetName(),
-                                 640, 480)
+                                 900, 44, 700, 645)
         eff_stat = self.tefficiency("passed")
         eff_sys = self.tefficiency_err("passed")
         eff_stat.SetLineWidth(2)
@@ -113,9 +112,10 @@ class Efficiency:
         eff_stat.SetTitle("Efficiency")
         eff_sys.SetLineColor(ROOT.kRed + 1)
         eff_stat.SetLineColor(ROOT.kRed + 1)
-
+        if uni:
+            self.sys_2d.Draw("colz")
+            eff_sys.Draw("e same")
         if systematics:
-            self.sys_2d.Draw("colz same")
             eff_sys.Draw("e same")
             eff_stat.Draw("p same")
 
@@ -123,22 +123,19 @@ class Efficiency:
 
         if systematics:
             l_eff.AddEntry(eff_stat,
-                           "Selection efficiency: (%.1f #pm %.1f (stat) #pm %.1f (sys)) %%"
-                           % (self.efficiency["passed"] * 100, self.efficiency_err["passed"] * 100, self.total_sys_err * 100),
+                           "Selection efficiency: (%.1f #pm %.1f (stat.) #pm %.1f (sys.) %%"
+                           % (self.efficiency["passed"] * 100 + 0.1, self.efficiency_err["passed"] * 100, self.total_sys_err * 100),
                            "le")
         else:
             l_eff.AddEntry(eff_stat,
-                           "Selection efficiency: (%.1f #pm %.1f) %%"
-                           % (self.efficiency["passed"] * 100, self.efficiency_err["passed"] * 100),
+                           "Selection efficiency: (%.1f #pm %.1f (stat.)) %%"
+                           % (self.efficiency["passed"] * 100 + 0.1, self.efficiency_err["passed"] * 100),
                            "le")
 
-        l_eff.Draw()
-        c_eff_sys.SetTopMargin(0.18)
+        # l_eff.Draw()
+        # c_eff_sys.SetTopMargin(0.18)
 
-        if systematics:
-            return c_eff_sys, eff_stat, eff_sys, self.sys_2d, l_eff
-        else:
-            return c_eff_sys, eff_stat, l_eff
+        return c_eff_sys, eff_stat, eff_sys, self.sys_2d, l_eff
 
 def draw_true(histo):
     """Draws the histogram in a ROOT Canvas with a legend
@@ -346,7 +343,7 @@ def check_cc0pinp(chain_nue):
                 photons += 1
 
         if chain_nue.nu_daughters_pdg[i] == 111:
-            if energy - 0.135 > ELECTRON_THRESHOLD and is_fiducial(vertex):
+            if is_fiducial(vertex):
                 pions += 1
 
         if abs(chain_nue.nu_daughters_pdg[i]) == 211:
@@ -496,9 +493,12 @@ def bkg_efficiency(files_path, scale=1):
                 elif chain_filter.ccnc == 0 and chain_filter.nu_pdg == 14:
                     true_category = 3
 
-
             energy = chain_filter.nu_energy
+
+            tot_bkg[1].Fill(energy, weight)
             tot_bkg[true_category].Fill(energy, weight)
+            if true_category != 5:
+                tot_bkg[7].Fill(energy, weight)
 
             if chain_filter.passed:
                 chain_nue.GetEntry(i_nue)
@@ -653,7 +653,7 @@ def bkg_efficiency_nue(files_path, scale=1):
 
 
 def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p=False):
-    nue_cosmic = glob(files_path+"/*10.root")
+    nue_cosmic = glob(files_path+"/*.root")
     chain_nue = ROOT.TChain("robertoana/pandoratree")
     chain_filter = ROOT.TChain("nueFilter/filtertree")
     chain_pot = ROOT.TChain("nueFilter/pot")
@@ -762,7 +762,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
             h_tot[v].Fill(eff_vars[v], weight)
 
             for u in range(N_UNI):
-                h_tot_sys[v][u].Fill(eff_vars[v], weight * flux_weights[u] * genie_weights[u])
+                h_tot_sys[v][u].Fill(eff_vars[v], weight * genie_weights[u])
 
             if not chain_filter.passed:
                 if chain_filter.selection_result == 2:
@@ -835,7 +835,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
                 h_selected[v]["passed"].Fill(eff_vars[v], weight)
 
             for u in range(N_UNI):
-                h_passed_sys[v][u].Fill(eff_vars[v], weight * flux_weights[u] * genie_weights[u])
+                h_passed_sys[v][u].Fill(eff_vars[v], weight * genie_weights[u])
 
             # bdt_values = {}
             # for bdt_name in BDT_TYPES:

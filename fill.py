@@ -201,6 +201,7 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     track_id, track_score = choose_track(root_chain, particleid)
 
     if STORE_SYS and (option == "bnb" or option == "nue"):
+        print(len(root_chain.flux_weights), len(root_chain.genie_weights))
 
         if (len(root_chain.flux_weights) > 0 and len(root_chain.genie_weights) > 0):
 
@@ -240,7 +241,7 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     true_vertex = [root_chain.true_vx_sce, root_chain.true_vy_sce, root_chain.true_vz_sce]
     neutrino_vertex = [root_chain.vx, root_chain.vy, root_chain.vz]
 
-    variables["is_signal"][0] = int(root_chain.category == 2)
+    # variables["is_signal"][0] = int(root_chain.category == 2)
     variables["true_nu_is_fidvol"][0] = int(is_fiducial(true_vertex))
 
     variables["n_objects"][0] = root_chain.n_tracks + root_chain.n_showers
@@ -495,9 +496,9 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
             shower_energy_cali = root_chain.shower_energy[i_sh][2] * root_chain.shower_energy_cali[i_sh][2]
             variables["shower_energy"][i_sh] = max(-999, shower_energy_cali)
             dedx = root_chain.shower_dEdx[i_sh][2]
-            variables["shower_dedx"][i_sh] = max(-999, dedx)
-            dedx_cali = dedx * root_chain.shower_dQdx_cali[i_sh][2]
             dqdx = root_chain.shower_dQdx[i_sh][2] * root_chain.shower_dQdx_cali[i_sh][2]
+            variables["shower_dedx"][i_sh] = max(-999, dedx)
+            dedx_cali = dqdx * root_chain.shower_dQdx_cali[i_sh][2] * 3.85e-5
             variables["shower_dqdx"][i_sh] = max(-999, dqdx)
             variables["shower_dedx_cali"][i_sh] = max(-999, dedx_cali)
             dedx_u = root_chain.shower_dEdx[shower_id][0] * root_chain.shower_dQdx_cali[shower_id][0]
@@ -583,7 +584,13 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
 
     if root_chain.ccnc == 1 and variables["category"][0] not in (0, 1, 5, 7):
         variables["category"][0] = 4
+    if not variables["true_nu_is_fidvol"][0] and variables["category"][0] != 0 and variables["category"][0] != 6 and variables["category"][0] != 1 and variables["category"][0] != 7:
+        variables["category"][0] = 5
 
+    if variables["category"][0] not in (0, 2, 6, 8) and option not in ("nue", "dirt"):
+        variables["is_signal"][0] = 0.5
+    else:
+        variables["is_signal"][0] = -1
 
 def pt_plot(root_chain, plane):
     p_showers = []
@@ -727,12 +734,12 @@ if __name__ == "__main__":
 
     samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue_sbnfit/*.root"),
+    tree_files = [glob("data_files/mc_nue_sbnfit2/*.root"),
                   glob("data_files/mc_bnb/*/*.root"),
                   glob("data_files/dirt/*.root"),
                   glob("data_files/data_bnb/*/*.root"),
                   glob("data_files/data_ext/*/*.root"),
-                  glob("data_files/mc_nue/*.root"), ]
+                  glob("data_files/mc_nue/*8.root"), ]
 
     chains = []
     chains_pot = []
@@ -755,7 +762,7 @@ if __name__ == "__main__":
             total_pot_file += c.pot
 
         pots.append(total_pot_file)
-
+    print(pots)
 
     pots_dict = dict(zip(samples, pots))
     chains_dict = dict(zip(samples, chains))

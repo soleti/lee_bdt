@@ -32,6 +32,10 @@ RECO_ENERGY = list(dict(VARIABLES)).index("reco_energy")
 POST_SCALING = 1
 
 def plot_pdg(variable, mode):
+    if variable in ("nu_E", "E_dep"):
+        DRAW_DATA = False
+    else:
+        DRAW_DATA = True
     if mode == "selection":
         folder = ""
     elif mode == "bdt":
@@ -94,6 +98,9 @@ def plot_pdg(variable, mode):
         h_mc_err_sys = h_tot_mc.Clone()
         fname_flux = "plots%s/sys/h_%s_flux_sys.root" % (folder, v)
         fname_genie = "plots%s/sys/h_%s_genie_sys.root" % (folder, v)
+        if mode == "selection":
+            fname_detsys = "plots%s/sys/h_%s_det_sys.root" % (folder, v)
+
         if v == "track_energy_length":
             fname_flux = fname_flux.replace("track", "total_track")
             fname_genie = fname_genie.replace("track", "total_track")
@@ -107,6 +114,12 @@ def plot_pdg(variable, mode):
                 h_flux = f_flux.Get("h_%s_cv" % var_name)
                 f_genie = ROOT.TFile(fname_genie)
                 h_genie = f_genie.Get("h_%s_cv" % var_name)
+                if mode == "selection" and os.path.isfile(fname_detsys):
+                    f_detsys = ROOT.TFile(fname_detsys)
+                    h_detsys = f_detsys.Get("h_%s_cv" % var_name)
+                    OBJECTS.append(h_detsys)
+                else:
+                    print("Det sys files not available")
 
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
@@ -115,8 +128,13 @@ def plot_pdg(variable, mode):
                     stat_err = h_mc_err_sys.GetBinError(k)
                     flux_err = h_flux.GetBinError(k)
                     genie_err = h_genie.GetBinError(k)
-                    h_mc_err_sys.SetBinError(k, math.sqrt(
-                        flux_err**2 + genie_err**2 + stat_err**2))
+                    if mode == "selection" and os.path.isfile(fname_detsys):
+                        detsys_err = h_detsys.GetBinError(k) * 1.2
+                    else:
+                        detsys_err = 0
+
+                    h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + detsys_err**2 + stat_err**2))
+                    # h_mc_err_sys.SetBinError(k, math.sqrt(stat_err**2))
                 f_genie.Close()
                 f_flux.Close()
             else:
@@ -152,8 +170,10 @@ def plot_pdg(variable, mode):
     h_tot_mc_clone.SetLineColor(1)
     h_tot_mc_clone.Draw("hist same")
     l_pdg.Draw()
+
     if DRAW_SYS and DRAW_DATA:
         chi2 = h.Chi2Test(h_mc_err_sys, "UW")
+        print("chi2", chi2)
         ks = h.KolmogorovTest(h_mc_err_sys)
     else:
         chi2 = h.Chi2Test(h_tot_mc, "UW")
@@ -181,6 +201,14 @@ def plot_pdg(variable, mode):
     c.SaveAs("plots%s/pdg/%s_pdg.pdf" % (folder, h_stack.GetName()))
     OBJECTS.append(c)
     OBJECTS.append(l_pdg)
+
+    integral_err = 0
+    integral = 0
+    for i_bin in range(1, h_mc_err_sys.GetNbinsX()+1):
+        integral += h_mc_err_sys.GetBinContent(i_bin)
+        integral_err += h_mc_err_sys.GetBinContent(i_bin) + h_mc_err_sys.GetBinError(i_bin)
+    print("Sys uncert. %.1f %%" % ((1 - integral / integral_err) * 100))
+
     return c, l_pdg
 
 
@@ -255,7 +283,7 @@ def draw_ratio(num, den, den_sys=None, OBJECTS=[]):
 
 
 def plot_energy(histograms, reco_err, reco_sys, mode="selection"):
-    c_fixed = ROOT.TCanvas("c_true", "", 900, 44, 700, 645)
+    c_fixed = ROOT.TCanvas("c_energy", "", 900, 44, 700, 645)
     c_fixed.cd()
     if DRAW_DATA and not mode in ("bdt", "cuts", "numu", "nc"):
         draw_top()
@@ -447,6 +475,10 @@ def plot_normalized(name):
 
 
 def plot_variable(name, mode="selection"):
+    if name in ("nu_E", "E_dep", "is_signal"):
+        DRAW_DATA = False
+    else:
+        DRAW_DATA = True
     histograms = {}
 
     if mode == "selection":
@@ -556,11 +588,13 @@ def plot_variable(name, mode="selection"):
         h_mc_err.Add(histograms["mc"].GetHists()[0], -1)
         histograms["mc"].RecursiveRemove(histograms["mc"].GetHists()[0])
     histograms["mc"].Draw("hist")
-    histograms["mc"].GetXaxis().SetTitleOffset(0.8)
+    histograms["mc"].GetHistogram().GetXaxis().SetTitleOffset(0.8)
+
     if DRAW_DATA:
         set_axis(histograms["mc"], max(histograms["mc"].GetHistogram().GetMaximum(), histograms["bnb"].GetMaximum()) * 1.35)
     else:
         set_axis(histograms["mc"])
+
 
     h_mc_err.SetFillStyle(3002)
     h_mc_err.SetFillColor(1)
@@ -580,6 +614,8 @@ def plot_variable(name, mode="selection"):
     if DRAW_SYS:
         fname_flux = "plots%s/sys/h_%s_flux_sys.root" % (folder, name)
         fname_genie = "plots%s/sys/h_%s_genie_sys.root" % (folder, name)
+        fname_detsys = "plots%s/sys/h_%s_det_sys.root" % (folder, name)
+
         if "_before" in name:
             fname_flux = fname_flux.replace("_before", "")
             fname_genie = fname_genie.replace("_before", "")
@@ -588,6 +624,7 @@ def plot_variable(name, mode="selection"):
             fname_genie = fname_genie.replace("track", "total_track")
 
         OBJECTS.append(h_mc_err_sys)
+        print(os.path.isfile(fname_flux), os.path.isfile(fname_genie))
         if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
             f_flux = ROOT.TFile(fname_flux)
             if name == "reco_energy":
@@ -603,27 +640,47 @@ def plot_variable(name, mode="selection"):
             h_genie = f_genie.Get("h_%s_cv%s" % (var_name, fixed))
             h_flux_nobinning = h_flux.Clone()
             h_genie_nobinning = h_genie.Clone()
+
+            if mode == "selection":
+                f_detsys = ROOT.TFile(fname_detsys)
+                h_detsys = f_detsys.Get("h_%s_cv" % var_name)
+                h_detsys_nobinning = h_detsys.Clone()
+
             if name == "reco_energy":
                 fix_binning(h_flux)
                 fix_binning(h_genie)
+                if mode == "selection":
+                    fix_binning(h_detsys)
             OBJECTS.append(h_flux)
             OBJECTS.append(h_genie)
+            if mode == "selection":
+                OBJECTS.append(h_detsys)
 
             for k in range(1, h_mc_err_sys.GetNbinsX() + 1):
                 stat_err = h_mc_err_sys.GetBinError(k)
                 flux_err = h_flux.GetBinError(k)
                 genie_err = h_genie.GetBinError(k)
+                if mode == "selection":
+                    detsys_err = h_detsys.GetBinError(k) * 1.07
+                    detsys_err_nobinning = h_detsys_nobinning.GetBinError(k) * 1.07
+                else:
+                    detsys_err, detsys_err_nobinning = h_mc_err_sys.GetBinContent(k) * 0.2, h_mc_err_sys_nobinning.GetBinContent(k) * 0.2
+
                 stat_err_nobinning = h_mc_err_sys_nobinning.GetBinError(k)
                 flux_err_nobinning = h_flux_nobinning.GetBinError(k)
                 genie_err_nobinning = h_genie_nobinning.GetBinError(k)
-                h_mc_err_sys.SetBinError(
-                    k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2))
-                h_mc_err_sys_nobinning.SetBinError(
-                    k, math.sqrt(flux_err_nobinning**2 + genie_err_nobinning**2 + stat_err_nobinning**2))
+
+                h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2 + detsys_err**2))
+                h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(stat_err_nobinning**2+flux_err_nobinning**2+genie_err_nobinning**2+detsys_err_nobinning**2))
+                # h_mc_err_sys.SetBinError(k, math.sqrt(detsys_err**2))
+                # h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(detsys_err_nobinning**2))
+
             f_genie.Close()
             f_flux.Close()
+            if mode == "selection":
+                f_detsys.Close()
         else:
-            print("GENIE or FLUX sys files not available")
+            print("GENIE or FLUX or DET sys files not available")
         h_mc_err_sys.Draw("e2 same")
     else:
         h_mc_err.Draw("e2 same")
@@ -680,10 +737,17 @@ def plot_variable(name, mode="selection"):
         p_chi2.SetFillStyle(0)
         p_chi2.SetBorderSize(0)
         OBJECTS.append(p_chi2)
+    else:
+        c.SetBottomMargin(0.15)
     OBJECTS.append(c)
-    c.SaveAs("plots%s/%s.pdf" % (folder, histograms["bnb"].GetName()))
     legend.Draw("same")
-
+    c.SaveAs("plots%s/%s.pdf" % (folder, histograms["bnb"].GetName()))
+    integral_err = 0
+    integral = 0
+    for i_bin in range(1, h_mc_err_nobinning.GetNbinsX()+1):
+        integral += h_mc_err_nobinning.GetBinContent(i_bin)
+        integral_err += h_mc_err_nobinning.GetBinContent(i_bin) + h_mc_err_sys_nobinning.GetBinError(i_bin)
+    print(integral, integral_err, "Sys uncert. %.1f %%" % (((integral_err / integral) - 1) * 100))
     return c, legend
 
 

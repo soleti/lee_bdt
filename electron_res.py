@@ -16,7 +16,6 @@ from proton_energy import length2energy
 ROOT.gStyle.SetOptTitle(1)
 ROOT.gStyle.SetTitleFillColor(ROOT.kWhite)
 ROOT.gStyle.SetOptStat(0)
-ROOT.gStyle.SetPalette(87)
 ROOT.gStyle.SetNumberContours(99)
 ROOT.gStyle.SetStatW(0.16)
 ROOT.gStyle.SetOptFit(0)
@@ -616,11 +615,11 @@ def deposited_calibration(file_path, n_bins=10, max_energy=2, scale=1,
 
     entries = int(c.GetEntries() / scale)
     h_reco_true = ROOT.TH2F("h_reco_true",
-                            ";E_{deposited} [GeV];E_{reco} [GeV]",
+                            ";E_{k} [GeV];E_{corr} [GeV]",
                             300, 0, 3,
                             300, 0, 3)
     h_reco_true_corr = ROOT.TH2F("h_reco_true_corr",
-                                 ";E_{deposited} [GeV];E_{reco} [GeV]",
+                                 ";E_{k} [GeV];E_{corr} [GeV]",
                                  300, 0, 3,
                                  300, 0, 3)
 

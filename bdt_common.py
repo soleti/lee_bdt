@@ -298,6 +298,9 @@ def pre_cuts(var_dict, numu=False):
                           var_dict["shower_energy"][0] > 0.01
     track_pid = var_dict["track_pidchipr"][tr_id] < 80
     ene = 0.4 < var_dict["reco_energy"][0] < 0.6
+    category = var_dict["category"][0]
+    if not var_dict["true_nu_is_fidvol"][0] and category != 0 and category != 6 and category != 1 and category != 7:
+        category = 5
     return numu and hits and shower_track_energy
 
 def is_active(point):
@@ -416,8 +419,7 @@ def manual_cuts(var_dict, mode="nue"):
     passed_photon = len(photon_cuts) == sum(photon_cuts)
 
     numu_cuts = [shower_distance, track_length_numu, shower_energy,
-                 track_shower_angle,
-                 shower_dedx, track_proton_chi2_numu]
+                 track_shower_angle, shower_dedx, track_proton_chi2_numu]
 
     passed_numu = len(numu_cuts) == sum(numu_cuts)
 
@@ -854,7 +856,7 @@ binning = {
     "run": [20, 0, 10],
     "subrun": [20, 0, 1000],
     "interaction_type": [100, 1000, 1100],
-    "is_signal": [2, 0, 1],
+    "is_signal": [1, 0, 1],
     "shower_pca": [20, 0.9, 1],
     "track_pca": [20, 0.99, 1],
     "total_shower_energy": [20, 0, 0.5],
@@ -866,7 +868,6 @@ binning = {
     "hits_ratio": [20, 0, 1],
     "nu_E": [40, 0, 4],
     "E_dep": [30, 0, 3],
-
     "track_hits": [20, 0, 400],
     "track_dqdx": [20, 0, 1200],
     "total_track_energy_length": [12, 0, 1.2],
@@ -918,7 +919,7 @@ labels = {
     "shower_res_mean": ";Shower res. #mu [cm]; N. Entries / %.2f" % bin_size("shower_res_mean"),
     "shower_res_std": ";Shower res. #sigma [cm]; N. Entries / %.2f" % bin_size("shower_res_std"),
     "nu_E": ";#nu_{e} energy [GeV];N. Entries / %.1f" % bin_size("nu_E"),
-    "E_dep": ";#nu_{e} energy [GeV];N. Entries / %.1f" % bin_size("nu_E"),
+    "E_dep": ";E_{deposited} [GeV];N. Entries / %.1f" % bin_size("nu_E"),
     "n_objects": ";# objects;N.Entries / %i" % bin_size("n_objects"),
     "n_tracks": ";# tracks;N.Entries / %i" % bin_size("n_tracks"),
     "n_showers": ";# showers;N.Entries / %i" % bin_size("n_showers"),
@@ -965,7 +966,7 @@ labels = {
     "run": ";run",
     "subrun": ";subrun",
     "interaction_type": ";interaction_type",
-    "is_signal": ";is_signal",
+    "is_signal": ";Selected events; N. Entries",
     "shower_pca": ";Shower PCA;N. Entries / %.3f" % bin_size("shower_pca"),
     "track_pca": ";Track PCA;N. Entries / %.3f" % bin_size("track_pca"),
     "total_shower_energy": ";Total shower E (not calibrated) [GeV]; N. Entries / %.2f GeV" % bin_size("total_shower_energy"),

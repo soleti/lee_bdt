@@ -50,7 +50,7 @@ else:
 
 chain = ROOT.TChain("mc_tree")
 chain.Add("root_files/mc_file.root/mc_tree")
-chain.Add("root_files/nue_file.root/nue_tree")
+# chain.Add("root_files/nue_file.root/nue_tree")
 
 total_entries = int(chain.GetEntries() / 1)
 
@@ -104,7 +104,6 @@ for ievt in tqdm(range(total_entries)):
             for i, v in enumerate(var):
                 if v > -999:
                     h_cv[name].Fill(v, chain.event_weight)
-
                     for u in range(N_UNI):
                         if SYS_MODE == "genie":
                             weight = chain.genie_weights[u]
@@ -112,7 +111,7 @@ for ievt in tqdm(range(total_entries)):
                             weight = chain.flux_weights[u]
                         else:
                             weight = chain.flux_weights[u] * chain.genie_weights[u]
-                        if weight > 2:
+                        if weight > 5:
                             weight = 1
                         h_sys[name][u].Fill(v, chain.event_weight * weight)
 
@@ -123,7 +122,7 @@ for n, b in vars.items():
                             labels[n],
                             len(bins) - 1,
                             bins,
-                            int(N_UNI/2), 0, h_sys[n][0].GetMaximum() * 2)
+                            int(h_sys[n][0].GetMaximum()), 0, h_sys[n][0].GetMaximum() * 2)
     else:
         h_2d[n] = ROOT.TH2F("h_%s" % n,
                             labels[n],
@@ -241,8 +240,8 @@ for v in SYS_VARIABLES:
 
 OBJECTS = []
 
-pt = ROOT.TPaveText(0.057, 0.905, 0.422, 0.951, "ndc")
-pt.AddText("MicroBooNE Preliminary")
+pt = ROOT.TPaveText(0.078, 0.91, 0.7, 0.978, "NDC")
+pt.AddText("MicroBooNE Simulation Preliminary")
 pt.SetFillColor(0)
 pt.SetBorderSize(0)
 pt.SetShadowColor(0)
@@ -262,7 +261,8 @@ for v in SYS_VARIABLES:
         h_frac[v] = fixed_width_histo_2d(h_frac[v])
         h_corr[v] = fixed_width_histo_2d(h_corr[v])
 
-    c = ROOT.TCanvas("c_%s" % v)
+    c = ROOT.TCanvas("c_%s" % v, "", 900, 44, 700, 645)
+    # c.SetTopMargin(0.18)
     h_cv[v].Draw("ep")
     h_2d[v].GetZaxis().SetRangeUser(0, 30)
     h_2d[v].Draw("colz same")
@@ -271,7 +271,43 @@ for v in SYS_VARIABLES:
     h_cv[v].SetMarkerColor(ROOT.kRed + 1)
     h_cv[v].SetLineColor(ROOT.kRed + 1)
     h_cv[v].GetYaxis().SetTitleOffset(0.9)
-    h_cv[v].GetYaxis().SetRangeUser(0.001, h_cv[v].GetMaximum() * 1.5)
+    h_cv[v].GetYaxis().SetRangeUser(0.001, h_cv[v].GetMaximum() * 1.2)
+    if v == "reco_energy":
+        p_15 = ROOT.TPaveText(0.744, 0.0555, 0.794, 0.101, "NDC")
+        p_white = ROOT.TPaveText(0.78, 0.0555, 0.84, 0.091, "NDC")
+        p_white2 = ROOT.TPaveText(0.875, 0.0545, 0.925, 0.091, "NDC")
+        p_3 = ROOT.TPaveText(0.874, 0.0575, 0.924, 0.103, "NDC")
+
+        p_15.AddText("1.5")
+        p_15.SetFillStyle(0)
+        p_15.SetShadowColor(0)
+        p_15.SetBorderSize(0)
+        p_15.SetTextFont(42)
+
+        p_white.AddText("  ")
+        p_white.SetFillColor(ROOT.kWhite)
+        p_white.SetShadowColor(0)
+        p_white.SetBorderSize(0)
+        p_white.SetTextFont(42)
+        p_white.SetTextSize(14)
+
+        p_white2.AddText("  ")
+        p_white2.SetFillColor(ROOT.kWhite)
+        p_white2.SetShadowColor(0)
+        p_white2.SetBorderSize(0)
+        p_white2.SetTextFont(42)
+        p_white2.SetTextSize(14)
+
+        p_3.AddText("3")
+        # p_3.SetFillColor(ROOT.kWhite)
+        p_3.SetFillStyle(0)
+        p_3.SetShadowColor(0)
+        p_3.SetBorderSize(0)
+        p_3.SetTextFont(42)
+        p_white.Draw()
+        p_white2.Draw()
+        p_15.Draw()
+        p_3.Draw()
     pt.Draw()
 
     f_cv = ROOT.TFile("plots%s/sys/h_%s_%s_sys.root" % (folder, v, SYS_MODE), "RECREATE")
@@ -281,25 +317,61 @@ for v in SYS_VARIABLES:
     c.SaveAs("plots%s/sys/h_%s_%s_err.pdf" % (folder, v, SYS_MODE))
     c.Update()
 
-    c_cov = ROOT.TCanvas("c_cov_%s" % v)
+    c_cov = ROOT.TCanvas("c_cov_%s" % v, v, 900, 44, 700, 645)
     ROOT.gStyle.SetPaintTextFormat(".3f")
-    h_covariance[v].Draw("colz text")
+    h_covariance[v].Draw("colz")
     h_covariance[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
     c_cov.SaveAs("plots%s/sys/h_%s_%s_cov.pdf" % (folder, v, SYS_MODE))
     c_cov.Update()
 
-    c_frac = ROOT.TCanvas("c_frac_%s" % v)
+    c_frac = ROOT.TCanvas("c_frac_%s" % v, v, 900, 44, 700, 645)
     ROOT.gStyle.SetPaintTextFormat(".3f")
-    h_frac[v].Draw("colz text")
+    h_frac[v].Draw("colz")
     h_frac[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
+    if v == "reco_energy":
+        p_15_vertical = ROOT.TPaveText(0.045, 0.745, 0.0959, 0.790, "NDC")
+        p_15_vertical.AddText("1.5")
+        p_15_vertical.SetFillStyle(0)
+        p_15_vertical.SetShadowColor(0)
+        p_15_vertical.SetBorderSize(0)
+        p_15_vertical.SetTextFont(42)
+        p_3_vertical = ROOT.TPaveText(0.05, 0.879, 0.0995, 0.924, "NDC")
+        p_3_vertical.AddText("3")
+        p_3_vertical.SetFillStyle(0)
+        p_3_vertical.SetShadowColor(0)
+        p_3_vertical.SetBorderSize(0)
+        p_3_vertical.SetTextFont(42)
+        p_white_vertical = ROOT.TPaveText(0.045, 0.879, 0.095, 0.924, "NDC")
+        p_white_vertical.AddText("   ")
+        p_white_vertical.SetFillColor(ROOT.kWhite)
+        p_white_vertical.SetShadowColor(0)
+        p_white_vertical.SetBorderSize(0)
+        p_white_vertical.SetTextFont(42)
+        p_white_vertical.SetTextSize(14)
+        p_white2_vertical = ROOT.TPaveText(0.045, 0.788, 0.095, 0.833, "NDC")
+        p_white2_vertical.AddText("   ")
+        p_white2_vertical.SetFillColor(ROOT.kWhite)
+        p_white2_vertical.SetShadowColor(0)
+        p_white2_vertical.SetBorderSize(0)
+        p_white2_vertical.SetTextFont(42)
+        p_white2_vertical.SetTextSize(14)
+        p_white.Draw()
+        p_white2.Draw()
+        p_white_vertical.Draw()
+        p_white2_vertical.Draw()
+        p_15.Draw()
+        p_15_vertical.Draw()
+        p_3_vertical.Draw()
+        p_3.Draw()
+    c_frac.SetRightMargin(0.2)
     c_frac.SaveAs("plots%s/sys/h_%s_%s_frac.pdf" % (folder, v, SYS_MODE))
     c_frac.Update()
 
     c_corr = ROOT.TCanvas("c_corr_%s" % v)
     ROOT.gStyle.SetPaintTextFormat(".3f")
-    h_corr[v].Draw("colz text")
+    h_corr[v].Draw("colz")
     h_corr[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
     c_corr.SaveAs("plots%s/sys/h_%s_%s_corr.pdf" % (folder, v, SYS_MODE))
