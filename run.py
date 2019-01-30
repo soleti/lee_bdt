@@ -89,8 +89,10 @@ def fill_histos_data(tree_name, mode="nue"):
             for bdt_name in bdt_types:
                 h_bdts[bdt_name].Fill(bdt_values[bdt_name], t_data.event_weight)
 
+            # print(bdt_values)
             if apply_cuts(bdt_values, variables_dict, BDT, MANUAL, mode):
                 passed_events += t_data.event_weight
+
                 all_vars = variables + spectators
                 clone.Fill()
                 for name, var in all_vars:
@@ -176,8 +178,12 @@ def fill_histos(chain, histo_dict, h_bdt_types, option="", mode="nue"):
             var_dict = dict(all_vars)
             for name, var in all_vars:
                 for i_v, v in enumerate(var):
+
                     if v == -999:
                         break
+
+                    pdg_code = 99999
+
                     if "track" in name and name != "no_tracks":
                         pdg_code = int(var_dict["track_pdg"][i_v])
                         if option != "bnbext" and abs(pdg_code) == 2147483648:
@@ -187,15 +193,18 @@ def fill_histos(chain, histo_dict, h_bdt_types, option="", mode="nue"):
                         if option != "bnbext" and abs(pdg_code) == 2147483648:
                             pdg_code = int(var_dict["track_pdg"][0])
 
-                    if option != "bnbext" and abs(pdg_code) == 2147483648:
-                        pdg_code = 99999
-
                     if abs(pdg_code) in h_pdgs[name]:
-                        h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
+                        if MANUAL and category == 2:
+                            h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight * 3.3/2.9)
+                        else:
+                            h_pdgs[name][abs(pdg_code)].Fill(v, chain.event_weight)
                     else:
                         h_pdgs[name][99999].Fill(v, chain.event_weight)
 
-                    histo_dict[name][category].Fill(v, chain.event_weight)
+                    if MANUAL and category == 2:
+                        histo_dict[name][category].Fill(v, chain.event_weight * 3.3/2.9)
+                    else:
+                        histo_dict[name][category].Fill(v, chain.event_weight)
 
     f.close()
     f = ROOT.TFile("plots/bdt_ntuple_%s.root" % option,
@@ -292,9 +301,9 @@ if __name__ == "__main__":
         h_bdt_stacks[bdt_type] = h_bdt_stack
         h_bdt_types[bdt_type] = h_bdts
 
+    print("LEE events", fill_histos_data("lee", mode))
     print("Data events", fill_histos_data("bnb", mode))
     print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue", mode))
-    print("LEE events", fill_histos_data("lee", mode))
     print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc", mode))
     print("EXT events", fill_histos(bnbext_chain, histo_dict, h_bdt_types, "bnbext", mode))
 
@@ -321,7 +330,6 @@ if __name__ == "__main__":
             folder = "_numu"
         elif mode == "nc":
             folder = "_nc"
-        print("plots%s/%s_mc.root" % (folder, h.GetName()))
         f = ROOT.TFile("plots%s/%s_mc.root" % (folder, h.GetName()), "RECREATE")
         h.Write()
         f.Close()

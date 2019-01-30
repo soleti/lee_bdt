@@ -6,11 +6,13 @@ from glob import glob
 
 import ROOT
 from tqdm import tqdm_notebook
-from settings import binning, labels
-from settings import is_fiducial, variables, spectators
-from settings import pre_cuts, load_bdt, apply_cuts, fill_kin_branches
+from bdt_common import binning, labels
+from bdt_common import is_fiducial, variables, spectators
+from bdt_common import pre_cuts, load_bdt, apply_cuts
+from fill import fill_kin_branches
 from settings import N_UNI, ELECTRON_THRESHOLD, PROTON_THRESHOLD
 from settings import PROTON_MASS, ELECTRON_MASS
+from bdt_common import bdt_types
 
 ELECTRON_THRESHOLD = 0.020
 PROTON_THRESHOLD = 0.040
@@ -87,12 +89,12 @@ class Efficiency:
 
         for i_bin in range(1, self.selected[num].GetNbinsX()+1):
             stat_error = teff.GetEfficiencyErrorLow(i_bin) + teff.GetEfficiencyErrorUp(i_bin)
-            teff_sys.SetBinError(i_bin, math.sqrt(self.sys_err[i_bin - 1]**2 + self.sys_err[i_bin - 1]**2))
+            teff_sys.SetBinError(i_bin, math.sqrt(stat_error**2 + self.sys_err[i_bin - 1]**2))
 
         return teff_sys
 
 
-    def draw(self, systematics=True, uni=True):
+    def draw(self, systematics=True, uni=True, mode="passed"):
         """Draws the efficiency in a ROOT Canvas with statistical
         and systematic errors
 
@@ -105,8 +107,8 @@ class Efficiency:
         c_eff_sys = ROOT.TCanvas("c_eff_sys_%s" % self.tot.GetName(),
                                  self.tot.GetName(),
                                  900, 44, 700, 645)
-        eff_stat = self.tefficiency("passed")
-        eff_sys = self.tefficiency_err("passed")
+        eff_stat = self.tefficiency(mode)
+        eff_sys = self.tefficiency_err(mode)
         eff_stat.SetLineWidth(2)
         eff_stat.Draw("ap")
         eff_stat.SetTitle("Efficiency")
@@ -119,17 +121,17 @@ class Efficiency:
             eff_sys.Draw("e same")
             eff_stat.Draw("p same")
 
-        l_eff = ROOT.TLegend(0.097, 0.854, 0.9, 0.9)
+        l_eff = ROOT.TLegend(0.097, 0.814, 0.9, 0.9)
 
         if systematics:
             l_eff.AddEntry(eff_stat,
                            "Selection efficiency: (%.1f #pm %.1f (stat.) #pm %.1f (sys.) %%"
-                           % (self.efficiency["passed"] * 100 + 0.1, self.efficiency_err["passed"] * 100, self.total_sys_err * 100),
+                           % (self.efficiency[mode] * 100, self.efficiency_err[mode] * 100, self.total_sys_err * 100),
                            "le")
         else:
             l_eff.AddEntry(eff_stat,
                            "Selection efficiency: (%.1f #pm %.1f (stat.)) %%"
-                           % (self.efficiency["passed"] * 100 + 0.1, self.efficiency_err["passed"] * 100),
+                           % (self.efficiency[mode] * 100, self.efficiency_err[mode] * 100),
                            "le")
 
         # l_eff.Draw()
@@ -157,6 +159,8 @@ def draw_true(histo):
                  "f")
     canvas = ROOT.TCanvas("c_tot", "True %s" % histo.GetName(), 640, 480)
     tot.Draw("hist")
+    tot2 = tot.Clone()
+    tot2.Draw("e2 same")
     tot.GetYaxis().SetTitleOffset(0.9)
     canvas.SetTopMargin(0.16)
 
@@ -440,7 +444,7 @@ def bkg_efficiency(files_path, scale=1):
                                   binning["energy"][1],
                                   binning["energy"][2])
 
-    bnb_cosmic = glob(files_path+"/*/*.root")
+    bnb_cosmic = glob(files_path+"/*.root")
     nue_cosmic = glob("data_files/mc_nue_sbnfit/*.root")
     dirt = glob("data_files/dirt/*.root")
     samples = [bnb_cosmic, nue_cosmic, dirt]
@@ -543,7 +547,6 @@ def bkg_efficiency(files_path, scale=1):
 
 def bkg_efficiency_nue(files_path, scale=1):
     bnb_cosmic = glob(files_path+"/*.root")
-
     chain_nue = ROOT.TChain("robertoana/pandoratree")
     chain_filter = ROOT.TChain("nueFilter/filtertree")
     chain_pot = ROOT.TChain("nueFilter/pot")
@@ -653,7 +656,7 @@ def bkg_efficiency_nue(files_path, scale=1):
 
 
 def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p=False):
-    nue_cosmic = glob(files_path+"/*.root")
+    nue_cosmic = glob(files_path+"/output*.root")
     chain_nue = ROOT.TChain("robertoana/pandoratree")
     chain_filter = ROOT.TChain("nueFilter/filtertree")
     chain_pot = ROOT.TChain("nueFilter/pot")
@@ -674,6 +677,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
     total_pot /= 1.028
     categories = ["passed", "quality cuts", "CC #nu_{#mu} selected", "not contained",
                   "cosmic selected", "1 shower", "no showers", "no flash", "no data products"]
+                #   "cuts"]
 
     h_tot = {}
     h_tot_sys = {}
@@ -741,6 +745,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
 
         if not (is_fiducial(true_neutrino_vertex) and eNp_interaction):
             continue
+
         proton_energy, electron_energy = eNp_interaction[0], eNp_interaction[1]
         eff_vars["proton_energy"] = proton_energy
         eff_vars["electron_energy"] = electron_energy
@@ -756,7 +761,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
             for flux in chain_filter.flux_weights:
                 flux_weights = [a*b for a, b in zip(flux_weights, flux)]
             genie_weights = chain_filter.genie_weights[0]
-        weight = chain_filter.bnbweight
+        weight = chain_filter.bnbweight * 1.04
 
         for v in eff_variables:
             h_tot[v].Fill(eff_vars[v], weight)
@@ -797,7 +802,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
                 h_selected[v]["not contained"].Fill(eff_vars[v], weight)
                 continue
 
-            fill_kin_branches(chain_nue, 1, var_dict, "nue", False)
+            fill_kin_branches(chain_nue, 1, var_dict, "nue", True)
 
             if not pre_cuts(var_dict):
                 h_selected[v]["quality cuts"].Fill(eff_vars[v], weight)
@@ -838,11 +843,11 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
                 h_passed_sys[v][u].Fill(eff_vars[v], weight * genie_weights[u])
 
             # bdt_values = {}
-            # for bdt_name in BDT_TYPES:
+            # for bdt_name in bdt_types:
             #     bdt_values[bdt_name] = reader.EvaluateMVA("BDT%s" % bdt_name)
 
-        #     if apply_cuts(bdt_values, var_dict, bdt=False, manual=True):
-        #         h_selected["cuts"].Fill(eff_vars[v], weight)
+            # if apply_cuts(bdt_values, var_dict, bdt=False, manual=True):
+            #     h_selected[v]["cuts"].Fill(eff_vars[v], weight * 3.2/2.9 * 1.04)
         #     if apply_cuts(bdt_values, var_dict, bdt=True, manual=False):
         #         h_selected["bdt"].Fill(eff_vars[v], weight)
 

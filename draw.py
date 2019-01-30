@@ -129,12 +129,13 @@ def plot_pdg(variable, mode):
                     flux_err = h_flux.GetBinError(k)
                     genie_err = h_genie.GetBinError(k)
                     if mode == "selection" and os.path.isfile(fname_detsys):
-                        detsys_err = h_detsys.GetBinError(k) * 1.2
+                        detsys_err = h_detsys.GetBinError(k)
                     else:
-                        detsys_err = 0
-
+                        detsys_err = h_mc_err_sys.GetBinContent(k) * 0.2
+                    # print(flux_err, genie_err, detsys_err, stat_err)
+                    # print(math.sqrt(flux_err**2 + genie_err**2 + detsys_err**2 + stat_err**2))
                     h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + detsys_err**2 + stat_err**2))
-                    # h_mc_err_sys.SetBinError(k, math.sqrt(stat_err**2))
+                    # h_mc_err_sys.SetBinError(k, math.sqrt(detsys_err**2))
                 f_genie.Close()
                 f_flux.Close()
             else:
@@ -172,11 +173,10 @@ def plot_pdg(variable, mode):
     l_pdg.Draw()
 
     if DRAW_SYS and DRAW_DATA:
-        chi2 = h.Chi2Test(h_mc_err_sys, "UW")
-        print("chi2", chi2)
+        chi2 = h.Chi2Test(h_mc_err_sys, "WW")
         ks = h.KolmogorovTest(h_mc_err_sys)
     else:
-        chi2 = h.Chi2Test(h_tot_mc, "UW")
+        chi2 = h.Chi2Test(h_tot_mc, "WW")
         ks = h.KolmogorovTest(h_tot_mc)
 
     p_test = ROOT.TPaveText(0.656, 0.587, 0.849, 0.695, "NDC")
@@ -185,7 +185,7 @@ def plot_pdg(variable, mode):
     p_test.SetFillStyle(0)
     p_test.SetBorderSize(0)
     p_test.SetTextAlign(11)
-    p_test.Draw()
+    # p_test.Draw()
 
     OBJECTS.append(p_test)
     OBJECTS.append(h_tot_mc_clone)
@@ -204,11 +204,13 @@ def plot_pdg(variable, mode):
 
     integral_err = 0
     integral = 0
+
     for i_bin in range(1, h_mc_err_sys.GetNbinsX()+1):
         integral += h_mc_err_sys.GetBinContent(i_bin)
         integral_err += h_mc_err_sys.GetBinContent(i_bin) + h_mc_err_sys.GetBinError(i_bin)
-    print("Sys uncert. %.1f %%" % ((1 - integral / integral_err) * 100))
 
+    if variable == "is_signal":
+        print("Sys uncert. %.1f %%" % (((integral_err / integral) - 1) * 100))
     return c, l_pdg
 
 
@@ -475,7 +477,7 @@ def plot_normalized(name):
 
 
 def plot_variable(name, mode="selection"):
-    if name in ("nu_E", "E_dep", "is_signal"):
+    if name in ("nu_E", "E_dep"):
         DRAW_DATA = False
     else:
         DRAW_DATA = True
@@ -518,6 +520,8 @@ def plot_variable(name, mode="selection"):
             legend.AddEntry(histo, "{}: {:.1f} entries".format(d, n_events), "f")
 
     if DRAW_LEE:
+        if mode == "cuts":
+            histograms["mc"].GetHists()[7].Scale(3.3/2.9)
         histograms["lee"].Scale(1.5)
         histograms["lee"].SetLineWidth(0)
         histograms["lee"].SetFillColor(ROOT.kGreen - 10)
@@ -553,7 +557,7 @@ def plot_variable(name, mode="selection"):
         h_mc_err.Add(histograms["mc"].GetHists()[j])
 
     if name == "reco_energy" and mode not in ("numu", "selection", "nc"):
-        print("Purity", h_sig.Integral()/h_mc_err_nobinning.Integral())
+        print("#nu_{e} CC0#pi-Np purity: %.1f%%" % (h_sig.Integral()/h_mc_err_nobinning.Integral()*100))
 
     if DRAW_LEE:
         if name == "reco_energy" and mode not in ("numu", "selection", "nc"):
@@ -567,13 +571,40 @@ def plot_variable(name, mode="selection"):
 
             sig = np.array(sig)
             bkg = np.array(bkg)
+            print("Bkg events:", bkg)
+            print("Sig events:", sig)
             nu_e = np.array(nu_e)
             print("Significance @ 4.4e19 POT stat: ",
                 sigma_calc_matrix(sig, bkg, 1, False))
             print("Significance @ 1.3e21 POT stat: ",
-                sigma_calc_matrix(sig, bkg, 30.4, False))
+                sigma_calc_matrix(sig, bkg, 1.32e21/total_data_bnb_pot, False))
+            h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
+            # for eff in range(10, 50):
+            #     for red in range(10, 50):
+            #         bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
+            #         sig_new = sig*eff/10
+            #         error_scale = (sum(sig_new)+sum(bkg_new))/(sum(sig)+sum(bkg))
+            #         h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, DRAW_SYS, mode, error_scale))
+            OBJECTS.append(h_eff_red)
+
+            c_eff_red = ROOT.TCanvas("c_eff_red")
+            if mode == "bdt":
+                ROOT.gStyle.SetPalette(ROOT.kBird)
+            else:
+                ROOT.gStyle.SetPalette(ROOT.kLightTemperature)
+
+            h_eff_red.Draw("colz")
+            h_eff_red.GetYaxis().SetTitleOffset(0.92)
+            h_eff_red.GetZaxis().SetRangeUser(1, 6.5)
+            h_eff_red.GetZaxis().SetTitle("Significance [#sigma]")
+            h_eff_red.GetZaxis().SetTitleOffset(0.7)
+            c_eff_red.SetRightMargin(0.15)
+            c_eff_red.Update()
+            c_eff_red.SaveAs("plots/h_2d_%s.pdf" % mode)
+            OBJECTS.append(c_eff_red)
             if DRAW_SYS:
-                print("Significance @ 1.3e21 POT sys: ", sigma_calc_matrix(sig, bkg, 30.4, True, mode))
+                print("Significance @ 1.3e21 POT sys: ", sigma_calc_matrix(
+                    sig, bkg, 1.32e21/total_data_bnb_pot, True, mode))
             fix_binning(histograms["lee"])
 
         h_mc_err.Add(histograms["lee"])
@@ -624,7 +655,7 @@ def plot_variable(name, mode="selection"):
             fname_genie = fname_genie.replace("track", "total_track")
 
         OBJECTS.append(h_mc_err_sys)
-        print(os.path.isfile(fname_flux), os.path.isfile(fname_genie))
+
         if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
             f_flux = ROOT.TFile(fname_flux)
             if name == "reco_energy":
@@ -672,8 +703,8 @@ def plot_variable(name, mode="selection"):
 
                 h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2 + detsys_err**2))
                 h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(stat_err_nobinning**2+flux_err_nobinning**2+genie_err_nobinning**2+detsys_err_nobinning**2))
-                # h_mc_err_sys.SetBinError(k, math.sqrt(detsys_err**2))
-                # h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(detsys_err_nobinning**2))
+                # h_mc_err_sys.SetBinError(k, math.sqrt(genie_err**2+flux_err**2))
+                # h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(genie_err_nobinning**2+flux_err_nobinning**2))
 
             f_genie.Close()
             f_flux.Close()
@@ -747,7 +778,8 @@ def plot_variable(name, mode="selection"):
     for i_bin in range(1, h_mc_err_nobinning.GetNbinsX()+1):
         integral += h_mc_err_nobinning.GetBinContent(i_bin)
         integral_err += h_mc_err_nobinning.GetBinContent(i_bin) + h_mc_err_sys_nobinning.GetBinError(i_bin)
-    print(integral, integral_err, "Sys uncert. %.1f %%" % (((integral_err / integral) - 1) * 100))
+    if name == "is_signal":
+        print("Sys uncert. %.1f %%" % (((integral_err / integral) - 1) * 100))
     return c, legend
 
 

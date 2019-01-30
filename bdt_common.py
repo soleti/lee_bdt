@@ -8,6 +8,8 @@ import collections
 import os
 from tqdm import tqdm
 
+np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+
 ELECTRON_MASS = 0.51e-3
 PROTON_MASS = 0.938
 PROTON_THRESHOLD = 0.040
@@ -21,13 +23,24 @@ BDT, MANUAL = False, False
 total_data_bnb_pot = 4.341e+19
 
 
-bdt_nc_cut = 0.165
-bdt_numu_cut = 0.105
-bdt_cut_cosmic = 0.09
-# bdt_nc_cut = 0.185
-# bdt_numu_cut = 0.20
-# bdt_cut_cosmic = 0.10
+bdt_nc_cut = 0.165 # thesis
+bdt_numu_cut = 0.105 # thesis
+bdt_cut_cosmic = 0.09 # thesis
 
+# NEW CUTS
+bdt_nc_cut = 0.15
+bdt_numu_cut = 0.15
+bdt_cut_cosmic = 0.2
+# NEW MAX CUTS
+bdt_nc_cut = 0.19
+bdt_numu_cut = 0.17
+bdt_cut_cosmic = 0.22
+
+bdt_nc_cut = 0.18
+bdt_numu_cut = 0.17
+bdt_cut_cosmic = 0.21
+
+# COLLAB MEETING MAX CUTS
 # bdt_nc_cut = 0.175
 # bdt_numu_cut = 0.19
 # bdt_cut_cosmic = 0.116
@@ -37,10 +50,10 @@ rectangular_cut = 0.03
 bdt_types = ["", "cosmic", "numu", "nc", "neutrino"]
 
 miniboone_bins = np.array([0, 0.200,  0.300,  0.375,  0.475,  0.550,  0.675,  0.800,  0.950,  1.100,  1.300,  1.500,  3.000])
-miniboone_bins_2 = np.array([0, 0.200,  0.300,  0.375,  0.475,  0.550,  0.675,  0.800,  0.950,  1.100,  1.300,  1.500,  1.8])
+miniboone_bins2 = np.array([0, 0.200,  0.300,  0.375,  0.475,  0.550,  0.675,  0.800,  0.950,  1.100,  1.300,  1.500,  1.8])
 
-energy_bins = np.array([0, 0.2, 0.4, 0.65, 1.1, 1.85, 3])
-energy_bins2 = np.array([0, 0.2, 0.4, 0.65, 1.1, 1.85, 2.2])
+energy_bins = np.array([0, 0.2, 0.4, 0.6, 0.9, 1.25, 1.9, 3])
+energy_bins2 = np.array([0, 0.2, 0.4, 0.6, 0.9, 1.25, 1.9, 2.5])
 
 # bins = array("f", [0, 0.200, 0.350, 0.5, 0.65, 0.8,
 #                    0.950, 1.200, 1.500, 3.000])
@@ -51,8 +64,8 @@ energy_bins2 = np.array([0, 0.2, 0.4, 0.65, 1.1, 1.85, 2.2])
 # bins2 = np.array([0, 0.200, 0.350, 0.5, 0.65, 0.850,
 #                   1.050, 1.300, 1.550, 1.700])
 
-bins = miniboone_bins
-bins2 = miniboone_bins_2
+bins = energy_bins
+bins2 = energy_bins2
 
 # bins = np.array([0, 0.2, 0.4, 0.6, 0.9, 1.25, 1.9, 3])
 
@@ -284,6 +297,8 @@ colors = [ROOT.TColor.GetColor("#000000"), ROOT.TColor.GetColor("#e7623d"),
 
 def pre_cuts(var_dict, numu=False):
     tr_id = int(var_dict["track_id"][0])
+    sh_id = int(var_dict["shower_id"][0])
+
     if numu:
         numu = int(var_dict["numu_score"][0]) == 1
     else:
@@ -301,7 +316,10 @@ def pre_cuts(var_dict, numu=False):
     category = var_dict["category"][0]
     if not var_dict["true_nu_is_fidvol"][0] and category != 0 and category != 6 and category != 1 and category != 7:
         category = 5
-    return numu and hits and shower_track_energy
+    shower_dedx = var_dict["shower_dedx"][sh_id] < 3.5
+    for i_sh in range(int(var_dict["n_showers"][0])):
+        shower_dedx = shower_dedx and var_dict["shower_dedx"][i_sh] < 4.5
+    return numu and hits and shower_track_energy# and shower_dedx
 
 def is_active(point):
     ok_y = y_start < point[1] < y_end
@@ -345,10 +363,10 @@ def bdt_cut(bdt_dict, bdt_values=[bdt_nc_cut, bdt_numu_cut, bdt_cut_cosmic]):
 
 def apply_cuts(bdt_dict, var_dict, bdt=BDT, manual=MANUAL, mode="nue"):
     if bdt:
-        if int(var_dict["category"][0]) == 6:
-            apply_bdt = bdt_cut(bdt_dict, [bdt_nc_cut, bdt_numu_cut, 0.109])
-        else:
-            apply_bdt = bdt_cut(bdt_dict)
+        # if int(var_dict["category"][0]) == 6:
+        #     apply_bdt = bdt_cut(bdt_dict, [bdt_nc_cut, bdt_numu_cut, 0.109])
+        # else:
+        apply_bdt = bdt_cut(bdt_dict)
     else:
         apply_bdt = True
 
@@ -394,23 +412,29 @@ def manual_cuts(var_dict, mode="nue"):
     total_shower_energy = var_dict["total_shower_energy_cali"][0] > 0.1
     total_shower_energy_numu = var_dict["total_shower_energy_cali"][0] > 0.05
     shower_dedx = 1/3.85e-5 < var_dict["shower_dqdx"][sh_id] < 3.2/3.85e-5
+    for i_sh in range(int(var_dict["n_showers"][0])):
+        shower_dedx = shower_dedx and var_dict["shower_dqdx"][i_sh] < 3.5/3.85e-5
     track_shower_angle = -0.95 < var_dict["track_shower_angle"][tr_id]
     track_hits = var_dict["track_hits"][0] > 100
-    track_proton_chi2 = False
+    track_proton_chi2 = True
     track_mu_chi2 = False
     for i_tr in range(int(var_dict["n_tracks"][0])):
-        if 0 < var_dict["track_pidchipr"][i_tr] < 80:
-            track_proton_chi2 = True
+        track_proton_chi2 = track_proton_chi2 and 0 < var_dict["track_pidchipr"][tr_id] < 80
         if var_dict["track_pidchipr"][i_tr] > 40 and var_dict["track_pidchipr"][i_tr] < 220:
             track_mu_chi2 = True
     track_proton_chi2_numu = track_mu_chi2
-
     shower_pi_chi2 = not (0 < var_dict["shower_pidchipi"][sh_id] < 12)
+    pt_ratio = var_dict["pt_ratio"][0] < 0.85
 
+    # total_hits_y = var_dict["total_hits_y"][0] > 85 # remove for thesis
+    # shower_open_angle = 1 < var_dict["shower_open_angle"][sh_id] < 30
+
+    # collabmeeting_cuts = [track_res, ratio, shower_distance, pt_ratio, shower_open_angle,
+    #                       track_length, track_distance, total_hits_y, track_shower_angle,
+    #                       shower_energy, shower_dedx, track_proton_chi2, shower_pi_chi2]
     collabmeeting_cuts = [track_res, ratio, shower_distance, shower_open_angle,
                           track_length, track_distance, total_hits_y, track_shower_angle,
                           shower_energy, shower_dedx, track_proton_chi2, shower_pi_chi2]
-
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
 
     photon_cuts = [ratio, track_length, track_distance, total_hits_y, track_shower_angle,
@@ -427,16 +451,17 @@ def manual_cuts(var_dict, mode="nue"):
         return passed_numu
     elif mode == "nc":
         return passed_photon
+
     return passed_collab
 
 
-def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False, mode="selection"):
+def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False, mode="selection", error_scale=1):
     #it is just, Δχ2 = (number of events signal in Energy bins in a 1D matrix)
     #(2D Matrix - (statistical uncertainty)^2 in a the diagonal of the matrix)^-1
     #(number of events signal in Energy bins in a 1D matrix)^Transpose
 
     sig_array = h_signal * scale_factor
-    bkg_array = h_background * scale_factor
+    bkg_array = (h_background + h_signal) * scale_factor
     if mode == "selection":
         folder = ""
     elif mode == "bdt":
@@ -446,29 +471,40 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
     nbins = len(sig_array)
 
     emtx = np.zeros((nbins, nbins))
-    matrix = ROOT.TMatrixD(len(h_signal)*2, len(h_signal)*2)
     for x in range(nbins):
         emtx[x][x] = bkg_array[x]
-        matrix[x][x] = bkg_array[x]
 
     if systematics:
         fname_flux = "plots%s/sys/h_cov_reco_energy_flux.root" % folder
         fname_genie = "plots%s/sys/h_cov_reco_energy_genie.root" % folder
+        fname_det = "plots/sys/h_reco_energy_det_sys.root"
 
-        if os.path.isfile(fname_flux) and os.path.isfile(fname_genie):
-            f_flux = ROOT.TFile(fname_flux)
-            h_flux = f_flux.Get("h_cov_reco_energy")
-            fill_cov_matrix(emtx, h_flux, scale_factor)
-            fill_cov_matrix(matrix, h_flux, scale_factor)
+        if os.path.isfile(fname_genie):
             f_genie = ROOT.TFile(fname_genie)
             h_genie = f_genie.Get("h_cov_reco_energy")
-            fill_cov_matrix(emtx, h_genie, scale_factor)
-            fill_cov_matrix(matrix, h_genie, scale_factor)
-            f_flux.Close()
+            fill_cov_matrix(emtx, h_genie, scale_factor * error_scale)
             f_genie.Close()
         else:
-            print("GENIE and FLUX covariance matrices not avaiable")
+            print("GENIE covariance matrix %s not available" % fname_genie)
+        # fill_cov_matrix_det(emtx, bkg_array, scale_factor * error_scale)
 
+        if os.path.isfile(fname_flux):
+            f_flux = ROOT.TFile(fname_flux)
+            h_flux = f_flux.Get("h_cov_reco_energy")
+            fill_cov_matrix(emtx, h_flux, scale_factor * error_scale)
+            f_flux.Close()
+        else:
+            print("Flux covariance matrix %s not available" % fname_flux)
+
+        if os.path.isfile(fname_det):
+            f_det = ROOT.TFile(fname_det)
+            h_det = f_det.Get("h_frac_reco_energy")
+            print(emtx)
+            fill_cov_matrix_det(emtx, h_det, bkg_array, scale_factor * error_scale)
+            print(emtx)
+            f_det.Close()
+        else:
+            print("Det. sys. covariance matricx %s not available" % fname_det)
 
     emtxinv = np.linalg.inv(emtx)
     chisq = float(sig_array.dot(emtxinv).dot(sig_array.T))
@@ -481,6 +517,11 @@ def fill_cov_matrix(matrix, histo, scale_factor=1):
     for x_bin in range(1, histo.GetNbinsX()+1):
         for y_bin in range(1, histo.GetNbinsY()+1):
             matrix[x_bin - 1][y_bin - 1] += histo.GetBinContent(x_bin, y_bin)*(scale_factor**2)
+
+def fill_cov_matrix_det(matrix, histo, bkg_array, scale_factor=1):
+    for x_bin in range(1, histo.GetNbinsX()+1):
+        for y_bin in range(1, histo.GetNbinsY()+1):
+            matrix[x_bin - 1][y_bin - 1] += histo.GetBinContent(x_bin, y_bin)*bkg_array[x_bin-1]*bkg_array[y_bin-1]
 
 def save_histo_sbnfit(histo, name, scale_factor=1):
     h_tosave = ROOT.TH1D(name, "", len(bins) - 1, bins)
@@ -597,7 +638,7 @@ track_angle = array("f", [0])
 shower_pdg = array("f", MAX_N_SHOWERS * [-sys.float_info.max])
 track_pdg = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_energy_length = array("f", MAX_N_TRACKS * [-sys.float_info.max])
-
+theta_ratio = array("f", [0])
 track_length = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_theta = array("f", MAX_N_TRACKS * [-sys.float_info.max])
 track_phi = array("f", MAX_N_TRACKS * [-sys.float_info.max])
@@ -648,6 +689,8 @@ b_shower_id = array("f", [0])
 b_track_id = array("f", [0])
 
 pt = array("f", [0])
+p = array("f", [0])
+pt_ratio = array("f", [0])
 n_tracks = array("f", [0])
 n_showers = array("f", [0])
 n_tracks_before = array("f", [0])
@@ -719,6 +762,8 @@ spectators = [
     # ("shower_length", shower_length),
     ("n_objects", n_objects),
     ("pt", pt),
+    ("p", p),
+
     ("track_pca", track_pca),
     ("shower_pca", shower_pca),
     ("track_res_std", track_res_std),
@@ -730,7 +775,6 @@ spectators = [
     ("total_track_energy_length", total_track_energy_length),
     ("numu_score", numu_score),
     ("shower_dedx", shower_dedx),
-
     ("shower_dedx_cali", shower_dedx_cali),
     ("shower_dedx_u", shower_dedx_u),
     ("shower_dedx_v", shower_dedx_v),
@@ -748,6 +792,8 @@ spectators = [
 ]
 
 variables = [
+    ("pt_ratio", pt_ratio),
+    ("theta_ratio", theta_ratio),
     ("shower_pidchimu", shower_pidchimu),
     ("shower_pidchipr", shower_pidchipr),
     ("shower_pidchipi", shower_pidchipi),
@@ -812,8 +858,8 @@ binning = {
     "n_showers_before": [5, 1, 6],
     "track_theta": [18, 0, 180],
     "track_phi": [18, -180, 180],
-    "shower_theta": [18, 0, 180],
-    "shower_phi": [18, -180, 180],
+    "shower_theta": [9, 0, 180],
+    "shower_phi": [9, -180, 180],
     "shower_distance": [20, 0, 15],
     "track_distance": [20, 0, 15],
     "track_shower_angle": [20, -1, 1],
@@ -823,9 +869,9 @@ binning = {
     "track_end_y": [20, y_start, y_end],
     "track_end_z": [20, z_start, z_end],
     "track_end_x": [20, x_start, x_end],
-    "shower_start_y": [20, y_start, y_end],
-    "shower_start_z": [20, z_start, z_end],
-    "shower_start_x": [20, x_start, x_end],
+    "shower_start_y": [10, y_start, y_end],
+    "shower_start_z": [10, z_start, z_end],
+    "shower_start_x": [10, x_start, x_end],
     "shower_end_y": [20, y_start, y_end],
     "shower_end_z": [20, z_start, z_end],
     "shower_end_x": [20, x_start, x_end],
@@ -839,10 +885,14 @@ binning = {
     "total_hits_v": [20, 0, 1000],
     "total_hits_y": [20, 0, 1000],
     "pt": [20, 0, 1],
+    "pt_ratio": [20, 0, 1],
+
+    "p": [20, 0, 1],
+
     "reco_energy": [10, 0, 2],
     "shower_open_angle": [23, 0, 46],
-    "shower_dedx": [20, 0.3, 6],
-    "shower_dedx_cali": [20, 0, 6],
+    "shower_dedx": [10, 0.3, 6],
+    "shower_dedx_cali": [10, 0, 6],
     "shower_dqdx": [18, 0, 155000],
 
     "shower_dedx_u": [20, 0.3, 6],
@@ -856,7 +906,7 @@ binning = {
     "run": [20, 0, 10],
     "subrun": [20, 0, 1000],
     "interaction_type": [100, 1000, 1100],
-    "is_signal": [1, 0, 1],
+    "is_signal": [1, -1.5, 1.5],
     "shower_pca": [20, 0.9, 1],
     "track_pca": [20, 0.99, 1],
     "total_shower_energy": [20, 0, 0.5],
@@ -866,6 +916,13 @@ binning = {
     "total_track_energy": [20, 0, 1],
     "shower_hits": [20, 0, 200],
     "hits_ratio": [20, 0, 1],
+    "theta_ratio": [40, 0, 5],
+    "energy": [20, 0, 3],
+    "vx": [30, x_start, x_end],
+    "vy": [30, y_start, y_end],
+    "vz": [30, z_start, z_end],
+    "theta": [18, 0, 180],
+    "phi": [18, -180, 180],
     "nu_E": [40, 0, 4],
     "E_dep": [30, 0, 3],
     "track_hits": [20, 0, 400],
@@ -875,12 +932,12 @@ binning = {
 
 }
 
-# if MANUAL or BDT:
-#     binning["shower_theta"] = [9, 0, 180]
-#     binning["shower_phi"] = [9, -180, 180]
-#     binning["shower_start_y"] = [10, y_start, y_end]
-#     binning["shower_start_z"] = [10, z_start, z_end]
-#     binning["shower_start_x"] = [10, x_start, x_end]
+if MANUAL or BDT:
+    binning["shower_theta"] = [9, 0, 180]
+    binning["shower_phi"] = [9, -180, 180]
+    binning["shower_start_y"] = [10, y_start, y_end]
+    binning["shower_start_z"] = [10, z_start, z_end]
+    binning["shower_start_x"] = [10, x_start, x_end]
 
 
 labels = {
@@ -919,6 +976,7 @@ labels = {
     "shower_res_mean": ";Shower res. #mu [cm]; N. Entries / %.2f" % bin_size("shower_res_mean"),
     "shower_res_std": ";Shower res. #sigma [cm]; N. Entries / %.2f" % bin_size("shower_res_std"),
     "nu_E": ";#nu_{e} energy [GeV];N. Entries / %.1f" % bin_size("nu_E"),
+    "energy": ";#nu_{e} energy [GeV];N. Entries / %.2f GeV" % bin_size("energy"),
     "E_dep": ";E_{deposited} [GeV];N. Entries / %.1f" % bin_size("nu_E"),
     "n_objects": ";# objects;N.Entries / %i" % bin_size("n_objects"),
     "n_tracks": ";# tracks;N.Entries / %i" % bin_size("n_tracks"),
@@ -950,6 +1008,11 @@ labels = {
     "shower_energy": ";Shower energy [GeV]; N. Entries / %.2f GeV" % bin_size("shower_energy"),
     "shower_energy_y": ";Shower energy (Y plane) [GeV]; N. Entries / %.2f GeV" % bin_size("shower_energy_y"),
     "pt": ";p_{t} [GeV/c];N. Entries / %.2f GeV/c" % bin_size("pt"),
+    "p": ";p [GeV/c];N. Entries / %.2f GeV/c" % bin_size("p"),
+    "pt_ratio": ";p_{t}/p [GeV/c];N. Entries / %.2f GeV/c" % bin_size("pt_ratio"),
+    "vx": ";x [cm];",
+    "vy": ";y [cm];",
+    "vz": ";z [cm];",
     "reco_energy": ";E_{deposited} [GeV]; N. Entries / 0.05 GeV",
     "shower_open_angle": ";Shower open angle [#circ]; N. Entries / %.1f#circ" % bin_size("shower_open_angle"),
     "shower_dedx": ";Shower dE/dx (not calibrated) [MeV/cm]; N. Entries / %.1f MeV/cm" % bin_size("shower_dedx"),
@@ -975,6 +1038,9 @@ labels = {
     "track_energy_length": ";Track E (stopping power) [GeV]; N. Entries / %.2f GeV" % bin_size("track_energy_length"),
     "shower_hits": ";Shower hits; N. Entries / %i" % bin_size("shower_hits"),
     "hits_ratio": ";Shower hits/total hits; N. Entries / %i" % bin_size("hits_ratio"),
+    "theta_ratio": ";#theta_{e}/#theta_{p}; N. Entries / %i" % bin_size("theta_ratio"),
+    "theta": ";Lepton #theta [#circ];N. Entries / %.1f#circ" % bin_size("track_theta"),
+    "phi": ";Lepton #phi [#circ];N. Entries / %.1f#circ" % bin_size("track_theta"),
     "total_hits": ";Total hits; N. Entries / %i" % bin_size("shower_hits"),
     "total_hits_u": ";Total hits (U plane); N. Entries / %i" % bin_size("shower_hits"),
     "total_hits_v": ";Total hits (V plane); N. Entries / %i" % bin_size("shower_hits"),

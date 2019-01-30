@@ -201,8 +201,6 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     track_id, track_score = choose_track(root_chain, particleid)
 
     if STORE_SYS and (option == "bnb" or option == "nue"):
-        print(len(root_chain.flux_weights), len(root_chain.genie_weights))
-
         if (len(root_chain.flux_weights) > 0 and len(root_chain.genie_weights) > 0):
 
             flux_weights = [1]*len(root_chain.flux_weights[0])
@@ -212,6 +210,8 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
             for u in range(N_UNI):
                 variables["genie_weights"][u] = root_chain.genie_weights[0][u]
                 variables["flux_weights"][u] = flux_weights[u]
+        else:
+            raise ValueError("Not valid weights")
 
     variables["E_dep"][0] = 0
 
@@ -294,7 +294,8 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
             variables["category"][0] = 10
 
 
-    variables["pt"][0] = pt_plot(root_chain, 2)
+    variables["p"][0], variables["pt"][0] = pt_plot(root_chain, 2)
+    variables["pt_ratio"][0] = variables["pt"][0]/variables["p"][0]
     variables["event"][0] = root_chain.event
     variables["run"][0] = root_chain.run
     variables["subrun"][0] = root_chain.subrun
@@ -592,6 +593,8 @@ def fill_kin_branches(root_chain, weight, variables, option="", particleid=True)
     else:
         variables["is_signal"][0] = -1
 
+    variables["theta_ratio"][0] = variables["shower_theta"][shower_id]/variables["track_theta"][track_id]
+
 def pt_plot(root_chain, plane):
     p_showers = []
     for ish in range(root_chain.n_showers):
@@ -633,7 +636,7 @@ def pt_plot(root_chain, plane):
             p_shower_sum += ish
 
     pt = (p_track_sum + p_shower_sum).Perp()
-    return pt
+    return (p_track_sum + p_shower_sum).Mag(), pt
 
 
 def fill_tree(chain, weight, tree, option=""):
@@ -734,8 +737,8 @@ if __name__ == "__main__":
 
     samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue_sbnfit2/*.root"),
-                  glob("data_files/mc_bnb/*/*.root"),
+    tree_files = [glob("data_files/mc_nue/*.root"),
+                  glob("data_files/mc_bnb/1/*.root"),
                   glob("data_files/dirt/*.root"),
                   glob("data_files/data_bnb/*/*.root"),
                   glob("data_files/data_ext/*/*.root"),
@@ -810,6 +813,8 @@ if __name__ == "__main__":
     samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
     for i, s in enumerate(samples):
+        if s not in ["dirt"]:
+            continue
         start_time = time.time()
         print("******************************")
         print("Sample", s)
@@ -819,7 +824,9 @@ if __name__ == "__main__":
         print("Time to fill %.1f s"  % (time.time() - start_time))
 
     for f, t in zip(files, trees):
-        tfile = TFile("root_files/" + f, "RECREATE")
+        if f not in ["dirt.root"]:
+            continue
+        tfile = TFile("root_files/sys_" + f, "RECREATE")
         t.Write()
         tfile.Close()
 
