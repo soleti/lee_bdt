@@ -41,6 +41,9 @@ def fill_histos_data(tree_name, mode="nue"):
     f_data = ROOT.TFile("root_files/%s_file.root" % tree_name)
     t_data = f_data.Get("%s_tree" % tree_name)
 
+    f = open("selected_events/%s_passed.txt" % tree_name, "w")
+
+
     ROOT.TMVA.Tools.Instance()
     reader = ROOT.TMVA.Reader(":".join([
         "!V",
@@ -92,6 +95,8 @@ def fill_histos_data(tree_name, mode="nue"):
             # print(bdt_values)
             if apply_cuts(bdt_values, variables_dict, BDT, MANUAL, mode):
                 passed_events += t_data.event_weight
+                print(int(t_data.run), int(t_data.subrun), int(t_data.event),
+                      int(t_data.category), t_data.reco_energy, file=f)
 
                 all_vars = variables + spectators
                 clone.Fill()
@@ -172,13 +177,18 @@ def fill_histos(chain, histo_dict, h_bdt_types, option="", mode="nue"):
 
             print(int(chain.run), int(chain.subrun), int(chain.event), int(category), chain.reco_energy, file=f)
 
-            passed_events += chain.event_weight
+            if option == "nue":
+                if category == 2:
+                    passed_events += chain.event_weight
+            else:
+                passed_events += chain.event_weight
 
             all_vars = variables + spectators
             var_dict = dict(all_vars)
             for name, var in all_vars:
                 for i_v, v in enumerate(var):
-
+                    if name == "interaction_type" and v == 10:
+                        v = 4
                     if v == -999:
                         break
 
@@ -300,12 +310,11 @@ if __name__ == "__main__":
         h_bdt_stack.Add(h_bdts[2])
         h_bdt_stacks[bdt_type] = h_bdt_stack
         h_bdt_types[bdt_type] = h_bdts
-
     print("LEE events", fill_histos_data("lee", mode))
-    print("Data events", fill_histos_data("bnb", mode))
-    print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue", mode))
-    print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc", mode))
     print("EXT events", fill_histos(bnbext_chain, histo_dict, h_bdt_types, "bnbext", mode))
+    print("nu_e events", fill_histos(nue_chain, histo_dict, h_bdt_types, "nue", mode))
+    print("Data events", fill_histos_data("bnb", mode))
+    print("BNB + cosmic events", fill_histos(mc_chain, histo_dict, h_bdt_types, "mc", mode))
 
     f_bdt = ROOT.TFile("plots/h_bdt.root", "RECREATE")
     for bdt_type in bdt_types:

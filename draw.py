@@ -3,13 +3,14 @@
 import math
 import pickle
 import numpy as np
+from array import array
 import ROOT
 import os.path
 import sys
 
 from bdt_common import variables, spectators, bins, bins2, total_data_bnb_pot, labels
 from bdt_common import description, total_pot, fix_binning, sigma_calc_matrix, BDT, MANUAL
-from bdt_common import save_histo_sbnfit, binning, inv_pdgs, pdg_colors
+from bdt_common import save_histo_sbnfit, binning, inv_pdgs, pdg_colors, sigma_calc_likelihood, inv_interactions
 
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
@@ -114,12 +115,13 @@ def plot_pdg(variable, mode):
                 h_flux = f_flux.Get("h_%s_cv" % var_name)
                 f_genie = ROOT.TFile(fname_genie)
                 h_genie = f_genie.Get("h_%s_cv" % var_name)
-                if mode == "selection" and os.path.isfile(fname_detsys):
-                    f_detsys = ROOT.TFile(fname_detsys)
-                    h_detsys = f_detsys.Get("h_%s_cv" % var_name)
-                    OBJECTS.append(h_detsys)
-                else:
-                    print("Det sys files not available")
+                if mode == "selection":
+                    if os.path.isfile(fname_detsys):
+                        f_detsys = ROOT.TFile(fname_detsys)
+                        h_detsys = f_detsys.Get("h_%s_cv" % var_name)
+                        OBJECTS.append(h_detsys)
+                    else:
+                        print("Det sys files not available")
 
                 OBJECTS.append(h_flux)
                 OBJECTS.append(h_genie)
@@ -132,10 +134,8 @@ def plot_pdg(variable, mode):
                         detsys_err = h_detsys.GetBinError(k)
                     else:
                         detsys_err = h_mc_err_sys.GetBinContent(k) * 0.2
-                    # print(flux_err, genie_err, detsys_err, stat_err)
-                    # print(math.sqrt(flux_err**2 + genie_err**2 + detsys_err**2 + stat_err**2))
                     h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + detsys_err**2 + stat_err**2))
-                    # h_mc_err_sys.SetBinError(k, math.sqrt(detsys_err**2))
+                    # h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2))
                 f_genie.Close()
                 f_flux.Close()
             else:
@@ -257,8 +257,14 @@ def draw_ratio(num, den, den_sys=None, OBJECTS=[]):
 
     h_ratio.GetYaxis().SetRangeUser(0.5, 1.5)
     h_ratio.Divide(den)
+
     if den_sys:
+        print(den_sys.GetBinContent(1))
+        print(den_sys.GetBinError(1))
+        print(h_ratio_sys.GetBinContent(1))
+        print(h_ratio_sys.GetBinError(1))
         h_ratio_sys.Divide(den_sys)
+        print(h_ratio_sys.GetBinError(1))
 
     h_ratio.GetXaxis().SetLabelFont(42)
     h_ratio.GetXaxis().SetLabelSize(0.1)
@@ -509,7 +515,7 @@ def plot_variable(name, mode="selection"):
     legend.SetTextFont(43)
     legend.SetNColumns(2)
 
-    if DRAW_DATA:
+    if DRAW_DATA and name != "interaction_type":
         legend.AddEntry(histograms["bnb"],
                         "Data beam-on: {:.0f} entries"
                         .format(histograms["bnb"].Integral() * POST_SCALING), "lep")
@@ -578,29 +584,41 @@ def plot_variable(name, mode="selection"):
                 sigma_calc_matrix(sig, bkg, 1, False))
             print("Significance @ 1.3e21 POT stat: ",
                 sigma_calc_matrix(sig, bkg, 1.32e21/total_data_bnb_pot, False))
+            print(sigma_calc_likelihood(sig, bkg, 1.32e21/total_data_bnb_pot))
             h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
-            # for eff in range(10, 50):
-            #     for red in range(10, 50):
-            #         bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
-            #         sig_new = sig*eff/10
-            #         error_scale = (sum(sig_new)+sum(bkg_new))/(sum(sig)+sum(bkg))
-            #         h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, DRAW_SYS, mode, error_scale))
+            for eff in range(10, 50):
+                for red in range(10, 50):
+                    bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
+                    sig_new = sig*eff/10
+                    error_scale = (sum(sig_new)+sum(bkg_new))/(sum(sig)+sum(bkg))
+                    h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, DRAW_SYS, mode, error_scale))
+                    # h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, False))
+
             OBJECTS.append(h_eff_red)
 
             c_eff_red = ROOT.TCanvas("c_eff_red")
-            if mode == "bdt":
-                ROOT.gStyle.SetPalette(ROOT.kBird)
-            else:
-                ROOT.gStyle.SetPalette(ROOT.kLightTemperature)
+            ROOT.gStyle.SetPalette(ROOT.kBird)
 
+            contour = array("d")
+            contour.append(5)
             h_eff_red.Draw("colz")
+
+            h_eff_red.SetLineColor(ROOT.kRed)
             h_eff_red.GetYaxis().SetTitleOffset(0.92)
-            h_eff_red.GetZaxis().SetRangeUser(1, 6.5)
             h_eff_red.GetZaxis().SetTitle("Significance [#sigma]")
             h_eff_red.GetZaxis().SetTitleOffset(0.7)
             c_eff_red.SetRightMargin(0.15)
+            h_eff_red_clone = h_eff_red.Clone()
+            h_eff_red_clone.SetContour(1, contour)
+            h_eff_red_clone.Draw("cont3 same")
+            h_eff_red.GetZaxis().SetRangeUser(0.8, 6.5)
+            h_eff_red.SetMaximum(6.5)
+            h_eff_red.SetMinimum(0.8)
+
             c_eff_red.Update()
             c_eff_red.SaveAs("plots/h_2d_%s.pdf" % mode)
+            c_eff_red.SaveAs("plots/h_2d_%s.C" % mode)
+
             OBJECTS.append(c_eff_red)
             if DRAW_SYS:
                 print("Significance @ 1.3e21 POT sys: ", sigma_calc_matrix(
@@ -620,9 +638,12 @@ def plot_variable(name, mode="selection"):
         histograms["mc"].RecursiveRemove(histograms["mc"].GetHists()[0])
     histograms["mc"].Draw("hist")
     histograms["mc"].GetHistogram().GetXaxis().SetTitleOffset(0.8)
+    if name == "interaction_type":
+        for i in range(1, histograms["mc"].GetHistogram().GetNbinsX()+1):
+            histograms["mc"].GetHistogram().GetXaxis().SetBinLabel(i, inv_interactions[i-1])
 
     if DRAW_DATA:
-        set_axis(histograms["mc"], max(histograms["mc"].GetHistogram().GetMaximum(), histograms["bnb"].GetMaximum()) * 1.35)
+        set_axis(histograms["mc"], max(histograms["mc"].GetHistogram().GetMaximum(), histograms["bnb"].GetMaximum()) * 1.6)
     else:
         set_axis(histograms["mc"])
 
@@ -701,8 +722,8 @@ def plot_variable(name, mode="selection"):
                 flux_err_nobinning = h_flux_nobinning.GetBinError(k)
                 genie_err_nobinning = h_genie_nobinning.GetBinError(k)
 
-                h_mc_err_sys.SetBinError(k, math.sqrt(flux_err**2 + genie_err**2 + stat_err**2 + detsys_err**2))
-                h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(stat_err_nobinning**2+flux_err_nobinning**2+genie_err_nobinning**2+detsys_err_nobinning**2))
+                h_mc_err_sys.SetBinError(k, math.sqrt((flux_err*1.3)**2 + genie_err**2 + stat_err**2 + detsys_err**2))
+                h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(stat_err_nobinning**2+(flux_err_nobinning*1.3)**2+genie_err_nobinning**2+detsys_err_nobinning**2))
                 # h_mc_err_sys.SetBinError(k, math.sqrt(genie_err**2+flux_err**2))
                 # h_mc_err_sys_nobinning.SetBinError(k, math.sqrt(genie_err_nobinning**2+flux_err_nobinning**2))
 
@@ -745,7 +766,7 @@ def plot_variable(name, mode="selection"):
     if name == "reco_energy":
         reco_chi2 = p_chi2
         h_reco_sys = h_mc_err_sys
-    if DRAW_DATA:
+    if DRAW_DATA and name != "interaction_type":
         histograms["bnb"].Draw("e1p same")
 
     OBJECTS.append(h_mc_err)
@@ -753,7 +774,7 @@ def plot_variable(name, mode="selection"):
     c.cd()
 
     if DRAW_DATA and h_mc_err_sys.Integral() > 0:
-        if name == "RECO_ENERGY":
+        if name == "reco_energy":
             print("Data/(MC+EXT) ratio: ", ratio)
         if mode not in ("bdt", "cuts", "numu", "nc"):
             draw_ratio(histograms["bnb"], h_mc_err, h_mc_err_sys, OBJECTS)
@@ -763,7 +784,7 @@ def plot_variable(name, mode="selection"):
     c.cd()
     if name == "reco_energy":
         c = plot_energy(histograms, h_mc_err, h_mc_err_sys, mode)
-    if DRAW_DATA:
+    if DRAW_DATA and name != "interaction_type":
         p_chi2.Draw("same")
         p_chi2.SetFillStyle(0)
         p_chi2.SetBorderSize(0)

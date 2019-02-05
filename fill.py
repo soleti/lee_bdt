@@ -737,8 +737,8 @@ if __name__ == "__main__":
 
     samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
-    tree_files = [glob("data_files/mc_nue/*.root"),
-                  glob("data_files/mc_bnb/1/*.root"),
+    tree_files = [glob("data_files/mc_nue_sbnfit2/*.root"),
+                  glob("data_files/mc_bnb_sbnfit/*.root"),
                   glob("data_files/dirt/*.root"),
                   glob("data_files/data_bnb/*/*.root"),
                   glob("data_files/data_ext/*/*.root"),
@@ -813,7 +813,7 @@ if __name__ == "__main__":
     samples = ["nue", "bnb", "dirt", "bnb_data", "ext_data", "lee"]
 
     for i, s in enumerate(samples):
-        if s not in ["dirt"]:
+        if s not in ["lee"]:
             continue
         start_time = time.time()
         print("******************************")
@@ -824,7 +824,7 @@ if __name__ == "__main__":
         print("Time to fill %.1f s"  % (time.time() - start_time))
 
     for f, t in zip(files, trees):
-        if f not in ["dirt.root"]:
+        if f not in ["lee_file.root"]:
             continue
         tfile = TFile("root_files/sys_" + f, "RECREATE")
         t.Write()

@@ -107,6 +107,7 @@ class Efficiency:
         c_eff_sys = ROOT.TCanvas("c_eff_sys_%s" % self.tot.GetName(),
                                  self.tot.GetName(),
                                  900, 44, 700, 645)
+        c_eff_sys.SetRightMargin(0.2)
         eff_stat = self.tefficiency(mode)
         eff_sys = self.tefficiency_err(mode)
         eff_stat.SetLineWidth(2)
@@ -767,7 +768,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
             h_tot[v].Fill(eff_vars[v], weight)
 
             for u in range(N_UNI):
-                h_tot_sys[v][u].Fill(eff_vars[v], weight * genie_weights[u])
+                h_tot_sys[v][u].Fill(eff_vars[v], weight * flux_weights[u])
 
             if not chain_filter.passed:
                 if chain_filter.selection_result == 2:
@@ -840,7 +841,7 @@ def efficiency(files_path, eff_variables=[], systematics=False, scale=1, is_1e1p
                 h_selected[v]["passed"].Fill(eff_vars[v], weight)
 
             for u in range(N_UNI):
-                h_passed_sys[v][u].Fill(eff_vars[v], weight * genie_weights[u])
+                h_passed_sys[v][u].Fill(eff_vars[v], weight * flux_weights[u])
 
             # bdt_values = {}
             # for bdt_name in bdt_types:

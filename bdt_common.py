@@ -312,14 +312,17 @@ def pre_cuts(var_dict, numu=False):
                           var_dict["total_track_energy_length"][0] > 0 and \
                           var_dict["shower_energy"][0] > 0.01
     track_pid = var_dict["track_pidchipr"][tr_id] < 80
-    ene = 0.4 < var_dict["reco_energy"][0] < 0.6
+    ene = True #
     category = var_dict["category"][0]
+
+    if category == 6 and 0.6 < var_dict["reco_energy"][0] < 1.25:
+        ene = ene and var_dict["n_showers"][0] < 3
     if not var_dict["true_nu_is_fidvol"][0] and category != 0 and category != 6 and category != 1 and category != 7:
         category = 5
     shower_dedx = var_dict["shower_dedx"][sh_id] < 3.5
     for i_sh in range(int(var_dict["n_showers"][0])):
         shower_dedx = shower_dedx and var_dict["shower_dedx"][i_sh] < 4.5
-    return numu and hits and shower_track_energy# and shower_dedx
+    return numu and hits and shower_track_energy and var_dict["reco_energy"][0] < 3# and shower_dedx and ene
 
 def is_active(point):
     ok_y = y_start < point[1] < y_end
@@ -432,9 +435,16 @@ def manual_cuts(var_dict, mode="nue"):
     # collabmeeting_cuts = [track_res, ratio, shower_distance, pt_ratio, shower_open_angle,
     #                       track_length, track_distance, total_hits_y, track_shower_angle,
     #                       shower_energy, shower_dedx, track_proton_chi2, shower_pi_chi2]
+
+
+    # total hits, shower energy, ratio, dedx, track distance, shower distance, proton chi2, track shower angle, track length
+
     collabmeeting_cuts = [track_res, ratio, shower_distance, shower_open_angle,
                           track_length, track_distance, total_hits_y, track_shower_angle,
                           shower_energy, shower_dedx, track_proton_chi2, shower_pi_chi2]
+
+    # collabmeeting_cuts = [total_hits_y, track_res, shower_energy, ratio, shower_dedx, shower_open_angle,
+    #                       track_distance, shower_distance, track_proton_chi2, shower_pi_chi2, track_shower_angle, track_length]
     passed_collab = len(collabmeeting_cuts) == sum(collabmeeting_cuts)
 
     photon_cuts = [ratio, track_length, track_distance, total_hits_y, track_shower_angle,
@@ -461,7 +471,7 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
     #(number of events signal in Energy bins in a 1D matrix)^Transpose
 
     sig_array = h_signal * scale_factor
-    bkg_array = (h_background + h_signal) * scale_factor
+    bkg_array = (h_background) * scale_factor
     if mode == "selection":
         folder = ""
     elif mode == "bdt":
@@ -486,7 +496,6 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
             f_genie.Close()
         else:
             print("GENIE covariance matrix %s not available" % fname_genie)
-        # fill_cov_matrix_det(emtx, bkg_array, scale_factor * error_scale)
 
         if os.path.isfile(fname_flux):
             f_flux = ROOT.TFile(fname_flux)
@@ -499,9 +508,7 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
         if os.path.isfile(fname_det):
             f_det = ROOT.TFile(fname_det)
             h_det = f_det.Get("h_frac_reco_energy")
-            print(emtx)
             fill_cov_matrix_det(emtx, h_det, bkg_array, scale_factor * error_scale)
-            print(emtx)
             f_det.Close()
         else:
             print("Det. sys. covariance matricx %s not available" % fname_det)
@@ -512,6 +519,28 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
     #print "Sqrt of that (==sigma?) is ",np.sqrt(chisq)
     return np.sqrt(chisq)
 
+def sigma_calc_likelihood_sys(sig, bkg, delta_b):
+    s = sig
+    b = bkg
+    db = delta_b
+
+    ln_1 = math.log((s+b)*(b+db**2)/(b**2+(s+b)*db**2))
+    ln_2 = math.log(1+db**2*s/(b*b+b*db**2))
+
+    sigma = math.sqrt(2*((s+b)*ln_1-b**2/db**2*ln_2))
+
+    return sigma
+
+def sigma_calc_likelihood(h_signal, h_background, scale_factor=1):
+    sig_array = h_signal * scale_factor
+    bkg_array = (h_background) * scale_factor
+
+    sum_sigma = 0
+    for sig, bkg, in zip(sig_array, bkg_array):
+        n0 = sig+bkg
+        sigma2 = 2 * n0 * math.log(1+sig/bkg) - 2*sig
+        sum_sigma += sigma2
+    return math.sqrt(sum_sigma)
 
 def fill_cov_matrix(matrix, histo, scale_factor=1):
     for x_bin in range(1, histo.GetNbinsX()+1):
@@ -521,7 +550,7 @@ def fill_cov_matrix(matrix, histo, scale_factor=1):
 def fill_cov_matrix_det(matrix, histo, bkg_array, scale_factor=1):
     for x_bin in range(1, histo.GetNbinsX()+1):
         for y_bin in range(1, histo.GetNbinsY()+1):
-            matrix[x_bin - 1][y_bin - 1] += histo.GetBinContent(x_bin, y_bin)*bkg_array[x_bin-1]*bkg_array[y_bin-1]
+            matrix[x_bin - 1][y_bin - 1] += histo.GetBinContent(x_bin, y_bin)*bkg_array[x_bin-1]*bkg_array[y_bin-1]/2
 
 def save_histo_sbnfit(histo, name, scale_factor=1):
     h_tosave = ROOT.TH1D(name, "", len(bins) - 1, bins)
@@ -557,17 +586,17 @@ description = ["Data beam-off",
 
 interactions = {
     "kUnknownInteraction": -1,
-    "kQE": 0,
-    "kRes": 1,
-    "kDIS": 2,
-    "kCoh": 3,
-    "kCohElastic": 4,
+    "QE": 0,
+    "Resonant": 1,
+    "DIS": 2,
+    "Coherent": 3,
+    "MEC": 4,
     "kElectronScattering": 5,
     "kIMDAnnihilation": 6,
     "kInverseBetaDecay": 7,
     "kGlashowResonance": 8,
     "kAMNuGamma": 9,
-    "kMEC": 10,
+    "kCohElastic": 10,
     "kDiffractive": 11,
     "kEM": 12,
     "kWeakMix": 13,
@@ -905,7 +934,7 @@ binning = {
     "event": [20, 0, 10000],
     "run": [20, 0, 10],
     "subrun": [20, 0, 1000],
-    "interaction_type": [100, 1000, 1100],
+    "interaction_type": [5, 0, 5],
     "is_signal": [1, -1.5, 1.5],
     "shower_pca": [20, 0.9, 1],
     "track_pca": [20, 0.99, 1],
@@ -1028,7 +1057,7 @@ labels = {
     "event": ";event",
     "run": ";run",
     "subrun": ";subrun",
-    "interaction_type": ";interaction_type",
+    "interaction_type": ";;N. Entries",
     "is_signal": ";Selected events; N. Entries",
     "shower_pca": ";Shower PCA;N. Entries / %.3f" % bin_size("shower_pca"),
     "track_pca": ";Track PCA;N. Entries / %.3f" % bin_size("track_pca"),

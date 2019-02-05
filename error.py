@@ -43,7 +43,7 @@ else:
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetNumberContours(99)
 SYS_MODE = sys.argv[2]
-print(SYS_MODE, MANUAL, BDT)
+print(SYS_MODE)
 if SYS_MODE == "flux":
     ROOT.gStyle.SetPalette(ROOT.kMint)
 else:
@@ -117,7 +117,7 @@ for ievt in tqdm(range(total_entries)):
                         if SYS_MODE == "genie":
                             weight = chain.genie_weights[u]
                         elif SYS_MODE == "flux":
-                            weight = chain.flux_weights[u]
+                            weight = chain.flux_weights[u] * 1.08 - 0.02
                         if weight not in (0, 1):
                             # h_weights.Fill(weight)
                             # if chain.category == 4:
@@ -150,7 +150,6 @@ for n, b in vars.items():
                             100, 0, h_cv[n].GetMaximum() * 1.5)
 
     if n == "reco_energy":
-        print(bins)
         h_covariance[n] = ROOT.TH2F("h_cov_%s" % n,
                                     labels[n],
                                     len(bins) - 1,
@@ -272,7 +271,7 @@ for v in SYS_VARIABLES:
 
     for i_bin in range(1, h_cv[v].GetNbinsX() + 1):
         h_cv[v].SetBinError(i_bin, math.sqrt(sys_err[v][i_bin] / N_UNI))
-        # print("error %.1f %%" % round(h_cv[v].GetBinError(i_bin) / h_2d[v].ProjectionY().GetMean() * 100, 1))
+        print("error %.1f %%" % round(h_cv[v].GetBinError(i_bin) / h_2d[v].ProjectionY().GetMean() * 100, 1))
         # print(round(h_cv[v].GetBinContent(i_bin), 1), round(h_2d[v].ProjectionY().GetMean(), 1))
 
     if v == "reco_energy":
@@ -359,7 +358,13 @@ for v in SYS_VARIABLES:
     h_covariance[v].Draw("colz")
     h_covariance[v].GetYaxis().SetTitleOffset(0.9)
     c_cov.SetRightMargin(0.18)
-    pt.Draw()
+    if v == "reco_energy":
+        p_white.Draw()
+        p_white_vertical.Draw()
+        p_15.Draw()
+        p_15_vertical.Draw()
+        p_3_vertical.Draw()
+        p_3.Draw()
     c_cov.SaveAs("plots%s/sys/h_%s_%s_cov.pdf" % (folder, v, SYS_MODE))
     c_cov.Update()
 
@@ -372,32 +377,6 @@ for v in SYS_VARIABLES:
     h_frac[v].GetYaxis().SetTitleOffset(0.9)
     pt.Draw()
     if v == "reco_energy":
-        p_15 = ROOT.TPaveText(0.60, 0.05806452,
-                              0.66, 0.1032258, "NDC")
-        p_white = ROOT.TPaveText(0.651404, 0.05322581,
-                                 0.8323782, 0.0983871, "NDC")
-        p_3 = ROOT.TPaveText(0.7836676, 0.05806452,
-                             0.8323782, 0.1032258, "NDC")
-        p_15.AddText("1.9")
-        p_15.SetFillStyle(0)
-        p_15.SetShadowColor(0)
-        p_15.SetBorderSize(0)
-        p_15.SetTextFont(42)
-
-        p_white.AddText("  ")
-        p_white.SetFillColor(ROOT.kWhite)
-        p_white.SetShadowColor(0)
-        p_white.SetBorderSize(0)
-        p_white.SetTextFont(42)
-        p_white.SetTextSize(14)
-
-        p_3.AddText("3")
-        # p_3.SetFillColor(ROOT.kWhite)
-        p_3.SetFillStyle(0)
-        p_3.SetShadowColor(0)
-        p_3.SetBorderSize(0)
-        p_3.SetTextFont(42)
-
         p_white.Draw()
         p_white_vertical.Draw()
         p_15.Draw()
