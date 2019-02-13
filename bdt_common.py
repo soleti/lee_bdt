@@ -2,13 +2,13 @@ from array import array
 import numpy as np
 import math
 import ROOT
-from scipy.stats import poisson
+from scipy.stats import poisson, chi2, norm
 import sys
 import collections
 import os
 from tqdm import tqdm
 
-np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+np.set_printoptions(formatter={'float': '{: 0.2f}'.format})
 
 ELECTRON_MASS = 0.51e-3
 PROTON_MASS = 0.938
@@ -322,7 +322,7 @@ def pre_cuts(var_dict, numu=False):
     shower_dedx = var_dict["shower_dedx"][sh_id] < 3.5
     for i_sh in range(int(var_dict["n_showers"][0])):
         shower_dedx = shower_dedx and var_dict["shower_dedx"][i_sh] < 4.5
-    return numu and hits and shower_track_energy and var_dict["reco_energy"][0] < 3# and shower_dedx and ene
+    return numu and hits and shower_track_energy# and var_dict["reco_energy"][0] < 3# and shower_dedx and ene
 
 def is_active(point):
     ok_y = y_start < point[1] < y_end
@@ -513,11 +513,39 @@ def sigma_calc_matrix(h_signal, h_background, scale_factor=1, systematics=False,
         else:
             print("Det. sys. covariance matricx %s not available" % fname_det)
 
+    get_frac(emtx, bkg_array)
     emtxinv = np.linalg.inv(emtx)
     chisq = float(sig_array.dot(emtxinv).dot(sig_array.T))
-
+    # print(chisq)
     #print "Sqrt of that (==sigma?) is ",np.sqrt(chisq)
     return np.sqrt(chisq)
+
+
+def get_frac(matrix, events):
+    h_frac_tot = ROOT.TH2F("h_frac_tot",
+                           labels["reco_energy"],
+                           len(bins) - 1,
+                           bins,
+                           len(bins) - 1,
+                           bins)
+    h_corr_tot = ROOT.TH2F("h_corr_tot",
+                           labels["reco_energy"],
+                           len(bins) - 1,
+                           bins,
+                           len(bins) - 1,
+                           bins)
+    h_frac_tot.GetYaxis().SetTitle(h_frac_tot.GetXaxis().GetTitle())
+    h_corr_tot.GetYaxis().SetTitle(h_frac_tot.GetXaxis().GetTitle())
+
+    for x_bin in range(len(events)):
+        for y_bin in range(len(events)):
+            h_corr_tot.SetBinContent(x_bin+1, y_bin+1, matrix[x_bin][y_bin] / math.sqrt(matrix[x_bin][x_bin]*matrix[y_bin][y_bin]))
+            h_frac_tot.SetBinContent(x_bin+1, y_bin+1, matrix[x_bin][y_bin] / (events[x_bin]*events[y_bin]))
+
+    f_frac_tot = ROOT.TFile("plots/f_frac_tot.root", "RECREATE")
+    h_frac_tot.Write()
+    h_corr_tot.Write()
+    f_frac_tot.Close()
 
 def sigma_calc_likelihood_sys(sig, bkg, delta_b):
     s = sig

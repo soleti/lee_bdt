@@ -259,12 +259,12 @@ def draw_ratio(num, den, den_sys=None, OBJECTS=[]):
     h_ratio.Divide(den)
 
     if den_sys:
-        print(den_sys.GetBinContent(1))
-        print(den_sys.GetBinError(1))
-        print(h_ratio_sys.GetBinContent(1))
-        print(h_ratio_sys.GetBinError(1))
+        # print(den_sys.GetBinContent(1))
+        # print(den_sys.GetBinError(1))
+        # print(h_ratio_sys.GetBinContent(1))
+        # print(h_ratio_sys.GetBinError(1))
         h_ratio_sys.Divide(den_sys)
-        print(h_ratio_sys.GetBinError(1))
+        # print(h_ratio_sys.GetBinError(1))
 
     h_ratio.GetXaxis().SetLabelFont(42)
     h_ratio.GetXaxis().SetLabelSize(0.1)
@@ -566,7 +566,7 @@ def plot_variable(name, mode="selection"):
         print("#nu_{e} CC0#pi-Np purity: %.1f%%" % (h_sig.Integral()/h_mc_err_nobinning.Integral()*100))
 
     if DRAW_LEE:
-        if name == "reco_energy" and mode not in ("numu", "selection", "nc"):
+        if name == "reco_energy" and mode not in ("numu", "nc"):
             sig = []
             bkg = []
             nu_e = []
@@ -579,6 +579,7 @@ def plot_variable(name, mode="selection"):
             bkg = np.array(bkg)
             print("Bkg events:", bkg)
             print("Sig events:", sig)
+            print("Nu_e events:", np.array(nu_e))
             nu_e = np.array(nu_e)
             print("Significance @ 4.4e19 POT stat: ",
                 sigma_calc_matrix(sig, bkg, 1, False))
@@ -586,13 +587,14 @@ def plot_variable(name, mode="selection"):
                 sigma_calc_matrix(sig, bkg, 1.32e21/total_data_bnb_pot, False))
             print(sigma_calc_likelihood(sig, bkg, 1.32e21/total_data_bnb_pot))
             h_eff_red = ROOT.TH2F("h_eff_red", ";Efficiency increase;Background rejection increase", 40, 1, 5, 40, 1, 5)
-            for eff in range(10, 50):
-                for red in range(10, 50):
-                    bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
-                    sig_new = sig*eff/10
-                    error_scale = (sum(sig_new)+sum(bkg_new))/(sum(sig)+sum(bkg))
-                    h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, DRAW_SYS, mode, error_scale))
-                    # h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, False))
+            if mode != "selection":
+                for eff in range(10, 50):
+                    for red in range(10, 50):
+                        bkg_new = (bkg-nu_e)/(red/10) + nu_e*eff/10
+                        sig_new = sig*eff/10
+                        error_scale = (sum(sig_new)+sum(bkg_new))/(sum(sig)+sum(bkg))
+                        h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, DRAW_SYS, mode, error_scale))
+                        # h_eff_red.Fill(eff/10+0.001, red/10+0.001, sigma_calc_matrix(sig_new, bkg_new, 30.4, False))
 
             OBJECTS.append(h_eff_red)
 
