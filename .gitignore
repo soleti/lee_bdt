@@ -9,12 +9,14 @@ a_e_true_reco.bin
 dataset
 __pycache__
 *.json
-eff_comparison.py
-track_study.py
 bin_purity.py
 dqdx_plot.py
 eff_selected.py
 filter_tree.py
 ineff.py
 reclassification.py
-cutflow.py
+numi.C
+plots*
+root_files/
+data_files
+run_det_script.sh
