@@ -20,3 +20,4 @@ plots*
 root_files/
 data_files
 run_det_script.sh
+.ipynb_checkpoints/
